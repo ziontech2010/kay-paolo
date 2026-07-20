@@ -16,4 +16,16 @@ class ExampleTest extends TestCase
 
         $response->assertStatus(200);
     }
+
+    public function test_public_kay_paolo_pages_render(): void
+    {
+        foreach (['/login', '/quote', '/tracking', '/about', '/services', '/contact'] as $path) {
+            $this->get($path)->assertStatus(200);
+        }
+    }
+
+    public function test_dashboard_redirects_when_zion_session_is_missing(): void
+    {
+        $this->get('/dashboard')->assertRedirect('/login');
+    }
 }
