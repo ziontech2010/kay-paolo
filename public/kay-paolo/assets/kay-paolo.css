@@ -1,0 +1,196 @@
+.footer-button {
+    background: none;
+    border: 0;
+    color: rgba(246, 242, 233, 0.72);
+    cursor: pointer;
+    font: inherit;
+    padding: 0;
+}
+
+.footer-button:hover {
+    color: var(--gold-300);
+}
+
+.muted-text {
+    color: var(--ink-600);
+    font-size: 15px;
+    line-height: 1.65;
+    margin: 10px 0 18px;
+}
+
+.api-alert,
+.api-inline-result {
+    border-radius: 8px;
+    font-size: 13px;
+    line-height: 1.5;
+    margin: 14px 0;
+    padding: 12px 14px;
+}
+
+.api-alert.error {
+    background: #fff0f0;
+    border: 1px solid #f2bbbb;
+    color: #842121;
+}
+
+.api-alert.success,
+.api-inline-result.success {
+    background: #eef9f5;
+    border: 1px solid #bfe3d5;
+    color: var(--teal-600);
+}
+
+.api-inline-result:empty {
+    display: none;
+}
+
+.field-with-button {
+    display: flex;
+    flex-direction: column;
+}
+
+.field-with-button .btn {
+    height: 44px;
+    padding: 12px 18px;
+}
+
+.api-results-wrap {
+    margin-top: 30px;
+}
+
+.api-loader {
+    background: #fff;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    box-shadow: var(--shadow);
+    margin: 22px auto;
+    max-width: 720px;
+    overflow: hidden;
+}
+
+.api-loader img {
+    display: block;
+    width: 100%;
+}
+
+.api-result-grid {
+    display: grid;
+    gap: 18px;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+}
+
+.api-card {
+    background: #fff;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    box-shadow: var(--shadow);
+    padding: 22px;
+}
+
+.api-card h3 {
+    font-size: 20px;
+    margin-bottom: 8px;
+}
+
+.api-card .price {
+    color: var(--navy-900);
+    font-family: "Fraunces", serif;
+    font-size: 34px;
+    margin: 12px 0;
+}
+
+.api-card dl,
+.session-list {
+    display: grid;
+    gap: 10px;
+    margin: 18px 0 0;
+}
+
+.api-card dl div,
+.session-list div {
+    border-top: 1px solid var(--line);
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+    padding-top: 10px;
+}
+
+.api-card dt,
+.session-list dt {
+    color: var(--ink-400);
+    font-size: 12px;
+    text-transform: uppercase;
+}
+
+.api-card dd,
+.session-list dd {
+    color: var(--ink-900);
+    font-size: 13px;
+    font-weight: 700;
+    margin: 0;
+    text-align: right;
+}
+
+.api-raw {
+    background: var(--navy-950);
+    border-radius: 8px;
+    color: var(--sand-50);
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 12px;
+    line-height: 1.55;
+    margin-top: 16px;
+    max-height: 360px;
+    overflow: auto;
+    padding: 16px;
+    white-space: pre-wrap;
+}
+
+.dashboard-grid {
+    display: grid;
+    gap: 28px;
+    grid-template-columns: 0.9fr 1.1fr;
+}
+
+.dashboard-actions {
+    display: grid;
+    gap: 18px;
+}
+
+.action-card {
+    color: inherit;
+}
+
+.compact-form {
+    padding: 18px;
+}
+
+.tracking-form {
+    max-width: 620px;
+}
+
+.readable {
+    max-width: 780px;
+}
+
+.readable p {
+    color: var(--ink-600);
+    font-size: 16px;
+    line-height: 1.75;
+    margin-top: 18px;
+}
+
+.quote-side li span {
+    color: var(--gold-300);
+    font-weight: 700;
+}
+
+#shippingResult,
+#trackingResult {
+    margin-top: 22px;
+}
+
+@media (max-width: 860px) {
+    .dashboard-grid {
+        grid-template-columns: 1fr;
+    }
+}
