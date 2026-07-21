@@ -13,6 +13,7 @@ Route::get('/blog', [PageController::class, 'blog'])->name('blog');
 Route::get('/blog/post', [PageController::class, 'blogPost'])->name('blog.post');
 
 Route::get('/login', [ZionSessionController::class, 'showLogin'])->name('login');
+Route::post('/login', [ZionSessionController::class, 'login'])->name('login.submit');
 Route::post('/logout', [ZionSessionController::class, 'logout'])->name('logout');
 Route::get('/dashboard', [ZionSessionController::class, 'dashboard'])->name('dashboard');
 

@@ -29,13 +29,14 @@ class ExampleTest extends TestCase
         $this->get('/dashboard')->assertStatus(200);
     }
 
-    public function test_login_form_posts_to_kay_paolo_api_route(): void
+    public function test_login_form_has_web_fallback_and_api_endpoint(): void
     {
         $this->get('/login')
             ->assertStatus(200)
-            ->assertSee('action="http://localhost/api/kay-paolo/login"', false)
+            ->assertSee('action="http://localhost/login"', false)
+            ->assertSee('data-api-endpoint="http://localhost/api/kay-paolo/login"', false)
             ->assertSee('data-api-login', false);
 
-        $this->post('/login')->assertStatus(405);
+        $this->postJson('/api/kay-paolo/login')->assertStatus(422);
     }
 }

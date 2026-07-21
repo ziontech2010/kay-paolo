@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Services\ZionShippingApi;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -13,6 +14,41 @@ class ZionSessionController extends Controller
         return view('pages.login');
     }
 
+    public function login(Request $request, ZionShippingApi $zion): RedirectResponse
+    {
+        $credentials = $request->validate([
+            'email' => ['required', 'string'],
+            'password' => ['required', 'string'],
+            'role_id' => ['nullable', 'integer'],
+        ]);
+
+        $payload = array_filter($credentials, static function ($value) {
+            return $value !== null && $value !== '';
+        });
+
+        $response = $zion->post('kay-paolo/login', $payload);
+        $data = $response['data'] ?? [];
+        $failed = !$response['ok']
+            || (($data['error'] ?? 'false') === 'true')
+            || empty($data['access_token']);
+
+        if ($failed) {
+            return back()
+                ->withInput($request->only('email', 'role_id'))
+                ->withErrors(['email' => $data['message'] ?? 'Unable to log in with Zion Shipping.']);
+        }
+
+        $request->session()->regenerate();
+
+        session([
+            'zion.access_token' => $data['access_token'],
+            'zion.token_type' => $data['token_type'] ?? 'Bearer',
+            'zion.user' => $data['user'] ?? [],
+        ]);
+
+        return redirect()->intended(route('dashboard'));
+    }
+
     public function logout(Request $request): RedirectResponse
     {
         $request->session()->forget('zion');
@@ -22,6 +58,8 @@ class ZionSessionController extends Controller
 
     public function dashboard(): View
     {
-        return view('pages.dashboard');
+        return view('pages.dashboard', [
+            'zionUser' => session('zion.user', []),
+        ]);
     }
 }

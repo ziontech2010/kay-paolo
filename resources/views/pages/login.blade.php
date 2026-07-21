@@ -26,7 +26,8 @@
             <div class="api-alert error" id="loginApiError" hidden></div>
             <div class="api-alert success" id="loginApiSuccess" hidden></div>
 
-            <form class="login-form" method="POST" action="{{ route('api.kay-paolo.login') }}" id="loginForm" data-api-login>
+            <form class="login-form" method="POST" action="{{ route('login.submit') }}" id="loginForm" data-api-login data-api-endpoint="{{ route('api.kay-paolo.login') }}">
+                @csrf
                 <div class="field">
                     <label for="email">Email or Phone</label>
                     <input type="text" id="email" name="email" value="{{ old('email') }}" required autocomplete="username">

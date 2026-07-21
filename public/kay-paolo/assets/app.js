@@ -96,7 +96,7 @@ document.addEventListener('DOMContentLoaded', () => {
           password: loginForm.querySelector('[name="password"]').value,
           role_id: loginForm.querySelector('[name="role_id"]').value || undefined
         };
-        const loginUrl = config.routes?.login || loginForm.action;
+        const loginUrl = loginForm.dataset.apiEndpoint || config.routes?.login || loginForm.action;
         const response = await postJson(loginUrl, payload, { token: '' });
 
         if (response.error === 'true' || !response.access_token) {
