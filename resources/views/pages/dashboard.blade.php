@@ -1,23 +1,29 @@
 @extends('layouts.site')
 
-@section('title', 'Dashboard | Kay Paolo Shipping')
+@section('title', 'Account | Kay Paolo Shipping')
 
 @section('banner')
 <div class="page-banner">
     <div class="wrap">
-        <h1>Dashboard</h1>
-        <div class="breadcrumb"><a href="{{ route('home') }}">Home</a><span class="sep">/</span><span>Dashboard</span></div>
+        <h1>Account</h1>
+        <div class="breadcrumb"><a href="{{ route('home') }}">Home</a><span class="sep">/</span><span>Account</span></div>
     </div>
 </div>
 @endsection
 
 @section('content')
-<section>
+<section class="page-follows-banner">
     <div class="wrap dashboard-grid">
         <div class="contact-form">
+            <div class="login-icon" style="margin-bottom: 22px">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                    <circle cx="12" cy="7" r="4"></circle>
+                </svg>
+            </div>
             <div class="eyebrow">Zion Session</div>
             <h2 id="dashboardUserName">{{ $zionUser['name'] ?? 'Zion user' }}</h2>
-            <p class="muted-text">Logged in through dev Zion Shipping and stored in Kay Paolo session.</p>
+            <p class="muted-text">Logged in through dev Zion Shipping and stored in the Kay Paolo session.</p>
             <dl class="session-list">
                 <div><dt>Role</dt><dd id="dashboardRole">{{ $zionUser['role']['name'] ?? 'User' }}</dd></div>
                 <div><dt>Role ID</dt><dd id="dashboardRoleId">{{ $zionUser['role_id'] ?? '-' }}</dd></div>
@@ -26,8 +32,16 @@
             </dl>
         </div>
         <div class="dashboard-actions">
-            <a class="service-card action-card" href="{{ route('quote') }}"><span class="num">Live API</span><h3>Create Quote</h3><p>Generate rates using `/api/kay-paolo/get-quote-result` on dev Zion.</p></a>
-            <a class="service-card action-card" href="{{ route('tracking') }}"><span class="num">Public API</span><h3>Track Shipment</h3><p>Validate tracking numbers through Zion without touching Zion UI flows.</p></a>
+            <a class="service-card action-card" href="{{ route('quote') }}">
+                <span class="num">LIVE API</span>
+                <h3>Create Quote</h3>
+                <p>Generate rates through Kay Paolo routes that forward to dev Zion Shipping.</p>
+            </a>
+            <a class="service-card action-card" href="{{ route('tracking') }}">
+                <span class="num">TRACK</span>
+                <h3>Track Shipment</h3>
+                <p>Validate tracking numbers with Zion data inside the Kay Paolo UI.</p>
+            </a>
             <form method="POST" action="{{ route('logout') }}" class="contact-form compact-form">
                 @csrf
                 <button class="btn btn-navy btn-block" type="submit">Logout</button>

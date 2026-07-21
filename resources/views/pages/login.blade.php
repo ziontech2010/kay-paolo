@@ -12,12 +12,17 @@
 @endsection
 
 @section('content')
-<section>
+<section class="page-follows-banner">
     <div class="wrap login-wrap">
         <div class="login-card">
-            <div class="login-icon"></div>
-            <h2>Zion Account Login</h2>
-            <p class="sub">Sign in with an active Zion Shipping user. Kay Paolo will keep the returned token and role in your browser.</p>
+            <div class="login-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                    <circle cx="12" cy="7" r="4"></circle>
+                </svg>
+            </div>
+            <h2>Agent &amp; Client Login</h2>
+            <p class="sub">Sign in with an active Zion Shipping user to manage Kay Paolo quotes, shipments, and tracking.</p>
 
             @if ($errors->any())
                 <div class="api-alert error">{{ $errors->first() }}</div>
@@ -32,12 +37,12 @@
             <form class="login-form" method="POST" action="{{ route('login.submit') }}" id="loginForm" data-api-login data-api-endpoint="{{ route('api.kay-paolo.login') }}">
                 @csrf
                 <div class="field">
-                    <label for="email">Email or Phone</label>
-                    <input type="text" id="email" name="email" value="{{ old('email') }}" required autocomplete="username">
+                    <label for="email">Email Address</label>
+                    <input type="email" id="email" name="email" value="{{ old('email') }}" placeholder="Enter your email" required autocomplete="username">
                 </div>
-                <div class="field">
+                <div class="field" style="margin-bottom: 0">
                     <label for="password">Password</label>
-                    <input type="password" id="password" name="password" required autocomplete="current-password">
+                    <input type="password" id="password" name="password" placeholder="Enter your password" required autocomplete="current-password">
                 </div>
                 <div class="field">
                     <label for="role_id">Role Filter Optional</label>
@@ -49,10 +54,14 @@
                         <option value="16" @selected(old('role_id') === '16')>Driver</option>
                     </select>
                 </div>
+                <div class="login-row-between">
+                    <label style="display: flex; align-items: center; gap: 8px"><input type="checkbox" style="width: auto"> Remember me</label>
+                    <a href="{{ route('contact') }}">Need help?</a>
+                </div>
                 <button type="submit" class="btn btn-navy btn-block">Login</button>
             </form>
 
-            <p class="login-foot">Kay Paolo does not change Zion users. Authentication is delegated to dev Zion Shipping.</p>
+            <p class="login-foot">Do not have an account? <a href="{{ route('contact') }}">Contact us to get set up</a></p>
         </div>
     </div>
 </section>

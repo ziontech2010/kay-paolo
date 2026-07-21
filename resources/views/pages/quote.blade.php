@@ -12,23 +12,38 @@
 @endsection
 
 @section('content')
-<section>
+<section class="page-follows-banner">
+    <div class="wrap">
+        <div class="section-head">
+            <div class="eyebrow">Pull Customer For Quote</div>
+            <h2>Generate a live Kay Paolo quote</h2>
+            <p>Kay Paolo uses its own Blade page and forwards every quote request to dev Zion Shipping as the third-party API.</p>
+        </div>
+    </div>
+
     <div class="wrap quote-page-grid">
         <form class="contact-form" id="quoteForm">
-            <h3 style="font-size:20px;margin-bottom:6px;">Shipment Details</h3>
-            <p class="muted-text">Live quotes are forwarded to dev Zion Shipping using Kay Paolo API routes.</p>
+            <h3 style="font-size: 20px; margin-bottom: 6px">Shipment Details</h3>
+            <p class="muted-text">Use the optional lookup for an existing customer, then enter shipment and consignee details.</p>
 
             <div class="api-alert error" id="authNotice">Login first to generate authenticated Zion quotes.</div>
 
             <div class="form-row">
-                <div class="field"><label for="customerLookup">Customer Phone / Account</label><input type="text" id="customerLookup" placeholder="Optional for agents"></div>
-                <div class="field field-with-button"><label>&nbsp;</label><button type="button" class="btn btn-navy" id="fetchCustomerBtn">Find Customer</button></div>
+                <div class="field">
+                    <label for="customerLookup">Customer Phone / Account</label>
+                    <input type="text" id="customerLookup" placeholder="Optional for agents">
+                </div>
+                <div class="field field-with-button">
+                    <label>&nbsp;</label>
+                    <button type="button" class="btn btn-navy" id="fetchCustomerBtn">Find Customer</button>
+                </div>
             </div>
             <input type="hidden" id="quoteUserId" name="user_id">
             <div id="customerLookupResult" class="api-inline-result"></div>
 
             <div class="form-row">
-                <div class="field"><label for="from_country">Origin Country</label>
+                <div class="field">
+                    <label for="from_country">Origin Country</label>
                     <select id="from_country" name="from_country" data-country-select>
                         <option value="US">United States</option>
                         <option value="HT">Haiti</option>
@@ -36,7 +51,8 @@
                         <option value="CA">Canada</option>
                     </select>
                 </div>
-                <div class="field"><label for="to_country">Destination Country</label>
+                <div class="field">
+                    <label for="to_country">Destination Country</label>
                     <select id="to_country" name="to_country" data-country-select>
                         <option value="HT">Haiti</option>
                         <option value="DO">Dominican Republic</option>
@@ -71,7 +87,13 @@
             </div>
             <div class="form-row">
                 <div class="field"><label for="consignee_id">Existing Consignee ID</label><input type="number" id="consignee_id" placeholder="Required for shipment creation"></div>
-                <div class="field"><label for="delivery_location">Delivery Location</label><select id="delivery_location"><option>Home Delivery</option><option>Office Pickup</option></select></div>
+                <div class="field">
+                    <label for="delivery_location">Delivery Location</label>
+                    <select id="delivery_location">
+                        <option>Home Delivery</option>
+                        <option>Office Pickup</option>
+                    </select>
+                </div>
             </div>
 
             <div class="form-row">
@@ -84,7 +106,13 @@
             </div>
             <div class="form-row">
                 <div class="field"><label for="package_height">Height</label><input type="number" id="package_height" min="1" value="6" required></div>
-                <div class="field"><label for="shipment_type">Package Type</label><select id="shipment_type"><option value="">Regular Package</option><option value="contains_document">Document</option></select></div>
+                <div class="field">
+                    <label for="shipment_type">Package Type</label>
+                    <select id="shipment_type">
+                        <option value="">Regular Package</option>
+                        <option value="contains_document">Document</option>
+                    </select>
+                </div>
             </div>
             <div class="field"><label for="package_description">Package Description</label><textarea id="package_description" placeholder="Documents, clothing, electronics, etc.">General merchandise</textarea></div>
 
@@ -92,14 +120,14 @@
         </form>
 
         <div class="quote-side">
-            <div class="eyebrow" style="color:var(--gold-300);">Live Zion API</div>
+            <div class="eyebrow" style="color: var(--gold-300)">Live Zion API</div>
             <h3>Quote and ship without changing Zion</h3>
             <ul>
-                <li><span>01</span> Kay Paolo sends the request to its local proxy route.</li>
+                <li><span>01</span> Kay Paolo sends this request to its local proxy route.</li>
                 <li><span>02</span> The proxy adds the Zion token and calls dev Zion.</li>
-                <li><span>03</span> Zion returns carrier cards, quote IDs, and shipment documents.</li>
+                <li><span>03</span> Zion returns quote cards, IDs, and shipment responses.</li>
             </ul>
-            <a href="{{ route('tracking') }}" class="btn btn-outline btn-block" style="margin-top:26px;">Track A Shipment</a>
+            <a href="{{ route('tracking') }}" class="btn btn-outline btn-block" style="margin-top: 26px">Track A Shipment</a>
         </div>
     </div>
 

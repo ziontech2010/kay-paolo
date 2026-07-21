@@ -36,6 +36,15 @@ document.addEventListener('DOMContentLoaded', () => {
   const mainNav = document.getElementById('mainNav');
   if (burger && mainNav) {
     burger.addEventListener('click', () => mainNav.classList.toggle('open'));
+
+    document.querySelectorAll('nav.main > ul > li.has-dd > a').forEach((link) => {
+      link.addEventListener('click', (event) => {
+        if (window.innerWidth <= 760) {
+          event.preventDefault();
+          link.parentElement.classList.toggle('dd-open');
+        }
+      });
+    });
   }
 
   document.querySelectorAll('.qc-tabs button').forEach((btn) => {
@@ -54,6 +63,73 @@ document.addEventListener('DOMContentLoaded', () => {
       form.reset();
     });
   });
+
+  const contactForm = document.getElementById('contactForm');
+  const confirmOverlay = document.getElementById('confirmOverlay');
+  const confirmClose = document.getElementById('confirmClose');
+  if (contactForm && confirmOverlay && confirmClose) {
+    const showModal = () => {
+      confirmOverlay.classList.add('active');
+      document.body.style.overflow = 'hidden';
+      confirmClose.focus();
+    };
+
+    const hideModal = () => {
+      confirmOverlay.classList.remove('active');
+      document.body.style.overflow = '';
+    };
+
+    contactForm.addEventListener('submit', (event) => {
+      event.preventDefault();
+      showModal();
+      contactForm.reset();
+    });
+
+    confirmClose.addEventListener('click', hideModal);
+    confirmOverlay.addEventListener('click', (event) => {
+      if (event.target === confirmOverlay) {
+        hideModal();
+      }
+    });
+    document.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape') {
+        hideModal();
+      }
+    });
+  }
+
+  const counters = document.querySelectorAll('.stat b[data-count]');
+  const animateCounter = (el) => {
+    const target = parseInt(el.dataset.count, 10);
+    const suffix = el.dataset.suffix || '';
+    const duration = 1400;
+    const start = performance.now();
+    const tick = (now) => {
+      const pct = Math.min((now - start) / duration, 1);
+      const eased = 1 - Math.pow(1 - pct, 3);
+      el.textContent = Math.floor(target * eased).toLocaleString() + suffix;
+      if (pct < 1) {
+        requestAnimationFrame(tick);
+      }
+    };
+    requestAnimationFrame(tick);
+  };
+
+  if ('IntersectionObserver' in window && counters.length) {
+    const observer = new IntersectionObserver((entries, obs) => {
+      entries.forEach((entry) => {
+        if (entry.isIntersecting) {
+          animateCounter(entry.target);
+          obs.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.35 });
+    counters.forEach((counter) => observer.observe(counter));
+  } else {
+    counters.forEach((counter) => {
+      counter.textContent = Number(counter.dataset.count || 0).toLocaleString() + (counter.dataset.suffix || '');
+    });
+  }
 
   const postJson = async (url, payload, options = {}) => {
     const headers = {
