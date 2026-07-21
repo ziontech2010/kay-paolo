@@ -22,6 +22,9 @@
             @if ($errors->any())
                 <div class="api-alert error">{{ $errors->first() }}</div>
             @endif
+            @if (request('login_error'))
+                <div class="api-alert error">{{ request('login_error') }}</div>
+            @endif
 
             <div class="api-alert error" id="loginApiError" hidden></div>
             <div class="api-alert success" id="loginApiSuccess" hidden></div>

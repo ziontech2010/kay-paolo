@@ -33,25 +33,34 @@ class ZionSessionController extends Controller
             || empty($data['access_token']);
 
         if ($failed) {
+            $message = $data['message'] ?? 'Unable to log in with Zion Shipping.';
+
+            if (!$request->hasSession()) {
+                return redirect()->route('login', ['login_error' => $message]);
+            }
+
             return back()
                 ->withInput($request->only('email', 'role_id'))
-                ->withErrors(['email' => $data['message'] ?? 'Unable to log in with Zion Shipping.']);
+                ->withErrors(['email' => $message]);
         }
 
-        $request->session()->regenerate();
-
-        session([
-            'zion.access_token' => $data['access_token'],
-            'zion.token_type' => $data['token_type'] ?? 'Bearer',
-            'zion.user' => $data['user'] ?? [],
-        ]);
+        if ($request->hasSession()) {
+            $request->session()->regenerate();
+            $request->session()->put([
+                'zion.access_token' => $data['access_token'],
+                'zion.token_type' => $data['token_type'] ?? 'Bearer',
+                'zion.user' => $data['user'] ?? [],
+            ]);
+        }
 
         return redirect()->intended(route('dashboard'));
     }
 
     public function logout(Request $request): RedirectResponse
     {
-        $request->session()->forget('zion');
+        if ($request->hasSession()) {
+            $request->session()->forget('zion');
+        }
 
         return redirect()->route('home');
     }

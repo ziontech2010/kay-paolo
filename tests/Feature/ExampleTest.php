@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 // use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 
 class ExampleTest extends TestCase
@@ -38,5 +39,33 @@ class ExampleTest extends TestCase
             ->assertSee('data-api-login', false);
 
         $this->postJson('/api/kay-paolo/login')->assertStatus(422);
+    }
+
+    public function test_api_login_redirects_browser_submits_to_dashboard(): void
+    {
+        Http::fake([
+            '*/api/kay-paolo/login' => Http::response([
+                'message' => 'Logged in Successfully',
+                'message_type' => 'success',
+                'error' => 'false',
+                'token_type' => 'Bearer',
+                'access_token' => 'fake-token',
+                'user' => [
+                    'id' => 123,
+                    'name' => 'Test User',
+                    'role_id' => 2,
+                    'role' => ['name' => 'Client'],
+                ],
+            ]),
+        ]);
+
+        $this->post('/api/kay-paolo/login', [
+            'email' => 'test@example.com',
+            'password' => 'password',
+            'role_id' => 2,
+        ])
+            ->assertOk()
+            ->assertSee('kayPaoloZionToken', false)
+            ->assertSee('/dashboard', false);
     }
 }

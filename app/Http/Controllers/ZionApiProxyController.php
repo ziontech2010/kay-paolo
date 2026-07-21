@@ -4,7 +4,9 @@ namespace App\Http\Controllers;
 
 use App\Services\ZionShippingApi;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
 
 class ZionApiProxyController extends Controller
 {
@@ -12,7 +14,7 @@ class ZionApiProxyController extends Controller
     {
     }
 
-    public function login(Request $request): JsonResponse
+    public function login(Request $request): JsonResponse|RedirectResponse|Response
     {
         $payload = $request->validate([
             'email' => ['required', 'string'],
@@ -20,7 +22,25 @@ class ZionApiProxyController extends Controller
             'role_id' => ['nullable', 'integer'],
         ]);
 
-        return $this->forward('kay-paolo/login', new Request($payload));
+        $response = $this->zion->post('kay-paolo/login', array_filter($payload, static function ($value) {
+            return $value !== null && $value !== '';
+        }));
+
+        if ($request->expectsJson()) {
+            return $this->jsonResponse($response);
+        }
+
+        $data = $response['data'] ?? [];
+        $failed = !$response['ok']
+            || (($data['error'] ?? 'false') === 'true')
+            || empty($data['access_token']);
+
+        if ($failed) {
+            return redirect()->route('login', ['login_error' => $data['message'] ?? 'Unable to log in with Zion Shipping.']);
+        }
+
+        return response($this->browserRedirectScript($data))
+            ->header('Content-Type', 'text/html; charset=UTF-8');
     }
 
     public function fetchUserForQuote(Request $request): JsonResponse
@@ -80,8 +100,35 @@ class ZionApiProxyController extends Controller
     private function forward(string $endpoint, Request $request, ?string $token = null): JsonResponse
     {
         $response = $this->zion->post($endpoint, $request->except('_token'), $token);
+
+        return $this->jsonResponse($response);
+    }
+
+    private function jsonResponse(array $response): JsonResponse
+    {
         $status = $response['status'] > 0 ? $response['status'] : 502;
 
         return response()->json($response['data'], $status);
+    }
+
+    private function browserRedirectScript(array $data): string
+    {
+        $token = json_encode($data['access_token'] ?? '');
+        $user = json_encode($data['user'] ?? []);
+        $dashboard = json_encode(route('dashboard'));
+
+        return <<<HTML
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Redirecting...</title></head>
+<body>
+<script>
+window.localStorage.setItem('kayPaoloZionToken', {$token});
+window.localStorage.setItem('kayPaoloZionUser', JSON.stringify({$user}));
+window.location.replace({$dashboard});
+</script>
+</body>
+</html>
+HTML;
     }
 }
