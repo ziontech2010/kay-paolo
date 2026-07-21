@@ -24,12 +24,33 @@ document.addEventListener('DOMContentLoaded', () => {
       element.value = nextValue;
     }
   };
+  const setSelectValue = (id, nextValue) => {
+    const element = document.getElementById(id);
+    if (!element || nextValue === undefined || nextValue === null || nextValue === '') return;
+
+    const raw = String(nextValue).trim();
+    const normalized = raw.toLowerCase();
+    const normalizedCode = countryCode(raw).toLowerCase();
+    const match = Array.from(element.options).find((option) => {
+      return String(option.value).trim().toLowerCase() === normalized
+        || String(option.textContent).trim().toLowerCase() === normalized
+        || countryCode(option.value).toLowerCase() === normalizedCode
+        || countryCode(option.textContent).toLowerCase() === normalizedCode;
+    });
+
+    if (match) {
+      element.value = match.value;
+    } else {
+      element.value = raw;
+    }
+  };
   const setText = (id, nextValue) => {
     const element = document.getElementById(id);
     if (element) element.textContent = String(nextValue ?? '-');
   };
   const firstValue = (...ids) => ids.map(value).find((item) => item !== '') || '';
   const firstElement = (...ids) => ids.map((id) => document.getElementById(id)).find(Boolean) || null;
+  const queryParam = (name) => new URLSearchParams(window.location.search).get(name) || '';
   const numberValue = (raw, fallback) => {
     const parsed = Number(String(raw ?? '').replace(/[^0-9.-]/g, ''));
     return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
@@ -93,6 +114,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initLogoutForms();
   initPullCustomer();
   initPackageBlocks();
+  initConsigneePicker();
   initQuoteForm();
   initCreateShipmentForm();
   initTrackingForm();
@@ -252,6 +274,7 @@ document.addEventListener('DOMContentLoaded', () => {
           phone_or_account: lookup,
           customer: lookup
         });
+        window.localStorage.setItem('kayPaoloQuoteCustomer', JSON.stringify(response));
         if (result) {
           result.className = 'api-inline-result success';
           result.textContent = response.message || 'Customer ready for quote.';
@@ -264,6 +287,135 @@ document.addEventListener('DOMContentLoaded', () => {
         }
       }
     });
+  }
+
+  function initConsigneePicker() {
+    const radios = document.querySelectorAll('input[name="consigneeType"]');
+    const existingField = document.getElementById('existingConsigneeSelectField');
+    const existingSelect = document.getElementById('existingConsignee');
+    const hiddenConsigneeId = document.getElementById('consignee_id');
+    if (!radios.length || !existingField || !existingSelect) return;
+
+    const result = document.getElementById('existingConsigneeResult');
+    const consigneesById = new Map();
+    let loaded = false;
+    let loading = false;
+
+    const quoteCustomer = storedJson('kayPaoloQuoteCustomer', {});
+    const storedCustomerId = String(quoteCustomer.quote_user_id || quoteCustomer.user_id || quoteCustomer.customer?.id || '');
+    const requestedCustomerId = queryParam('customer');
+    if (quoteCustomer?.customer && (!requestedCustomerId || storedCustomerId === requestedCustomerId)) {
+      applyCustomerToQuoteForm(quoteCustomer.customer);
+      if (!value('quoteUserId')) {
+        setValue('quoteUserId', quoteCustomer.quote_user_id || quoteCustomer.user_id || quoteCustomer.customer.id);
+      }
+    }
+
+    const clearConsigneeFields = () => {
+      ['toName', 'toPhone', 'toHomePhone', 'toCountry', 'toZip', 'toAddress', 'toApt', 'toCity', 'toState'].forEach((id) => {
+        const field = document.getElementById(id);
+        if (field) field.value = '';
+      });
+      if (hiddenConsigneeId) hiddenConsigneeId.value = '';
+    };
+
+    const showMessage = (message, isError = false) => {
+      if (!result) return;
+      result.className = isError ? 'api-inline-result api-alert error' : 'api-inline-result success';
+      result.textContent = message;
+    };
+
+    const buildLookupPayload = () => {
+      const customerId = firstValue('quoteUserId') || queryParam('customer');
+      const lookup = queryParam('lookup');
+
+      return {
+        user_id: customerId || undefined,
+        quote_user_id: customerId || undefined,
+        phone_or_account: lookup || undefined
+      };
+    };
+
+    const loadConsignees = async (force = false) => {
+      if (loaded && !force) return;
+      if (loading) return;
+      if (!storedToken()) return;
+
+      const payload = buildLookupPayload();
+      if (!payload.user_id && !payload.phone_or_account) {
+        showMessage('Pull a customer first, then select an existing consignee.', true);
+        return;
+      }
+
+      loading = true;
+      existingSelect.disabled = true;
+      existingSelect.innerHTML = '<option value="">Loading consignees...</option>';
+      showMessage('Loading existing consignees from Zion...');
+
+      try {
+        const response = await postJson(route('consigneeList', '/api/kay-paolo/consignee-list'), payload);
+        const customer = response.customer || response.data?.customer;
+        if (customer) applyCustomerToQuoteForm(customer);
+
+        const consignees = response.consignees || response.data?.consignees || [];
+        consigneesById.clear();
+        existingSelect.innerHTML = '<option value="">-- Select Existing Consignee --</option>';
+
+        consignees.forEach((consignee) => {
+          const id = String(consignee.id || consignee.consignee_id || '');
+          if (!id) return;
+          consigneesById.set(id, consignee);
+          const option = document.createElement('option');
+          option.value = id;
+          option.textContent = [
+            consignee.consignee_name || consignee.name || 'Unnamed consignee',
+            consignee.consignee_phone || consignee.phone,
+            consignee.consignee_address_city || consignee.city,
+            consignee.consignee_address_country || consignee.country
+          ].filter(Boolean).join(' - ');
+          existingSelect.appendChild(option);
+        });
+
+        loaded = true;
+        existingSelect.disabled = false;
+        showMessage(consignees.length ? `${consignees.length} consignee(s) loaded.` : 'No consignees found for this customer.', consignees.length === 0);
+      } catch (error) {
+        existingSelect.innerHTML = '<option value="">-- Select Existing Consignee --</option>';
+        existingSelect.disabled = false;
+        showMessage(error.message, true);
+      } finally {
+        loading = false;
+      }
+    };
+
+    radios.forEach((radio) => {
+      radio.addEventListener('change', () => {
+        if (radio.value === 'existing' && radio.checked) {
+          existingField.style.display = 'block';
+          clearConsigneeFields();
+          loadConsignees();
+        }
+
+        if (radio.value === 'new' && radio.checked) {
+          existingField.style.display = 'none';
+          existingSelect.value = '';
+          clearConsigneeFields();
+        }
+      });
+    });
+
+    existingSelect.addEventListener('change', () => {
+      const consignee = consigneesById.get(existingSelect.value);
+      if (consignee) {
+        applyConsigneeToQuoteForm(consignee);
+      } else {
+        clearConsigneeFields();
+      }
+    });
+
+    if (firstValue('quoteUserId') || queryParam('customer') || queryParam('lookup')) {
+      loadConsignees();
+    }
   }
 
   function initPackageBlocks() {
@@ -576,9 +728,12 @@ document.addEventListener('DOMContentLoaded', () => {
     const deliveryLocation = firstValue('deliveryLocation', 'delivery_location');
     const packageDescription = firstValue('packageDescription', 'package_description') || 'General merchandise';
 
+    const quoteCustomerId = firstValue('quoteUserId') || queryParam('customer');
+
     return {
-      user_id: firstValue('quoteUserId') || undefined,
-      quote_user_id: firstValue('quoteUserId') || undefined,
+      user_id: quoteCustomerId || undefined,
+      quote_user_id: quoteCustomerId || undefined,
+      phone_or_account: queryParam('lookup') || undefined,
       from_country_name: fromCountryName,
       from_country: countryCode(fromCountry?.value || fromCountryName),
       from_address: firstValue('from_address'),
@@ -614,6 +769,38 @@ document.addEventListener('DOMContentLoaded', () => {
       fragile_shipment: document.getElementById('fragileShipment')?.checked ? 1 : 0,
       package_description: packageDescription
     };
+  }
+
+  function applyCustomerToQuoteForm(customer) {
+    if (!customer || typeof customer !== 'object') return;
+
+    const name = customer.name || customer.business_name || '';
+    setText('fromCardTitle', `From: ${name || 'Customer'}`);
+    setValue('from_name', name);
+    setValue('from_email', customer.email);
+    setValue('from_phone', customer.shipper_phone || customer.phone || customer.mobile);
+    setValue('from_account', customer.account_number);
+    setSelectValue('from_country', customer.shipper_country || customer.country || 'US');
+    setValue('from_address', customer.shipper_address || customer.address);
+    setValue('from_apt', customer.shipper_apt || customer.apt);
+    setValue('from_city', customer.shipper_city || customer.city);
+    setValue('from_state', customer.shipper_state || customer.state);
+    setValue('from_zip', customer.shipper_zip || customer.zip);
+  }
+
+  function applyConsigneeToQuoteForm(consignee) {
+    if (!consignee || typeof consignee !== 'object') return;
+
+    setValue('consignee_id', consignee.id || consignee.consignee_id);
+    setValue('toName', consignee.consignee_name || consignee.name);
+    setValue('toPhone', consignee.consignee_phone || consignee.phone);
+    setValue('toHomePhone', consignee.consignee_homephone || consignee.home_phone || consignee.homePhone);
+    setSelectValue('toCountry', consignee.consignee_address_country || consignee.country);
+    setValue('toZip', consignee.consignee_address_zip || consignee.zip);
+    setValue('toAddress', consignee.consignee_address || consignee.address);
+    setValue('toApt', consignee.consignee_apt || consignee.apt);
+    setValue('toCity', consignee.consignee_address_city || consignee.city);
+    setValue('toState', consignee.consignee_address_state || consignee.state);
   }
 
   function mergeShipmentFormPayload(basePayload) {

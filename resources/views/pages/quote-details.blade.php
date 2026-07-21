@@ -36,22 +36,22 @@
 
             <div class="create-shipment-grid">
                 <div class="shipment-card" style="height: 100%; display: flex; flex-direction: column; margin-bottom: 0">
-                    <div class="shipment-card-header" style="text-transform: none; font-family: 'Inter', sans-serif; font-size: 18px; font-weight: 700; letter-spacing: 0">
+                    <div class="shipment-card-header" id="fromCardTitle" style="text-transform: none; font-family: 'Inter', sans-serif; font-size: 18px; font-weight: 700; letter-spacing: 0">
                         From: {{ $shipperName }}
                     </div>
                     <div class="shipment-card-body" style="flex-grow: 1">
                         <div class="field">
                             <label>Name</label>
-                            <input type="text" value="{{ $shipperName }}" readonly style="background: #f8fafc; font-weight: 600; color: #334155">
+                            <input type="text" id="from_name" value="{{ $shipperName }}" readonly style="background: #f8fafc; font-weight: 600; color: #334155">
                         </div>
                         <div class="form-row-2">
                             <div class="field">
                                 <label>Email</label>
-                                <input type="email" value="{{ $shipperEmail }}" readonly style="background: #f8fafc; font-weight: 600; color: #334155">
+                                <input type="email" id="from_email" value="{{ $shipperEmail }}" readonly style="background: #f8fafc; font-weight: 600; color: #334155">
                             </div>
                             <div class="field">
                                 <label>Phone</label>
-                                <input type="text" value="{{ $shipperPhone }}" readonly style="background: #f8fafc; font-weight: 600; color: #334155">
+                                <input type="text" id="from_phone" value="{{ $shipperPhone }}" readonly style="background: #f8fafc; font-weight: 600; color: #334155">
                             </div>
                         </div>
                         <div class="form-row-3">
@@ -63,7 +63,7 @@
                             </div>
                             <div class="field">
                                 <label>Account Number</label>
-                                <input type="text" value="{{ $shipperAccount }}" readonly style="background: #f8fafc; font-weight: 600; color: #334155">
+                                <input type="text" id="from_account" value="{{ $shipperAccount }}" readonly style="background: #f8fafc; font-weight: 600; color: #334155">
                             </div>
                         </div>
                         <div class="form-row-3">
@@ -87,7 +87,7 @@
                             </div>
                             <div class="field">
                                 <label>Apt/Ste/Unit</label>
-                                <input type="text" value="{{ $shipperApt }}" placeholder="None specified">
+                                <input type="text" id="from_apt" value="{{ $shipperApt }}" placeholder="None specified">
                             </div>
                         </div>
                     </div>
@@ -114,6 +114,7 @@
                             <select id="existingConsignee">
                                 <option value="">-- Select Existing Consignee --</option>
                             </select>
+                            <div id="existingConsigneeResult" class="api-inline-result"></div>
                         </div>
 
                         <div class="field">
