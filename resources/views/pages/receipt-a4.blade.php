@@ -14,28 +14,49 @@
 @section('content')
 <section class="page-follows-banner">
     <div class="wrap" style="max-width: 900px">
-        <div class="shipment-card">
-            <div class="shipment-card-header" style="display: flex; justify-content: space-between; align-items: center; text-transform: none; font-family: 'Inter', sans-serif; font-size: 18px; font-weight: 700; letter-spacing: 0">
-                <span>Kay Paolo Shipping Receipt</span>
-                <button type="button" class="btn btn-gold no-print" onclick="window.print()">Print Receipt</button>
+        <div class="a4-receipt-card">
+            <div class="shipment-doc-actions no-print">
+                <button type="button" class="btn btn-navy" onclick="window.print()">Print Receipt</button>
+                <a href="{{ route('receipt') }}" class="btn btn-gold">Open Receipt</a>
+                <a href="{{ route('invoice') }}" class="btn btn-outline">Open Invoice</a>
             </div>
-            <div class="shipment-card-body">
-                <div style="text-align: center; margin-bottom: 22px">
-                    <img src="{{ asset('kay-paolo/assets/logo/kay-paolo.svg') }}" alt="Kay Paolo Shipping" width="150" height="75">
-                    <h3 id="receiptA4TrackingNumber" class="mono" style="margin-top: 12px">Pending</h3>
-                </div>
-                <div class="form-row-2">
-                    <div class="api-card">
-                        <h3>Shipper</h3>
+
+            <article class="awb-sheet">
+                <header class="awb-header">
+                    <div>
+                        <img src="{{ asset('kay-paolo/assets/logo/kay-paolo.svg') }}" alt="Kay Paolo Shipping" width="150" height="75">
+                        <p>414 Main St, Asbury Park, NJ 07712</p>
+                    </div>
+                    <div class="awb-code">
+                        <div class="barcode-text" id="receiptA4Barcode">*PENDING*</div>
+                        <strong id="receiptA4TrackingNumber">Pending</strong>
+                    </div>
+                </header>
+
+                <div class="awb-number" id="receiptA4LargeNumber">Pending</div>
+
+                <section class="awb-grid">
+                    <div>
+                        <h3>Sender</h3>
                         <p id="receiptA4Shipper">Kay Paolo Shipping</p>
                     </div>
-                    <div class="api-card">
+                    <div>
                         <h3>Receiver</h3>
                         <p id="receiptA4Receiver">Destination customer</p>
                     </div>
-                </div>
-                <pre id="receiptA4Payload" class="api-raw">Shipment details will appear here after booking.</pre>
-            </div>
+                </section>
+
+                <section class="awb-grid">
+                    <div>
+                        <h3>Package</h3>
+                        <p id="receiptA4Package">General merchandise / 1 package</p>
+                    </div>
+                    <div>
+                        <h3>Payment</h3>
+                        <p><strong id="receiptA4PaymentType">PAID AT AGENT</strong><br>Total: <span id="receiptA4Total">USD 0.00</span></p>
+                    </div>
+                </section>
+            </article>
         </div>
     </div>
 </section>

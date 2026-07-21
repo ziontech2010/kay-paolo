@@ -118,4 +118,17 @@ class ExampleTest extends TestCase
             ->assertSee('existingConsigneeResult', false)
             ->assertSee('id="consignee_id"', false);
     }
+
+    public function test_receipt_and_invoice_render_documents_not_raw_json(): void
+    {
+        foreach (['/receipt', '/invoice', '/receipt-a4'] as $path) {
+            $this->get($path)
+                ->assertStatus(200)
+                ->assertSee('Print', false)
+                ->assertDontSee('api-raw', false)
+                ->assertDontSee('JSON.stringify', false)
+                ->assertDontSee('receiptSummary', false)
+                ->assertDontSee('invoicePayload', false);
+        }
+    }
 }
