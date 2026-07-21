@@ -107,4 +107,15 @@ class ExampleTest extends TestCase
             ->assertSee('/quote-details', false)
             ->assertDontSee('id="quoteForm"', false);
     }
+
+    public function test_quote_details_exposes_existing_customer_consignee_ui(): void
+    {
+        $this->get('/quote-details?lookup=9400&customer=7020')
+            ->assertStatus(200)
+            ->assertSee('value="7020"', false)
+            ->assertSee('name="consigneeType"', false)
+            ->assertSee('existingConsigneeSelectField', false)
+            ->assertSee('existingConsigneeResult', false)
+            ->assertSee('id="consignee_id"', false);
+    }
 }
