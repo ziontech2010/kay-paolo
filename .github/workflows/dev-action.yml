@@ -4,7 +4,6 @@ on:
   push:
     branches:
       - dev
-  workflow_dispatch:   # allows manual runs from the Actions tab
 
 jobs:
   deploy:
@@ -25,5 +24,6 @@ jobs:
             git fetch origin
             git checkout dev
             git pull --ff-only origin dev
+            sudo -u composer install
             sudo -u www-data php artisan migrate --force
             sudo -u www-data php artisan optimize:clear
