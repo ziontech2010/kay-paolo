@@ -98,6 +98,22 @@ class ExampleTest extends TestCase
             ->assertSee('loginPage: "http:\/\/localhost\/login"', false);
     }
 
+    public function test_header_shows_my_profile_for_logged_in_users(): void
+    {
+        $this->get('/')
+            ->assertStatus(200)
+            ->assertSee('data-auth-link>Login</a>', false);
+
+        $this->withSession([
+            'zion.access_token' => 'session-token',
+            'zion.user' => ['name' => 'Session User', 'role_id' => 2],
+        ])
+            ->get('/')
+            ->assertStatus(200)
+            ->assertSee('data-auth-link>My Profile</a>', false)
+            ->assertDontSee('data-auth-link>Account</a>', false);
+    }
+
     public function test_quote_page_uses_archive_customer_pull_flow(): void
     {
         $this->get('/quote')
