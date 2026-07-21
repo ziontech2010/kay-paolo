@@ -196,7 +196,8 @@
 
                                     <div class="form-row-2" style="margin-bottom: 14px">
                                         <div class="checkbox-field" style="margin-top: 0; align-self: center">
-                                            <input type="checkbox" id="pkgFlatRate1" class="pkg-flat-rate">
+                                            <input type="hidden" value="0" name="flat_rate[]" class="pkg-flat-rate-hidden">
+                                            <input type="checkbox" id="pkgFlatRate1" name="flat_rate[]" class="pkg-flat-rate" value="on">
                                             <label for="pkgFlatRate1">Flat Rate?</label>
                                         </div>
                                         <div class="field" style="margin-bottom: 0">
@@ -213,7 +214,8 @@
 
                                     <div class="field pkg-flat-rate-field" style="display: none; margin-bottom: 14px">
                                         <label for="pkgFlatRateType1">Flat Rate Item</label>
-                                        <select id="pkgFlatRateType1" class="pkg-flat-rate-type">
+                                        <input type="hidden" value="" name="shipment_type[]" class="pkg-flat-rate-type-hidden">
+                                        <select id="pkgFlatRateType1" name="shipment_type[]" class="pkg-flat-rate-type">
                                             <option value="">-- Select Flat Rate Item --</option>
                                         </select>
                                         <div class="api-inline-result pkg-flat-rate-note"></div>

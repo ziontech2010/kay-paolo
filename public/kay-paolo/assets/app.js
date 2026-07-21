@@ -455,8 +455,11 @@ document.addEventListener('DOMContentLoaded', () => {
         const lastBlock = container.querySelector('.package-block:last-child');
         const clone = lastBlock.cloneNode(true);
         clone.querySelectorAll('input').forEach((input) => {
-          if (input.type === 'checkbox') input.checked = false;
+          if (input.classList.contains('pkg-flat-rate-hidden')) input.value = '0';
+          else if (input.classList.contains('pkg-flat-rate-type-hidden')) input.value = '';
+          else if (input.type === 'checkbox') input.checked = false;
           else input.value = '';
+          input.disabled = false;
         });
         clone.querySelectorAll('select').forEach((select) => {
           select.selectedIndex = 0;
@@ -489,11 +492,28 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     ['toCountry', 'to_country'].forEach((id) => {
-      document.getElementById(id)?.addEventListener('change', () => reloadVisibleFlatRateFields(container));
+      document.getElementById(id)?.addEventListener('change', () => resetPackageFlatRates(container, true));
     });
     document.getElementById('from_state')?.addEventListener('change', () => reloadVisibleFlatRateFields(container));
 
     refreshPackages();
+  }
+
+  function resetPackageFlatRates(container, clearDimensions = false) {
+    container.querySelectorAll('.package-block').forEach((block) => {
+      const checkbox = block.querySelector('.pkg-flat-rate');
+      if (checkbox) checkbox.checked = false;
+      toggleFlatRateField(block, false);
+
+      if (clearDimensions) {
+        ['.pkg-weight', '.pkg-length', '.pkg-width', '.pkg-height'].forEach((selector) => {
+          const input = block.querySelector(selector);
+          if (input) {
+            input.value = '';
+          }
+        });
+      }
+    });
   }
 
   function toggleFlatRateField(block, checked) {
@@ -501,11 +521,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const field = block.querySelector('.pkg-flat-rate-field');
     const select = block.querySelector('.pkg-flat-rate-type');
+    const hiddenFlatRate = block.querySelector('.pkg-flat-rate-hidden');
+    const hiddenFlatRateType = block.querySelector('.pkg-flat-rate-type-hidden');
     const note = block.querySelector('.pkg-flat-rate-note');
     if (!field || !select) return;
 
     field.style.display = checked ? 'block' : 'none';
     select.required = checked;
+    if (hiddenFlatRate) hiddenFlatRate.disabled = checked;
+    if (hiddenFlatRateType) hiddenFlatRateType.disabled = checked;
 
     if (checked) {
       loadFlatRatesForBlock(block);
@@ -1026,12 +1050,8 @@ document.addEventListener('DOMContentLoaded', () => {
         dimensions.length.push(length);
         dimensions.width.push(width);
         dimensions.height.push(height);
-        if (isFlat) {
-          flatRate.push('on');
-          if (flatType) {
-            shipmentType.push(flatType);
-          }
-        }
+        flatRate.push(isFlat ? 'on' : '0');
+        shipmentType.push(isFlat ? flatType : '');
       });
     } else {
       dimensions.package_count_ind.push(1);
@@ -1039,6 +1059,8 @@ document.addEventListener('DOMContentLoaded', () => {
       dimensions.length.push(numberValue(firstValue('package_length'), 1));
       dimensions.width.push(numberValue(firstValue('package_width'), 1));
       dimensions.height.push(numberValue(firstValue('package_height'), 1));
+      flatRate.push(firstValue('shipment_type') ? 'on' : '0');
+      shipmentType.push(firstValue('shipment_type'));
     }
 
     const toCountryName = selectedCountryName(toCountry);
@@ -1083,7 +1105,7 @@ document.addEventListener('DOMContentLoaded', () => {
       package_value: numberValue(firstValue('totalValue', 'package_value'), 10),
       dimensions,
       flat_rate: flatRate,
-      shipment_type: shipmentType.length ? shipmentType : (firstValue('shipment_type') ? [firstValue('shipment_type')] : []),
+      shipment_type: shipmentType,
       delivery_location: deliveryLocation,
       deliveryLocation,
       coupon_code: firstValue('couponCode'),

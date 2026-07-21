@@ -126,7 +126,9 @@ class ExampleTest extends TestCase
             ->assertSee('pkgFlatRate1', false)
             ->assertSee('pkg-flat-rate-field', false)
             ->assertSee('pkgFlatRateType1', false)
-            ->assertSee('pkg-flat-rate-type', false);
+            ->assertSee('pkg-flat-rate-type', false)
+            ->assertSee('name="flat_rate[]"', false)
+            ->assertSee('name="shipment_type[]"', false);
     }
 
     public function test_receipt_and_invoice_render_documents_not_raw_json(): void
