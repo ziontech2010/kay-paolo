@@ -24,6 +24,5 @@ jobs:
             git fetch origin
             git checkout dev
             git pull --ff-only origin dev
-            sudo -u composer install
-            sudo -u www-data php artisan migrate --force
+            sudo -u www-data composer install
             sudo -u www-data php artisan optimize:clear
