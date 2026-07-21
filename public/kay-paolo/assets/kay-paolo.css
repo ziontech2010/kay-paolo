@@ -189,8 +189,278 @@
     margin-top: 22px;
 }
 
+.shipment-doc-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    justify-content: flex-end;
+    margin-bottom: 18px;
+}
+
+.shipment-doc,
+.awb-sheet {
+    background: #fff;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    box-shadow: var(--shadow);
+    color: var(--ink-900);
+    padding: 34px;
+}
+
+.shipment-doc-header,
+.awb-header {
+    align-items: flex-start;
+    border-bottom: 1px solid var(--line);
+    display: flex;
+    gap: 24px;
+    justify-content: space-between;
+    padding-bottom: 22px;
+}
+
+.shipment-doc-header p,
+.awb-header p {
+    color: var(--ink-600);
+    font-size: 13px;
+    line-height: 1.55;
+    margin: 8px 0 0;
+}
+
+.shipment-doc-title {
+    text-align: right;
+}
+
+.shipment-doc-title span,
+.shipment-doc-meta span,
+.shipment-doc-addresses h3,
+.shipment-doc-note h3,
+.shipment-doc-summary dt,
+.awb-grid h3 {
+    color: var(--ink-400);
+    display: block;
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0;
+    text-transform: uppercase;
+}
+
+.shipment-doc-title h2 {
+    color: var(--navy-950);
+    font-family: "Fraunces", serif;
+    font-size: 42px;
+    margin: 4px 0 8px;
+}
+
+.shipment-doc-title strong,
+.awb-code strong {
+    color: var(--gold-500);
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 15px;
+}
+
+.shipment-doc-meta {
+    display: grid;
+    gap: 14px;
+    grid-template-columns: repeat(4, 1fr);
+    margin: 24px 0;
+}
+
+.shipment-doc-meta div {
+    background: #f8fafc;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 14px;
+}
+
+.shipment-doc-meta strong {
+    display: block;
+    font-size: 14px;
+    margin-top: 5px;
+}
+
+.shipment-doc-addresses,
+.awb-grid {
+    display: grid;
+    gap: 18px;
+    grid-template-columns: 1fr 1fr;
+    margin-bottom: 24px;
+}
+
+.shipment-doc-addresses > div,
+.awb-grid > div {
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 18px;
+}
+
+.shipment-doc-addresses strong {
+    display: block;
+    font-size: 16px;
+    margin: 8px 0;
+}
+
+.shipment-doc-addresses p,
+.shipment-doc-note p,
+.awb-grid p {
+    color: var(--ink-600);
+    font-size: 14px;
+    line-height: 1.65;
+    margin: 0;
+}
+
+.awb-grid p {
+    white-space: pre-line;
+}
+
+.shipment-doc-table-wrap {
+    margin: 26px 0;
+    overflow-x: auto;
+}
+
+.shipment-doc-table {
+    border-collapse: collapse;
+    width: 100%;
+}
+
+.shipment-doc-table th,
+.shipment-doc-table td {
+    border: 1px solid var(--line);
+    padding: 13px 12px;
+    text-align: left;
+    vertical-align: top;
+}
+
+.shipment-doc-table th {
+    background: #f8fafc;
+    color: var(--ink-500);
+    font-size: 11px;
+    font-weight: 800;
+    text-transform: uppercase;
+}
+
+.shipment-doc-table td {
+    font-size: 14px;
+}
+
+.shipment-doc-summary {
+    align-items: flex-start;
+    display: grid;
+    gap: 26px;
+    grid-template-columns: 1.1fr 0.9fr;
+}
+
+.shipment-doc-summary dl {
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    margin: 0;
+    overflow: hidden;
+}
+
+.shipment-doc-summary dl div {
+    align-items: center;
+    display: flex;
+    justify-content: space-between;
+    padding: 12px 16px;
+}
+
+.shipment-doc-summary dl div + div {
+    border-top: 1px solid var(--line);
+}
+
+.shipment-doc-summary dd {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 14px;
+    font-weight: 700;
+    margin: 0;
+}
+
+.shipment-doc-summary .total {
+    background: var(--navy-950);
+    color: #fff;
+}
+
+.shipment-doc-summary .total dt,
+.shipment-doc-summary .total dd {
+    color: #fff;
+    font-size: 16px;
+}
+
+.a4-receipt-card {
+    display: grid;
+    gap: 18px;
+}
+
+.awb-sheet {
+    border: 2px solid #111827;
+}
+
+.awb-code {
+    text-align: right;
+}
+
+.barcode-text {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 28px;
+    font-weight: 800;
+}
+
+.awb-number {
+    border-bottom: 2px dashed #cbd5e1;
+    border-top: 2px dashed #cbd5e1;
+    color: #111827;
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 46px;
+    font-weight: 800;
+    margin: 22px 0;
+    padding: 22px 0;
+    text-align: center;
+}
+
+@media print {
+    .topbar,
+    header.site,
+    footer.site,
+    .page-banner,
+    .whatsapp-fab,
+    .no-print {
+        display: none !important;
+    }
+
+    .page-follows-banner {
+        margin: 0;
+        padding: 0;
+    }
+
+    .shipment-doc,
+    .awb-sheet {
+        border-radius: 0;
+        box-shadow: none;
+    }
+}
+
 @media (max-width: 860px) {
     .dashboard-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .shipment-doc-header,
+    .awb-header,
+    .shipment-doc-summary {
+        grid-template-columns: 1fr;
+    }
+
+    .shipment-doc-header,
+    .awb-header {
+        display: grid;
+    }
+
+    .shipment-doc-title,
+    .awb-code {
+        text-align: left;
+    }
+
+    .shipment-doc-meta,
+    .shipment-doc-addresses,
+    .awb-grid {
         grid-template-columns: 1fr;
     }
 }

@@ -634,33 +634,140 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function initReceiptPages() {
-    const receiptSummary = document.getElementById('receiptSummary');
-    const receiptA4Payload = document.getElementById('receiptA4Payload');
-    const invoicePayload = document.getElementById('invoicePayload');
-    if (!receiptSummary && !receiptA4Payload && !invoicePayload) return;
+    const documentRoot = document.querySelector('[data-shipment-document]');
+    const awbSheet = document.querySelector('.awb-sheet');
+    if (!documentRoot && !awbSheet) return;
 
     const shipment = storedJson(shipmentResponseKey, {});
     const response = shipment.response || {};
     const payload = shipment.payload || {};
     const selected = shipment.selected || {};
-    const tracking = response.tracking_number || response.invoice_num || response.awb || payload.tracking_number || 'Pending';
-    const total = selected.total || selected.price || payload.deliveryEstimatePrice || response.total || '0.00';
-    const status = response.status_name || response.status || response.message || 'Booked';
+    const data = buildShipmentDocumentData(response, payload, selected);
 
-    setText('receiptTrackingNumber', tracking);
-    setText('receiptStatus', status);
-    setText('receiptTotal', `USD ${total}`);
-    setText('receiptA4TrackingNumber', tracking);
-    setText('receiptA4Shipper', [payload.from_address, payload.from_city, payload.from_state, payload.from_zip].filter(Boolean).join(', ') || 'Kay Paolo Shipping');
-    setText('receiptA4Receiver', [payload.to_name, payload.to_address, payload.to_city, payload.to_state, payload.to_zip].filter(Boolean).join(', ') || 'Destination customer');
-    setText('invoiceNumber', response.invoice_num || tracking);
-    setText('invoiceAmount', `USD ${total}`);
-    setText('invoiceStatus', status);
+    setText('documentNumber', data.documentNumber);
+    setText('documentDate', data.date);
+    setText('documentStatus', data.status);
+    setText('documentPaymentType', data.paymentType);
+    setText('documentTracking', data.tracking);
+    setText('documentShipperName', data.shipperName);
+    setText('documentShipperAddress', data.shipperAddress);
+    setText('documentShipperContact', data.shipperContact);
+    setText('documentConsigneeName', data.consigneeName);
+    setText('documentConsigneeAddress', data.consigneeAddress);
+    setText('documentConsigneeContact', data.consigneeContact);
+    setText('documentNotes', data.notes);
+    setText('documentFreight', moneyText(data.freight));
+    setText('documentInsurance', moneyText(data.insurance));
+    setText('documentHomeDelivery', moneyText(data.homeDelivery));
+    setText('documentTax', moneyText(data.tax));
+    setText('documentTotal', moneyText(data.total));
+    renderDocumentItems(data.items);
 
-    const pretty = JSON.stringify({ response, payload, selected }, null, 2);
-    if (receiptSummary) receiptSummary.textContent = pretty;
-    if (receiptA4Payload) receiptA4Payload.textContent = pretty;
-    if (invoicePayload) invoicePayload.textContent = pretty;
+    setText('receiptA4TrackingNumber', data.tracking);
+    setText('receiptA4Barcode', `*${data.tracking}*`);
+    setText('receiptA4LargeNumber', data.tracking);
+    setText('receiptA4Shipper', `${data.shipperName}\n${data.shipperAddress}\n${data.shipperContact}`);
+    setText('receiptA4Receiver', `${data.consigneeName}\n${data.consigneeAddress}\n${data.consigneeContact}`);
+    setText('receiptA4Package', `${data.description} / ${data.packageCount} package(s) / ${data.totalWeight} lb`);
+    setText('receiptA4PaymentType', data.paymentType);
+    setText('receiptA4Total', moneyText(data.total));
+  }
+
+  function buildShipmentDocumentData(response, payload, selected) {
+    const responseData = response.data || {};
+    const shipping = response.shipping_data || response.shipping || responseData.shipping_data || responseData.shipping || {};
+    const tracking = response.tracking_number
+      || response.invoice_num
+      || response.awb
+      || responseData.tracking_number
+      || shipping.tracking_number
+      || shipping.invoice_num
+      || payload.tracking_number
+      || 'Pending';
+    const documentNumber = response.invoice_num
+      || responseData.invoice_num
+      || shipping.invoice_num
+      || tracking;
+    const description = payload.package_description || shipping.package_description || 'General merchandise';
+    const items = packageRowsFromPayload(payload, description);
+    const totalWeight = items.reduce((sum, item) => sum + numberValue(item.weight, 0), 0) || 1;
+
+    return {
+      documentNumber,
+      tracking,
+      date: readableDate(response.created_at || responseData.created_at || shipping.created_at || new Date()),
+      status: response.status_name || response.status || response.message || responseData.status || shipping.status || 'Booked',
+      paymentType: payload.payment_type || shipping.payment_type || 'PAID AT AGENT',
+      shipperName: payload.from_name || shipping.shipper_name || storedUser().name || 'Kay Paolo Customer',
+      shipperAddress: [payload.from_address, payload.from_city, payload.from_state, payload.from_zip, payload.from_country_name].filter(Boolean).join(', ') || '414 Main St, Asbury Park, NJ 07712',
+      shipperContact: [payload.from_phone, payload.from_email || storedUser().email].filter(Boolean).join(' / ') || 'info@kaypaoloshipping.com',
+      consigneeName: payload.to_name || payload.consignee_name || shipping.consignee_name || 'Destination Customer',
+      consigneeAddress: [payload.to_address, payload.to_apt, payload.to_city, payload.to_state, payload.to_zip, payload.to_country_name].filter(Boolean).join(', ') || 'Destination address pending',
+      consigneeContact: [payload.to_phone_1 || payload.consignee_phone, payload.to_phone_2].filter(Boolean).join(' / ') || 'Phone pending',
+      description,
+      items,
+      packageCount: payload.package_count || items.reduce((sum, item) => sum + numberValue(item.count, 0), 0) || 1,
+      totalWeight,
+      freight: selected.freight || response.freight || responseData.freight || shipping.freight || 0,
+      insurance: selected.insurance || response.insurance || responseData.insurance || shipping.insurance || 0,
+      homeDelivery: selected.home_delivery || selected.delivery || response.home_delivery || responseData.home_delivery || shipping.home_delivery || 0,
+      tax: selected.tax || response.tax || responseData.tax || shipping.tax || 0,
+      total: selected.total || selected.price || selected.amount || payload.deliveryEstimatePrice || response.total || responseData.total || shipping.total || 0,
+      notes: response.message || responseData.message || 'Thank you for shipping with Kay Paolo Shipping.'
+    };
+  }
+
+  function packageRowsFromPayload(payload, description) {
+    const dimensions = payload.dimensions || {};
+    const counts = Array.isArray(dimensions.package_count_ind) ? dimensions.package_count_ind : [payload.package_count || 1];
+    const weights = Array.isArray(dimensions.weight) ? dimensions.weight : [payload.package_weight || 1];
+    const lengths = Array.isArray(dimensions.length) ? dimensions.length : [payload.package_length || 1];
+    const widths = Array.isArray(dimensions.width) ? dimensions.width : [payload.package_width || 1];
+    const heights = Array.isArray(dimensions.height) ? dimensions.height : [payload.package_height || 1];
+    const declaredValue = payload.total_value || payload.package_value || 0;
+    const rowCount = Math.max(counts.length, weights.length, lengths.length, widths.length, heights.length, 1);
+
+    return Array.from({ length: rowCount }, (_, index) => ({
+      description,
+      count: counts[index] || 1,
+      weight: weights[index] || 1,
+      dimensions: `${lengths[index] || 1} x ${widths[index] || 1} x ${heights[index] || 1}`,
+      value: declaredValue
+    }));
+  }
+
+  function renderDocumentItems(items) {
+    const tbody = document.getElementById('documentItems');
+    if (!tbody) return;
+
+    tbody.innerHTML = items.map((item) => `
+      <tr>
+        <td>${escapeHtml(item.description)}</td>
+        <td>${escapeHtml(item.count)}</td>
+        <td>${escapeHtml(item.weight)} lb</td>
+        <td>${escapeHtml(item.dimensions)}</td>
+        <td>${escapeHtml(moneyText(item.value))}</td>
+      </tr>
+    `).join('');
+  }
+
+  function moneyText(amount) {
+    if (amount === undefined || amount === null || amount === '') return 'USD 0.00';
+    const raw = String(amount).trim();
+    if (/^usd\s/i.test(raw)) return raw;
+    if (raw.startsWith('$')) return `USD ${raw.slice(1)}`;
+    return `USD ${raw}`;
+  }
+
+  function readableDate(dateValue) {
+    const date = dateValue instanceof Date ? dateValue : new Date(dateValue);
+    if (Number.isNaN(date.getTime())) return String(dateValue || '');
+
+    return date.toLocaleDateString(undefined, {
+      year: 'numeric',
+      month: 'short',
+      day: '2-digit'
+    });
   }
 
   function initShipmentHistoryFilters() {
@@ -734,6 +841,10 @@ document.addEventListener('DOMContentLoaded', () => {
       user_id: quoteCustomerId || undefined,
       quote_user_id: quoteCustomerId || undefined,
       phone_or_account: queryParam('lookup') || undefined,
+      from_name: firstValue('from_name'),
+      from_email: firstValue('from_email'),
+      from_phone: firstValue('from_phone'),
+      from_account: firstValue('from_account'),
       from_country_name: fromCountryName,
       from_country: countryCode(fromCountry?.value || fromCountryName),
       from_address: firstValue('from_address'),
@@ -806,6 +917,9 @@ document.addEventListener('DOMContentLoaded', () => {
   function mergeShipmentFormPayload(basePayload) {
     return {
       ...basePayload,
+      from_name: value('shipmentFromName') || basePayload.from_name,
+      from_email: value('shipmentFromEmail') || basePayload.from_email,
+      from_phone: value('shipmentFromPhone') || basePayload.from_phone,
       from_address: value('shipmentFromAddress') || basePayload.from_address,
       from_city: value('shipmentFromCity') || basePayload.from_city,
       from_state: value('shipmentFromState') || basePayload.from_state,
