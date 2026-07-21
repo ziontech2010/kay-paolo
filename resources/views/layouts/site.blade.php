@@ -81,9 +81,9 @@
                 <li><a href="{{ route('blog') }}">Blog</a></li>
                 <li><a href="{{ route('contact') }}">Get In Touch</a></li>
                 @if ($isLoggedIn)
-                    <li><a href="{{ route('account') }}">Account</a></li>
+                    <li><a href="{{ route('account') }}" id="authNavLink" data-auth-link>My Profile</a></li>
                 @else
-                    <li><a href="{{ route('login') }}">Login</a></li>
+                    <li><a href="{{ route('login') }}" id="authNavLink" data-auth-link>Login</a></li>
                 @endif
             </ul>
         </nav>

@@ -112,6 +112,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initCounters();
   initLogin();
   initSessionPanels();
+  initAuthNav();
   initLogoutForms();
   initPullCustomer();
   initPackageBlocks();
@@ -227,6 +228,19 @@ document.addEventListener('DOMContentLoaded', () => {
       setText('dashboardRoleId', user.role_id || '-');
       setText('dashboardEmail', user.email || '-');
       setText('dashboardAccount', user.account_number || user.id || '-');
+    }
+  }
+
+  function initAuthNav() {
+    const authLink = document.querySelector('[data-auth-link]');
+    if (!authLink) return;
+
+    if (storedToken()) {
+      authLink.textContent = 'My Profile';
+      authLink.href = route('account', '/account');
+    } else {
+      authLink.textContent = 'Login';
+      authLink.href = route('loginPage', '/login');
     }
   }
 
