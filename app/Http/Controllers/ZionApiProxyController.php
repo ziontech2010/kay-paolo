@@ -12,6 +12,17 @@ class ZionApiProxyController extends Controller
     {
     }
 
+    public function login(Request $request): JsonResponse
+    {
+        $payload = $request->validate([
+            'email' => ['required', 'string'],
+            'password' => ['required', 'string'],
+            'role_id' => ['nullable', 'integer'],
+        ]);
+
+        return $this->forward('kay-paolo/login', new Request($payload));
+    }
+
     public function fetchUserForQuote(Request $request): JsonResponse
     {
         return $this->forwardAuthenticated('kay-paolo/fetch-user-for-quote', $request);
@@ -54,7 +65,7 @@ class ZionApiProxyController extends Controller
 
     private function forwardAuthenticated(string $endpoint, Request $request): JsonResponse
     {
-        $token = session('zion.access_token');
+        $token = $request->bearerToken() ?: session('zion.access_token');
 
         if (!$token) {
             return response()->json([

@@ -53,12 +53,8 @@ class ZionSessionController extends Controller
         return redirect()->route('home');
     }
 
-    public function dashboard(): View|RedirectResponse
+    public function dashboard(): View
     {
-        if (!session('zion.access_token')) {
-            return redirect()->route('login');
-        }
-
         return view('pages.dashboard', [
             'zionUser' => session('zion.user', []),
         ]);

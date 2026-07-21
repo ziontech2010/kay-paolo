@@ -24,8 +24,8 @@ class ExampleTest extends TestCase
         }
     }
 
-    public function test_dashboard_redirects_when_zion_session_is_missing(): void
+    public function test_dashboard_renders_without_a_server_side_zion_session(): void
     {
-        $this->get('/dashboard')->assertRedirect('/login');
+        $this->get('/dashboard')->assertStatus(200);
     }
 }

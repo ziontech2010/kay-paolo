@@ -1,6 +1,17 @@
 document.addEventListener('DOMContentLoaded', () => {
   const csrf = document.querySelector('meta[name="csrf-token"]')?.content || '';
   const config = window.KayPaolo || {};
+  const tokenKey = 'kayPaoloZionToken';
+  const userKey = 'kayPaoloZionUser';
+
+  const storedToken = () => window.localStorage.getItem(tokenKey) || '';
+  const storedUser = () => {
+    try {
+      return JSON.parse(window.localStorage.getItem(userKey) || '{}');
+    } catch (error) {
+      return {};
+    }
+  };
 
   const header = document.getElementById('siteHeader');
   if (header) {
@@ -32,14 +43,21 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 
-  const postJson = async (url, payload) => {
+  const postJson = async (url, payload, options = {}) => {
+    const headers = {
+      'Accept': 'application/json',
+      'Content-Type': 'application/json',
+      'X-CSRF-TOKEN': csrf
+    };
+
+    const token = options.token === undefined ? storedToken() : options.token;
+    if (token) {
+      headers.Authorization = `Bearer ${token}`;
+    }
+
     const response = await fetch(url, {
       method: 'POST',
-      headers: {
-        'Accept': 'application/json',
-        'Content-Type': 'application/json',
-        'X-CSRF-TOKEN': csrf
-      },
+      headers,
       body: JSON.stringify(payload)
     });
 
@@ -58,6 +76,70 @@ document.addEventListener('DOMContentLoaded', () => {
 
     return data;
   };
+
+  const loginForm = document.getElementById('loginForm');
+  if (loginForm && loginForm.dataset.apiLogin !== undefined) {
+    loginForm.addEventListener('submit', async (event) => {
+      event.preventDefault();
+
+      const errorBox = document.getElementById('loginApiError');
+      const successBox = document.getElementById('loginApiSuccess');
+      const submitButton = loginForm.querySelector('button[type="submit"]');
+      errorBox.hidden = true;
+      successBox.hidden = true;
+      submitButton.disabled = true;
+      submitButton.textContent = 'Logging in...';
+
+      try {
+        const payload = {
+          email: loginForm.querySelector('[name="email"]').value.trim(),
+          password: loginForm.querySelector('[name="password"]').value,
+          role_id: loginForm.querySelector('[name="role_id"]').value || undefined
+        };
+        const response = await postJson(config.routes.login, payload, { token: '' });
+
+        if (response.error === 'true' || !response.access_token) {
+          throw new Error(response.message || 'Unable to login with Zion Shipping.');
+        }
+
+        window.localStorage.setItem(tokenKey, response.access_token);
+        window.localStorage.setItem(userKey, JSON.stringify(response.user || {}));
+        successBox.textContent = response.message || 'Logged in successfully.';
+        successBox.hidden = false;
+        window.location.href = '/dashboard';
+      } catch (error) {
+        errorBox.textContent = error.message;
+        errorBox.hidden = false;
+      } finally {
+        submitButton.disabled = false;
+        submitButton.textContent = 'Login';
+      }
+    });
+  }
+
+  const authNotice = document.getElementById('authNotice');
+  if (authNotice && storedToken()) {
+    authNotice.hidden = true;
+  }
+
+  const dashboardName = document.getElementById('dashboardUserName');
+  if (dashboardName) {
+    const user = storedUser();
+    if (user && Object.keys(user).length) {
+      dashboardName.textContent = user.name || 'Zion user';
+      document.getElementById('dashboardRole').textContent = user.role?.name || 'User';
+      document.getElementById('dashboardRoleId').textContent = user.role_id || '-';
+      document.getElementById('dashboardEmail').textContent = user.email || '-';
+      document.getElementById('dashboardAccount').textContent = user.account_number || '-';
+    }
+  }
+
+  document.querySelectorAll('form[action$="/logout"]').forEach((form) => {
+    form.addEventListener('submit', () => {
+      window.localStorage.removeItem(tokenKey);
+      window.localStorage.removeItem(userKey);
+    });
+  });
 
   const selectedCountryName = (select) => select?.options[select.selectedIndex]?.text || select?.value || '';
   const value = (id) => document.getElementById(id)?.value?.trim() || '';

@@ -151,12 +151,13 @@
     window.KayPaolo = {
         authenticated: @json($isLoggedIn),
         routes: {
-            quote: @json(route('zion-api.quote')),
-            shipping: @json(route('zion-api.shipping')),
-            tracking: @json(route('zion-api.tracking')),
-            fetchUserForQuote: @json(route('zion-api.fetch-user-for-quote')),
-            consigneeList: @json(route('zion-api.consignee-list')),
-            flatRates: @json(route('zion-api.flat-rates'))
+            login: @json(route('api.kay-paolo.login')),
+            quote: @json(route('api.kay-paolo.quote')),
+            shipping: @json(route('api.kay-paolo.shipping')),
+            tracking: @json(route('api.kay-paolo.validate-tracking')),
+            fetchUserForQuote: @json(route('api.kay-paolo.fetch-user-for-quote')),
+            consigneeList: @json(route('api.kay-paolo.consignee-list')),
+            flatRates: @json(route('api.kay-paolo.flat-rates'))
         },
         assets: {
             generatingQuote: @json(asset('kay-paolo/assets/generating-quote.gif')),

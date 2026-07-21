@@ -18,9 +18,7 @@
             <h3 style="font-size:20px;margin-bottom:6px;">Shipment Details</h3>
             <p class="muted-text">Live quotes are forwarded to dev Zion Shipping using Kay Paolo API routes.</p>
 
-            @unless (session('zion.access_token'))
-                <div class="api-alert error">Login first to generate authenticated Zion quotes.</div>
-            @endunless
+            <div class="api-alert error" id="authNotice">Login first to generate authenticated Zion quotes.</div>
 
             <div class="form-row">
                 <div class="field"><label for="customerLookup">Customer Phone / Account</label><input type="text" id="customerLookup" placeholder="Optional for agents"></div>
