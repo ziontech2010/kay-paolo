@@ -20,7 +20,22 @@ class ExampleTest extends TestCase
 
     public function test_public_kay_paolo_pages_render(): void
     {
-        foreach (['/login', '/quote', '/tracking', '/about', '/services', '/contact'] as $path) {
+        foreach ([
+            '/login',
+            '/quote',
+            '/quote-details',
+            '/create-shipment',
+            '/shipment-history',
+            '/tracking',
+            '/tracking-detail',
+            '/account',
+            '/invoice',
+            '/receipt',
+            '/receipt-a4',
+            '/about',
+            '/services',
+            '/contact',
+        ] as $path) {
             $this->get($path)->assertStatus(200);
         }
     }
@@ -42,7 +57,7 @@ class ExampleTest extends TestCase
         $this->postJson('/api/kay-paolo/login')->assertStatus(422);
     }
 
-    public function test_api_login_redirects_browser_submits_to_home(): void
+    public function test_api_login_redirects_browser_submits_to_account(): void
     {
         Http::fake([
             '*/api/kay-paolo/login' => Http::response([
@@ -67,7 +82,7 @@ class ExampleTest extends TestCase
         ])
             ->assertOk()
             ->assertSee('kayPaoloZionToken', false)
-            ->assertSee('window.location.replace("http:\/\/localhost")', false)
+            ->assertSee('window.location.replace("http:\/\/localhost\/account")', false)
             ->assertDontSee('/dashboard', false);
     }
 
@@ -77,9 +92,19 @@ class ExampleTest extends TestCase
             'zion.access_token' => 'session-token',
             'zion.user' => ['name' => 'Session User', 'role_id' => 2],
         ])
-            ->get('/quote')
+            ->get('/quote-details')
             ->assertStatus(200)
             ->assertSee('sessionToken: "session-token"', false)
             ->assertSee('loginPage: "http:\/\/localhost\/login"', false);
+    }
+
+    public function test_quote_page_uses_archive_customer_pull_flow(): void
+    {
+        $this->get('/quote')
+            ->assertStatus(200)
+            ->assertSee('qCustomerLookup', false)
+            ->assertSee('pullCustomerBtn', false)
+            ->assertSee('/quote-details', false)
+            ->assertDontSee('id="quoteForm"', false);
     }
 }

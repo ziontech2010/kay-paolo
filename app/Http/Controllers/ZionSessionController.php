@@ -53,7 +53,13 @@ class ZionSessionController extends Controller
             ]);
         }
 
-        return redirect()->route('home');
+        $redirectTo = $request->input('redirect');
+
+        if (is_string($redirectTo) && str_starts_with($redirectTo, '/') && !str_starts_with($redirectTo, '//')) {
+            return redirect()->to($redirectTo);
+        }
+
+        return redirect()->route('account');
     }
 
     public function logout(Request $request): RedirectResponse
