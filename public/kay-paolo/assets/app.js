@@ -12,6 +12,18 @@ document.addEventListener('DOMContentLoaded', () => {
       return {};
     }
   };
+  const loginUrl = (redirectPath = '') => {
+    const base = config.routes?.loginPage || '/login';
+    return redirectPath ? `${base}?redirect=${encodeURIComponent(redirectPath)}` : base;
+  };
+
+  if (!storedToken() && config.sessionToken) {
+    window.localStorage.setItem(tokenKey, config.sessionToken);
+  }
+
+  if (!Object.keys(storedUser()).length && config.sessionUser && Object.keys(config.sessionUser).length) {
+    window.localStorage.setItem(userKey, JSON.stringify(config.sessionUser));
+  }
 
   const header = document.getElementById('siteHeader');
   if (header) {
@@ -244,6 +256,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const quoteForm = document.getElementById('quoteForm');
   if (quoteForm) {
+    if (!storedToken()) {
+      window.location.replace(loginUrl(window.location.pathname + window.location.search));
+      return;
+    }
+
     quoteForm.addEventListener('submit', async (event) => {
       event.preventDefault();
       const container = document.getElementById('quoteResult');

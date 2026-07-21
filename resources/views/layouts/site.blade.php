@@ -150,7 +150,10 @@
 <script>
     window.KayPaolo = {
         authenticated: @json($isLoggedIn),
+        sessionToken: @json($isLoggedIn ? session('zion.access_token') : null),
+        sessionUser: @json($zionUser),
         routes: {
+            loginPage: @json(route('login')),
             login: @json(route('api.kay-paolo.login')),
             quote: @json(route('api.kay-paolo.quote')),
             shipping: @json(route('api.kay-paolo.shipping')),

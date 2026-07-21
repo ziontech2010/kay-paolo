@@ -35,6 +35,7 @@ class ExampleTest extends TestCase
         $this->get('/login')
             ->assertStatus(200)
             ->assertSee('action="http://localhost/login"', false)
+            ->assertSee('loginPage', false)
             ->assertSee('data-api-endpoint="http://localhost/api/kay-paolo/login"', false)
             ->assertSee('data-api-login', false);
 
@@ -68,5 +69,17 @@ class ExampleTest extends TestCase
             ->assertSee('kayPaoloZionToken', false)
             ->assertSee('window.location.replace("http:\/\/localhost")', false)
             ->assertDontSee('/dashboard', false);
+    }
+
+    public function test_layout_exposes_session_token_for_quote_api_calls(): void
+    {
+        $this->withSession([
+            'zion.access_token' => 'session-token',
+            'zion.user' => ['name' => 'Session User', 'role_id' => 2],
+        ])
+            ->get('/quote')
+            ->assertStatus(200)
+            ->assertSee('sessionToken: "session-token"', false)
+            ->assertSee('loginPage: "http:\/\/localhost\/login"', false);
     }
 }
