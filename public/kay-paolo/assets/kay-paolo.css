@@ -168,6 +168,22 @@
     max-width: 620px;
 }
 
+.pkg-flat-rate-field {
+    background: #f8fafc;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 12px;
+}
+
+.pkg-flat-rate-note {
+    margin-bottom: 0;
+}
+
+.package-block input.is-readonly {
+    background: #eef2f7;
+    color: var(--ink-600);
+}
+
 .readable {
     max-width: 780px;
 }

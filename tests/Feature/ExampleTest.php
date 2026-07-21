@@ -119,6 +119,16 @@ class ExampleTest extends TestCase
             ->assertSee('id="consignee_id"', false);
     }
 
+    public function test_quote_details_has_flat_rate_dropdown_for_package_blocks(): void
+    {
+        $this->get('/quote-details?lookup=9400&customer=7020')
+            ->assertStatus(200)
+            ->assertSee('pkgFlatRate1', false)
+            ->assertSee('pkg-flat-rate-field', false)
+            ->assertSee('pkgFlatRateType1', false)
+            ->assertSee('pkg-flat-rate-type', false);
+    }
+
     public function test_receipt_and_invoice_render_documents_not_raw_json(): void
     {
         foreach (['/receipt', '/invoice', '/receipt-a4'] as $path) {
