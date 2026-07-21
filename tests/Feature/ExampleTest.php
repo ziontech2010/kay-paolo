@@ -41,7 +41,7 @@ class ExampleTest extends TestCase
         $this->postJson('/api/kay-paolo/login')->assertStatus(422);
     }
 
-    public function test_api_login_redirects_browser_submits_to_dashboard(): void
+    public function test_api_login_redirects_browser_submits_to_home(): void
     {
         Http::fake([
             '*/api/kay-paolo/login' => Http::response([
@@ -66,6 +66,7 @@ class ExampleTest extends TestCase
         ])
             ->assertOk()
             ->assertSee('kayPaoloZionToken', false)
-            ->assertSee('/dashboard', false);
+            ->assertSee('window.location.replace("http:\/\/localhost")', false)
+            ->assertDontSee('/dashboard', false);
     }
 }

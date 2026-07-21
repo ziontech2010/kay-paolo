@@ -53,7 +53,7 @@ class ZionSessionController extends Controller
             ]);
         }
 
-        return redirect()->intended(route('dashboard'));
+        return redirect()->route('home');
     }
 
     public function logout(Request $request): RedirectResponse

@@ -107,7 +107,7 @@ document.addEventListener('DOMContentLoaded', () => {
         window.localStorage.setItem(userKey, JSON.stringify(response.user || {}));
         successBox.textContent = response.message || 'Logged in successfully.';
         successBox.hidden = false;
-        window.location.href = '/dashboard';
+        window.location.href = '/';
       } catch (error) {
         errorBox.textContent = error.message;
         errorBox.hidden = false;

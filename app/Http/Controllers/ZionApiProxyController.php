@@ -115,7 +115,7 @@ class ZionApiProxyController extends Controller
     {
         $token = json_encode($data['access_token'] ?? '');
         $user = json_encode($data['user'] ?? []);
-        $dashboard = json_encode(route('dashboard'));
+        $home = json_encode(route('home'));
 
         return <<<HTML
 <!doctype html>
@@ -125,7 +125,7 @@ class ZionApiProxyController extends Controller
 <script>
 window.localStorage.setItem('kayPaoloZionToken', {$token});
 window.localStorage.setItem('kayPaoloZionUser', JSON.stringify({$user}));
-window.location.replace({$dashboard});
+window.location.replace({$home});
 </script>
 </body>
 </html>
