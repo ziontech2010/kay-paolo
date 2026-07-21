@@ -6,6 +6,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const pendingShipmentKey = 'kayPaoloPendingShipment';
   const shipmentResponseKey = 'kayPaoloShipmentResponse';
   const trackingResponseKey = 'kayPaoloTrackingResponse';
+  const flatRateCache = new Map();
 
   const route = (name, fallback) => config.routes?.[name] || fallback;
   const storedToken = () => window.localStorage.getItem(tokenKey) || '';
@@ -432,12 +433,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const flat = block.querySelector('.pkg-flat-rate');
         const count = block.querySelector('.pkg-count');
+        const type = block.querySelector('.pkg-flat-rate-type');
         if (flat) flat.id = `pkgFlatRate${number}`;
         if (count) count.id = `pkgCount${number}`;
+        if (type) type.id = `pkgFlatRateType${number}`;
         const flatLabel = block.querySelector('label[for^="pkgFlatRate"]');
         const countLabel = block.querySelector('label[for^="pkgCount"]');
+        const typeLabel = block.querySelector('label[for^="pkgFlatRateType"]');
         if (flatLabel) flatLabel.setAttribute('for', `pkgFlatRate${number}`);
         if (countLabel) countLabel.setAttribute('for', `pkgCount${number}`);
+        if (typeLabel) typeLabel.setAttribute('for', `pkgFlatRateType${number}`);
+        toggleFlatRateField(block, Boolean(flat?.checked));
       });
     };
 
@@ -455,6 +461,10 @@ document.addEventListener('DOMContentLoaded', () => {
         clone.querySelectorAll('select').forEach((select) => {
           select.selectedIndex = 0;
         });
+        clone.querySelectorAll('.pkg-flat-rate-note').forEach((note) => {
+          note.textContent = '';
+          note.className = 'api-inline-result pkg-flat-rate-note';
+        });
         container.appendChild(clone);
         refreshPackages();
       }
@@ -465,7 +475,205 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     });
 
+    container.addEventListener('change', (event) => {
+      const flatCheckbox = event.target.closest('.pkg-flat-rate');
+      const flatType = event.target.closest('.pkg-flat-rate-type');
+
+      if (flatCheckbox) {
+        toggleFlatRateField(flatCheckbox.closest('.package-block'), flatCheckbox.checked);
+      }
+
+      if (flatType) {
+        applyFlatRateDefaults(flatType.closest('.package-block'), flatType.selectedOptions[0]);
+      }
+    });
+
+    ['toCountry', 'to_country'].forEach((id) => {
+      document.getElementById(id)?.addEventListener('change', () => reloadVisibleFlatRateFields(container));
+    });
+    document.getElementById('from_state')?.addEventListener('change', () => reloadVisibleFlatRateFields(container));
+
     refreshPackages();
+  }
+
+  function toggleFlatRateField(block, checked) {
+    if (!block) return;
+
+    const field = block.querySelector('.pkg-flat-rate-field');
+    const select = block.querySelector('.pkg-flat-rate-type');
+    const note = block.querySelector('.pkg-flat-rate-note');
+    if (!field || !select) return;
+
+    field.style.display = checked ? 'block' : 'none';
+    select.required = checked;
+
+    if (checked) {
+      loadFlatRatesForBlock(block);
+      return;
+    }
+
+    select.value = '';
+    select.disabled = false;
+    if (note) {
+      note.textContent = '';
+      note.className = 'api-inline-result pkg-flat-rate-note';
+    }
+    setFlatRateDimensionReadonly(block, false);
+  }
+
+  function reloadVisibleFlatRateFields(container) {
+    container.querySelectorAll('.package-block').forEach((block) => {
+      if (block.querySelector('.pkg-flat-rate')?.checked) {
+        loadFlatRatesForBlock(block, true);
+      }
+    });
+  }
+
+  async function loadFlatRatesForBlock(block, force = false) {
+    const select = block.querySelector('.pkg-flat-rate-type');
+    const note = block.querySelector('.pkg-flat-rate-note');
+    if (!select) return;
+
+    const toCountry = firstElement('toCountry', 'to_country');
+    const toCountryName = selectedCountryName(toCountry);
+    const toCountryCode = countryCode(toCountry?.value || toCountryName);
+    const fromState = firstValue('from_state');
+    const cacheKey = `${toCountryCode || 'any'}:${fromState || 'any'}`;
+
+    if (!force && select.dataset.loadedFor === cacheKey && select.options.length > 1) return;
+
+    const setNote = (message, isError = false) => {
+      if (!note) return;
+      note.className = isError ? 'api-inline-result api-alert error pkg-flat-rate-note' : 'api-inline-result success pkg-flat-rate-note';
+      note.textContent = message;
+    };
+
+    select.disabled = true;
+    select.innerHTML = '<option value="">Loading flat rate items...</option>';
+    setNote('Loading flat rate items from Zion...');
+
+    try {
+      const response = await postJson(route('flatRates', '/api/kay-paolo/flat-rates'), {
+        to_country: toCountryCode || undefined,
+        from_state: fromState || undefined,
+        to: {
+          country: toCountryCode || undefined,
+          country_name: toCountryName || undefined
+        },
+        from: {
+          state: fromState || undefined
+        }
+      });
+      const options = normalizeFlatRateOptions(response);
+      flatRateCache.set(cacheKey, options);
+      populateFlatRateSelect(select, options);
+      select.dataset.loadedFor = cacheKey;
+      select.disabled = false;
+      setNote(options.length ? `${options.length} flat rate item(s) loaded.` : 'No flat rate items available for this destination.', options.length === 0);
+    } catch (error) {
+      const fallbackOptions = flatRateCache.get('fallback') || fallbackFlatRateOptions();
+      flatRateCache.set('fallback', fallbackOptions);
+      populateFlatRateSelect(select, fallbackOptions);
+      select.dataset.loadedFor = cacheKey;
+      select.disabled = false;
+      setNote('Showing standard flat rate items until Zion returns live options.', true);
+    }
+  }
+
+  function normalizeFlatRateOptions(response) {
+    const options = [
+      response?.options,
+      response?.data?.options,
+      response?.all_options,
+      response?.data?.all_options
+    ].find(Array.isArray) || [];
+
+    return options.map((option) => normalizeFlatRateOption(option)).filter((option) => option.slug);
+  }
+
+  function normalizeFlatRateOption(option) {
+    const defaults = option.default_dimensions || option.dimensions || {};
+
+    return {
+      slug: option.slug || option.value || option.id || '',
+      label: option.label || option.name || option.title || option.slug || 'Flat Rate Item',
+      group: option.group || option.category || 'Flat Rate',
+      price: option.price || option.amount || option.rate || option.total || '',
+      readonly: option.readonly_dimensions !== false,
+      defaults: {
+        package_count_ind: defaults.package_count_ind || defaults.count || 1,
+        weight: defaults.weight || option.weight || '',
+        length: defaults.length || option.length || '',
+        width: defaults.width || option.width || '',
+        height: defaults.height || option.height || ''
+      }
+    };
+  }
+
+  function fallbackFlatRateOptions() {
+    return [
+      { slug: 'contains_document', label: 'DOCUMENT', group: 'DOCUMENT', defaults: { package_count_ind: 1, weight: 0.5, length: 12, width: 8, height: 1 }, readonly: true },
+      { slug: 'phone_new', label: 'NEW PHONE', group: 'PHONE', defaults: { package_count_ind: 1, weight: 2, length: 9, width: 6, height: 2 }, readonly: true },
+      { slug: 'phone_used', label: 'USED PHONE', group: 'PHONE', defaults: { package_count_ind: 1, weight: 2, length: 9, width: 6, height: 2 }, readonly: true },
+      { slug: 'tablet_new', label: 'NEW TABLET', group: 'TABLET', defaults: { package_count_ind: 1, weight: 2, length: 12, width: 9, height: 3 }, readonly: true },
+      { slug: 'laptop_used', label: 'USED LAPTOP', group: 'LAPTOP', defaults: { package_count_ind: 1, weight: 5, length: 18, width: 12, height: 4 }, readonly: true },
+      { slug: 'barrel_55_gal', label: 'BARREL 55 GAL', group: 'SPECIAL', defaults: { package_count_ind: 1, weight: 200, length: 34, width: 24, height: 24 }, readonly: true },
+      { slug: 'bins', label: 'BINS', group: 'SPECIAL', defaults: { package_count_ind: 1, weight: 80, length: 36, width: 16, height: 16 }, readonly: true }
+    ];
+  }
+
+  function populateFlatRateSelect(select, options) {
+    select.innerHTML = '<option value="">-- Select Flat Rate Item --</option>';
+
+    const groups = new Map();
+    options.forEach((option) => {
+      const groupName = option.group || 'Flat Rate';
+      if (!groups.has(groupName)) {
+        const group = document.createElement('optgroup');
+        group.label = groupName;
+        groups.set(groupName, group);
+        select.appendChild(group);
+      }
+
+      const optionElement = document.createElement('option');
+      optionElement.value = option.slug;
+      optionElement.textContent = option.price ? `${option.label} - ${moneyText(option.price)}` : option.label;
+      optionElement.dataset.weight = option.defaults.weight;
+      optionElement.dataset.length = option.defaults.length;
+      optionElement.dataset.width = option.defaults.width;
+      optionElement.dataset.height = option.defaults.height;
+      optionElement.dataset.count = option.defaults.package_count_ind;
+      optionElement.dataset.readonlyDimensions = option.readonly ? '1' : '0';
+      groups.get(groupName).appendChild(optionElement);
+    });
+  }
+
+  function applyFlatRateDefaults(block, option) {
+    if (!block || !option || !option.value) {
+      setFlatRateDimensionReadonly(block, false);
+      return;
+    }
+
+    setBlockValue(block, '.pkg-count', option.dataset.count);
+    setBlockValue(block, '.pkg-weight', option.dataset.weight);
+    setBlockValue(block, '.pkg-length', option.dataset.length);
+    setBlockValue(block, '.pkg-width', option.dataset.width);
+    setBlockValue(block, '.pkg-height', option.dataset.height);
+    setFlatRateDimensionReadonly(block, option.dataset.readonlyDimensions === '1');
+  }
+
+  function setBlockValue(block, selector, nextValue) {
+    const element = block?.querySelector(selector);
+    if (element && nextValue !== undefined && nextValue !== null && nextValue !== '') {
+      element.value = nextValue;
+    }
+  }
+
+  function setFlatRateDimensionReadonly(block, readonly) {
+    block?.querySelectorAll('.pkg-weight,.pkg-length,.pkg-width,.pkg-height').forEach((input) => {
+      input.readOnly = readonly;
+      input.classList.toggle('is-readonly', readonly);
+    });
   }
 
   function initQuoteForm() {
@@ -812,6 +1020,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const width = numberValue(block.querySelector('.pkg-width')?.value, 1);
         const height = numberValue(block.querySelector('.pkg-height')?.value, 1);
         const isFlat = Boolean(block.querySelector('.pkg-flat-rate')?.checked);
+        const flatType = block.querySelector('.pkg-flat-rate-type')?.value || '';
         dimensions.package_count_ind.push(count);
         dimensions.weight.push(weight);
         dimensions.length.push(length);
@@ -819,7 +1028,9 @@ document.addEventListener('DOMContentLoaded', () => {
         dimensions.height.push(height);
         if (isFlat) {
           flatRate.push('on');
-          shipmentType.push('flat_rate');
+          if (flatType) {
+            shipmentType.push(flatType);
+          }
         }
       });
     } else {

@@ -211,6 +211,14 @@
                                         </div>
                                     </div>
 
+                                    <div class="field pkg-flat-rate-field" style="display: none; margin-bottom: 14px">
+                                        <label for="pkgFlatRateType1">Flat Rate Item</label>
+                                        <select id="pkgFlatRateType1" class="pkg-flat-rate-type">
+                                            <option value="">-- Select Flat Rate Item --</option>
+                                        </select>
+                                        <div class="api-inline-result pkg-flat-rate-note"></div>
+                                    </div>
+
                                     <div style="display: grid; grid-template-columns: repeat(4, 1fr) auto; gap: 12px; align-items: end">
                                         <div class="field" style="margin-bottom: 0">
                                             <label>Weight *</label>
