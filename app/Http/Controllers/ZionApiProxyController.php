@@ -65,7 +65,7 @@ class ZionApiProxyController extends Controller
 
     private function forwardAuthenticated(string $endpoint, Request $request): JsonResponse
     {
-        $token = $request->bearerToken() ?: session('zion.access_token');
+        $token = $request->bearerToken();
 
         if (!$token) {
             return response()->json([

@@ -28,4 +28,14 @@ class ExampleTest extends TestCase
     {
         $this->get('/dashboard')->assertStatus(200);
     }
+
+    public function test_login_form_posts_to_kay_paolo_api_route(): void
+    {
+        $this->get('/login')
+            ->assertStatus(200)
+            ->assertSee('action="http://localhost/api/kay-paolo/login"', false)
+            ->assertSee('data-api-login', false);
+
+        $this->post('/login')->assertStatus(405);
+    }
 }

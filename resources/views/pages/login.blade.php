@@ -17,7 +17,7 @@
         <div class="login-card">
             <div class="login-icon"></div>
             <h2>Zion Account Login</h2>
-            <p class="sub">Sign in with an active Zion Shipping user. Kay Paolo will keep the returned token and role in this session.</p>
+            <p class="sub">Sign in with an active Zion Shipping user. Kay Paolo will keep the returned token and role in your browser.</p>
 
             @if ($errors->any())
                 <div class="api-alert error">{{ $errors->first() }}</div>
@@ -26,8 +26,7 @@
             <div class="api-alert error" id="loginApiError" hidden></div>
             <div class="api-alert success" id="loginApiSuccess" hidden></div>
 
-            <form class="login-form" method="POST" action="{{ route('login.submit') }}" id="loginForm" data-api-login>
-                @csrf
+            <form class="login-form" method="POST" action="{{ route('api.kay-paolo.login') }}" id="loginForm" data-api-login>
                 <div class="field">
                     <label for="email">Email or Phone</label>
                     <input type="text" id="email" name="email" value="{{ old('email') }}" required autocomplete="username">
