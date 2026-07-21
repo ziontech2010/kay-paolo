@@ -36,6 +36,7 @@
 
             <form class="login-form" method="POST" action="{{ route('login.submit') }}" id="loginForm" data-api-login data-api-endpoint="{{ route('api.kay-paolo.login') }}">
                 @csrf
+                <input type="hidden" name="redirect" value="{{ request('redirect') }}">
                 <div class="field">
                     <label for="email">Email Address</label>
                     <input type="email" id="email" name="email" value="{{ old('email') }}" placeholder="Enter your email" required autocomplete="username">

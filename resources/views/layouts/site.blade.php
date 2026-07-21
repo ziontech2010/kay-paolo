@@ -68,9 +68,7 @@
                     <div class="dropdown">
                         <a href="{{ route('quote') }}">Create a Shipment</a>
                         <a href="{{ route('quote') }}">Get Quote</a>
-                        @if ($isLoggedIn)
-                            <a href="{{ route('dashboard') }}">Shipment History</a>
-                        @endif
+                        <a href="{{ route('shipment-history') }}">Shipment History</a>
                     </div>
                 </li>
                 <li class="has-dd">
@@ -83,7 +81,7 @@
                 <li><a href="{{ route('blog') }}">Blog</a></li>
                 <li><a href="{{ route('contact') }}">Get In Touch</a></li>
                 @if ($isLoggedIn)
-                    <li><a href="{{ route('dashboard') }}">Dashboard</a></li>
+                    <li><a href="{{ route('account') }}">Account</a></li>
                 @else
                     <li><a href="{{ route('login') }}">Login</a></li>
                 @endif
@@ -137,22 +135,11 @@
             </ul>
         </div>
         <div>
-            <h5>{{ $isLoggedIn ? 'Session' : 'Contact' }}</h5>
+            <h5>Contact</h5>
             <ul>
-                @if ($isLoggedIn)
-                    <li>{{ $zionUser['name'] ?? 'Zion user' }}</li>
-                    <li>{{ $zionUser['role']['name'] ?? 'Role synced from Zion' }}</li>
-                    <li>
-                        <form method="POST" action="{{ route('logout') }}">
-                            @csrf
-                            <button class="footer-button" type="submit">Logout</button>
-                        </form>
-                    </li>
-                @else
-                    <li>(732) 898-9303</li>
-                    <li>info@kaypaoloshipping.com</li>
-                    <li>414 Main St,<br>Asbury Park, NJ 07712</li>
-                @endif
+                <li>(732) 898-9303</li>
+                <li>info@kaypaoloshipping.com</li>
+                <li>414 Main St,<br>Asbury Park, NJ 07712</li>
             </ul>
         </div>
     </div>
@@ -175,13 +162,21 @@
         sessionUser: @json($zionUser),
         routes: {
             loginPage: @json(route('login')),
+            account: @json(route('account')),
+            quotePage: @json(route('quote')),
+            quoteDetails: @json(route('quote.details')),
+            createShipmentPage: @json(route('create-shipment')),
+            trackingPage: @json(route('tracking')),
+            trackingDetail: @json(route('tracking.detail')),
+            receipt: @json(route('receipt')),
             login: @json(route('api.kay-paolo.login')),
             quote: @json(route('api.kay-paolo.quote')),
             shipping: @json(route('api.kay-paolo.shipping')),
             tracking: @json(route('api.kay-paolo.validate-tracking')),
             fetchUserForQuote: @json(route('api.kay-paolo.fetch-user-for-quote')),
             consigneeList: @json(route('api.kay-paolo.consignee-list')),
-            flatRates: @json(route('api.kay-paolo.flat-rates'))
+            flatRates: @json(route('api.kay-paolo.flat-rates')),
+            shippingHistory: @json(route('api.kay-paolo.shipping-history'))
         },
         assets: {
             generatingQuote: @json(asset('kay-paolo/assets/generating-quote.gif')),
