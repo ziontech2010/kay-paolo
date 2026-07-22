@@ -181,8 +181,22 @@ class ExampleTest extends TestCase
             ->assertSee('kayProcessOverlay', false)
             ->assertSee('generating-quote.gif', false)
             ->assertSee('processing-shipping.gif', false)
+            ->assertSee('app.js?v=', false)
+            ->assertSee('kay-paolo.css?v=', false)
             ->assertSee('saveConsignee', false)
             ->assertSee('save-consignee', false);
+    }
+
+    public function test_delivery_location_runtime_guard_limits_options(): void
+    {
+        $script = file_get_contents(public_path('kay-paolo/assets/app.js'));
+
+        $this->assertStringContainsString('initDeliveryLocationSelects', $script);
+        $this->assertStringContainsString("select.dataset.kayDeliveryLocked = '1'", $script);
+        $this->assertStringContainsString('Pickup in Office', $script);
+        $this->assertStringContainsString('Home Delivery', $script);
+        $this->assertStringNotContainsString('Door to Door', $script);
+        $this->assertStringNotContainsString('Port to Port', $script);
     }
 
     public function test_account_shows_admin_access_notice_for_admin_session(): void

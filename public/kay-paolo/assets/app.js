@@ -108,6 +108,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 
+  initDeliveryLocationSelects();
   initBackButtons();
   initContactModal();
   initCounters();
@@ -169,6 +170,35 @@ document.addEventListener('DOMContentLoaded', () => {
 
         window.location.href = route('quotePage', '/quote');
       });
+    });
+  }
+
+  function initDeliveryLocationSelects() {
+    const selectors = [
+      '#deliveryLocation',
+      '#shipmentDeliveryLocation',
+      'select[name="delivery_location"]',
+      'select.delivery_location'
+    ];
+    const selects = new Set(selectors.flatMap((selector) => Array.from(document.querySelectorAll(selector))));
+
+    selects.forEach((select) => {
+      const previous = normalizeDeliveryLocation(select.value);
+      select.innerHTML = '';
+
+      [
+        { value: '', label: '-- Select Delivery Location --' },
+        { value: 'Pickup in Office', label: 'Pickup in Office' },
+        { value: 'Home Delivery', label: 'Home Delivery' }
+      ].forEach((option) => {
+        const optionElement = document.createElement('option');
+        optionElement.value = option.value;
+        optionElement.textContent = option.label;
+        select.appendChild(optionElement);
+      });
+
+      select.value = ['Pickup in Office', 'Home Delivery'].includes(previous) ? previous : '';
+      select.dataset.kayDeliveryLocked = '1';
     });
   }
 

@@ -1,6 +1,9 @@
 @php
     $zionUser = session('zion.user', []);
     $isLoggedIn = (bool) session('zion.access_token');
+    $styleVersion = @filemtime(public_path('kay-paolo/assets/style.css')) ?: time();
+    $kayPaoloCssVersion = @filemtime(public_path('kay-paolo/assets/kay-paolo.css')) ?: time();
+    $appJsVersion = @filemtime(public_path('kay-paolo/assets/app.js')) ?: time();
 @endphp
 <!doctype html>
 <html lang="en">
@@ -13,8 +16,8 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;0,9..144,700;1,9..144,500&family=Inter:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="{{ asset('kay-paolo/assets/style.css') }}">
-    <link rel="stylesheet" href="{{ asset('kay-paolo/assets/kay-paolo.css') }}">
+    <link rel="stylesheet" href="{{ asset('kay-paolo/assets/style.css') }}?v={{ $styleVersion }}">
+    <link rel="stylesheet" href="{{ asset('kay-paolo/assets/kay-paolo.css') }}?v={{ $kayPaoloCssVersion }}">
     <link rel="icon" href="{{ asset('kay-paolo/assets/logo/kay-paolo.svg') }}">
 </head>
 <body data-authenticated="{{ $isLoggedIn ? '1' : '0' }}">
@@ -196,6 +199,6 @@
         }
     };
 </script>
-<script src="{{ asset('kay-paolo/assets/app.js') }}" defer></script>
+<script src="{{ asset('kay-paolo/assets/app.js') }}?v={{ $appJsVersion }}" defer></script>
 </body>
 </html>
