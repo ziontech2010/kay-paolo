@@ -27,6 +27,10 @@
 @section('content')
 <section class="page-follows-banner">
     <div class="wrap quote-page-grid">
+        <div class="page-back-actions" style="grid-column: 1 / -1">
+            <button type="button" class="btn btn-secondary btn-back" data-go-back>&larr; Back</button>
+        </div>
+
         <form class="contact-form" id="quoteForm" style="padding: 0; background: none; border: none; box-shadow: none; grid-column: 1 / -1">
             <input type="hidden" id="quoteUserId" name="user_id" value="{{ request('customer') }}">
             <input type="hidden" id="consignee_id" name="consignee_id" value="">
@@ -35,35 +39,21 @@
             <div class="api-alert error" id="authNotice">Login first to generate authenticated Zion quotes.</div>
 
             <div class="create-shipment-grid">
-                <div class="shipment-card" style="height: 100%; display: flex; flex-direction: column; margin-bottom: 0">
+                <div class="shipment-card quote-party-card" style="height: 100%; display: flex; flex-direction: column; margin-bottom: 0">
                     <div class="shipment-card-header" id="fromCardTitle" style="text-transform: none; font-family: 'Inter', sans-serif; font-size: 18px; font-weight: 700; letter-spacing: 0">
                         From: {{ $shipperName }}
                     </div>
                     <div class="shipment-card-body" style="flex-grow: 1">
-                        <div class="field">
-                            <label>Name</label>
-                            <input type="text" id="from_name" value="{{ $shipperName }}" readonly style="background: #f8fafc; font-weight: 600; color: #334155">
-                        </div>
-                        <div class="form-row-2">
-                            <div class="field">
-                                <label>Email</label>
-                                <input type="email" id="from_email" value="{{ $shipperEmail }}" readonly style="background: #f8fafc; font-weight: 600; color: #334155">
-                            </div>
-                            <div class="field">
-                                <label>Phone</label>
-                                <input type="text" id="from_phone" value="{{ $shipperPhone }}" readonly style="background: #f8fafc; font-weight: 600; color: #334155">
-                            </div>
-                        </div>
                         <div class="form-row-3">
-                            <div class="field" style="grid-column: span 2">
+                            <div class="field">
                                 <label for="from_country">Country *</label>
                                 <select id="from_country" name="from_country" required>
                                     <option value="US" selected>United States</option>
                                 </select>
                             </div>
-                            <div class="field">
-                                <label>Account Number</label>
-                                <input type="text" id="from_account" value="{{ $shipperAccount }}" readonly style="background: #f8fafc; font-weight: 600; color: #334155">
+                            <div class="field" style="grid-column: span 2">
+                                <label for="from_address">Address *</label>
+                                <input type="text" id="from_address" value="{{ $shipperAddress }}" required>
                             </div>
                         </div>
                         <div class="form-row-3">
@@ -80,10 +70,24 @@
                                 <input type="text" id="from_state" value="{{ $shipperState }}" required>
                             </div>
                         </div>
+                        <div class="form-row-3">
+                            <div class="field">
+                                <label>Name</label>
+                                <input type="text" id="from_name" value="{{ $shipperName }}" readonly style="background: #f8fafc; font-weight: 600; color: #334155">
+                            </div>
+                            <div class="field">
+                                <label>Email</label>
+                                <input type="email" id="from_email" value="{{ $shipperEmail }}" readonly style="background: #f8fafc; font-weight: 600; color: #334155">
+                            </div>
+                            <div class="field">
+                                <label>Phone</label>
+                                <input type="text" id="from_phone" value="{{ $shipperPhone }}" readonly style="background: #f8fafc; font-weight: 600; color: #334155">
+                            </div>
+                        </div>
                         <div class="form-row-2">
                             <div class="field">
-                                <label for="from_address">Address *</label>
-                                <input type="text" id="from_address" value="{{ $shipperAddress }}" required>
+                                <label>Account Number</label>
+                                <input type="text" id="from_account" value="{{ $shipperAccount }}" readonly style="background: #f8fafc; font-weight: 600; color: #334155">
                             </div>
                             <div class="field">
                                 <label>Apt/Ste/Unit</label>
@@ -93,7 +97,7 @@
                     </div>
                 </div>
 
-                <div class="shipment-card" style="height: 100%; display: flex; flex-direction: column; margin-bottom: 0">
+                <div class="shipment-card quote-party-card" style="height: 100%; display: flex; flex-direction: column; margin-bottom: 0">
                     <div class="shipment-card-header" style="text-transform: none; font-family: 'Inter', sans-serif; font-size: 18px; font-weight: 700; letter-spacing: 0">
                         To:
                     </div>
@@ -117,22 +121,8 @@
                             <div id="existingConsigneeResult" class="api-inline-result"></div>
                         </div>
 
-                        <div class="field">
-                            <label for="toName">Consignee Name</label>
-                            <input type="text" id="toName" placeholder="Consignee Name" required>
-                        </div>
-                        <div class="form-row-2">
-                            <div class="field">
-                                <label for="toPhone">Phone</label>
-                                <input type="text" id="toPhone" placeholder="Phone" required>
-                            </div>
-                            <div class="field">
-                                <label for="toHomePhone">Home Phone</label>
-                                <input type="text" id="toHomePhone" placeholder="Home Phone">
-                            </div>
-                        </div>
                         <div class="form-row-3">
-                            <div class="field" style="grid-column: span 2">
+                            <div class="field">
                                 <label for="toCountry">Country *</label>
                                 <select id="toCountry" required>
                                     <option value="">Select Country</option>
@@ -153,22 +143,16 @@
                                     <option>India</option>
                                 </select>
                             </div>
+                            <div class="field" style="grid-column: span 2">
+                                <label for="toAddress">Address *</label>
+                                <input type="text" id="toAddress" placeholder="Enter a location" required>
+                            </div>
+                        </div>
+                        <div class="form-row-3">
                             <div class="field">
                                 <label for="toZip">Zip Code</label>
                                 <input type="text" id="toZip" placeholder="Zip Code">
                             </div>
-                        </div>
-                        <div class="form-row-2">
-                            <div class="field">
-                                <label for="toAddress">Address *</label>
-                                <input type="text" id="toAddress" placeholder="Enter a location" required>
-                            </div>
-                            <div class="field">
-                                <label for="toApt">Apt/Ste/Unit</label>
-                                <input type="text" id="toApt" placeholder="Apt/Ste/Unit">
-                            </div>
-                        </div>
-                        <div class="form-row-2">
                             <div class="field">
                                 <label for="toCity">City *</label>
                                 <input type="text" id="toCity" placeholder="City" required>
@@ -177,6 +161,24 @@
                                 <label for="toState">State *</label>
                                 <input type="text" id="toState" placeholder="State" required>
                             </div>
+                        </div>
+                        <div class="form-row-3">
+                            <div class="field">
+                                <label for="toName">Consignee Name</label>
+                                <input type="text" id="toName" placeholder="Consignee Name" required>
+                            </div>
+                            <div class="field">
+                                <label for="toPhone">Phone</label>
+                                <input type="text" id="toPhone" placeholder="Phone" required>
+                            </div>
+                            <div class="field">
+                                <label for="toHomePhone">Home Phone</label>
+                                <input type="text" id="toHomePhone" placeholder="Home Phone">
+                            </div>
+                        </div>
+                        <div class="field">
+                            <label for="toApt">Apt/Ste/Unit</label>
+                            <input type="text" id="toApt" placeholder="Apt/Ste/Unit">
                         </div>
                     </div>
                 </div>
@@ -249,7 +251,7 @@
                             </div>
                             <div class="field">
                                 <label for="packageDescription">Package Description</label>
-                                <textarea id="packageDescription" placeholder="Documents, clothing, electronics, etc.">General merchandise</textarea>
+                                <textarea id="packageDescription" placeholder="Documents, clothing, electronics, etc."></textarea>
                             </div>
                         </div>
                         <div class="checkbox-field" style="margin-top: 16px">
@@ -269,12 +271,8 @@
                                 <label for="deliveryLocation">Delivery location *</label>
                                 <select id="deliveryLocation" required>
                                     <option value="">-- Select Delivery Location --</option>
-                                    <option>Door to Door</option>
-                                    <option>Port to Port</option>
-                                    <option>Door to Port</option>
-                                    <option>Port to Door</option>
-                                    <option>Home Delivery</option>
-                                    <option>Office Pickup</option>
+                                    <option value="Pickup in Office">Pickup in Office</option>
+                                    <option value="Home Delivery">Home Delivery</option>
                                 </select>
                             </div>
                             <div class="field">

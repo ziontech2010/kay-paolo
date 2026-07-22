@@ -1,6 +1,9 @@
 @php
     $zionUser = session('zion.user', []);
     $isLoggedIn = (bool) session('zion.access_token');
+    $styleVersion = @filemtime(public_path('kay-paolo/assets/style.css')) ?: time();
+    $kayPaoloCssVersion = @filemtime(public_path('kay-paolo/assets/kay-paolo.css')) ?: time();
+    $appJsVersion = @filemtime(public_path('kay-paolo/assets/app.js')) ?: time();
 @endphp
 <!doctype html>
 <html lang="en">
@@ -13,8 +16,8 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;0,9..144,700;1,9..144,500&family=Inter:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="{{ asset('kay-paolo/assets/style.css') }}">
-    <link rel="stylesheet" href="{{ asset('kay-paolo/assets/kay-paolo.css') }}">
+    <link rel="stylesheet" href="{{ asset('kay-paolo/assets/style.css') }}?v={{ $styleVersion }}">
+    <link rel="stylesheet" href="{{ asset('kay-paolo/assets/kay-paolo.css') }}?v={{ $kayPaoloCssVersion }}">
     <link rel="icon" href="{{ asset('kay-paolo/assets/logo/kay-paolo.svg') }}">
 </head>
 <body data-authenticated="{{ $isLoggedIn ? '1' : '0' }}">
@@ -153,6 +156,16 @@
     <svg viewBox="0 0 32 32"><path d="M16.001 3C9.383 3 4 8.383 4 15c0 2.34.687 4.51 1.865 6.34L4 29l7.86-1.822A11.94 11.94 0 0 0 16 27c6.617 0 12-5.383 12-12S22.618 3 16.001 3zm6.98 17.02c-.298.84-1.47 1.54-2.41 1.74-.65.14-1.5.25-4.35-.93-3.65-1.51-6-5.2-6.18-5.44-.18-.24-1.47-1.95-1.47-3.72 0-1.77.93-2.64 1.26-3 .33-.36.72-.45.96-.45.24 0 .48 0 .69.01.22.01.52-.08.81.62.3.72 1.02 2.49 1.11 2.67.09.18.15.39.03.63-.12.24-.18.39-.36.6-.18.21-.38.47-.54.63-.18.18-.37.38-.16.74.21.36.94 1.55 2.02 2.51 1.39 1.24 2.56 1.62 2.92 1.8.36.18.57.15.78-.09.21-.24.9-1.05 1.14-1.41.24-.36.48-.3.81-.18.33.12 2.1.99 2.46 1.17.36.18.6.27.69.42.09.15.09.87-.19 1.71z"></path></svg>
 </a>
 
+<div class="kay-process-overlay" id="kayProcessOverlay" hidden>
+    <div class="kay-process-card" role="status" aria-live="polite">
+        <img id="kayProcessImage" src="{{ asset('kay-paolo/assets/generating-quote.gif') }}" alt="Processing request">
+        <div class="kay-process-copy">
+            <h3 id="kayProcessTitle">Processing</h3>
+            <p id="kayProcessMessage">Please wait while Kay Paolo talks to Zion Shipping.</p>
+        </div>
+    </div>
+</div>
+
 @stack('modals')
 
 <script>
@@ -160,6 +173,7 @@
         authenticated: @json($isLoggedIn),
         sessionToken: @json($isLoggedIn ? session('zion.access_token') : null),
         sessionUser: @json($zionUser),
+        zionWebUrl: @json(rtrim((string) config('services.zion_shipping.web_url'), '/') . '/'),
         routes: {
             loginPage: @json(route('login')),
             account: @json(route('account')),
@@ -176,6 +190,7 @@
             fetchUserForQuote: @json(route('api.kay-paolo.fetch-user-for-quote')),
             consigneeList: @json(route('api.kay-paolo.consignee-list')),
             flatRates: @json(route('api.kay-paolo.flat-rates')),
+            saveConsignee: @json(route('api.kay-paolo.save-consignee')),
             shippingHistory: @json(route('api.kay-paolo.shipping-history'))
         },
         assets: {
@@ -184,6 +199,6 @@
         }
     };
 </script>
-<script src="{{ asset('kay-paolo/assets/app.js') }}" defer></script>
+<script src="{{ asset('kay-paolo/assets/app.js') }}?v={{ $appJsVersion }}" defer></script>
 </body>
 </html>

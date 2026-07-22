@@ -108,6 +108,8 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 
+  initDeliveryLocationSelects();
+  initBackButtons();
   initContactModal();
   initCounters();
   initLogin();
@@ -156,6 +158,48 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     return data;
+  }
+
+  function initBackButtons() {
+    document.querySelectorAll('[data-go-back]').forEach((button) => {
+      button.addEventListener('click', () => {
+        if (window.history.length > 1) {
+          window.history.back();
+          return;
+        }
+
+        window.location.href = route('quotePage', '/quote');
+      });
+    });
+  }
+
+  function initDeliveryLocationSelects() {
+    const selectors = [
+      '#deliveryLocation',
+      '#shipmentDeliveryLocation',
+      'select[name="delivery_location"]',
+      'select.delivery_location'
+    ];
+    const selects = new Set(selectors.flatMap((selector) => Array.from(document.querySelectorAll(selector))));
+
+    selects.forEach((select) => {
+      const previous = normalizeDeliveryLocation(select.value);
+      select.innerHTML = '';
+
+      [
+        { value: '', label: '-- Select Delivery Location --' },
+        { value: 'Pickup in Office', label: 'Pickup in Office' },
+        { value: 'Home Delivery', label: 'Home Delivery' }
+      ].forEach((option) => {
+        const optionElement = document.createElement('option');
+        optionElement.value = option.value;
+        optionElement.textContent = option.label;
+        select.appendChild(optionElement);
+      });
+
+      select.value = ['Pickup in Office', 'Home Delivery'].includes(previous) ? previous : '';
+      select.dataset.kayDeliveryLocked = '1';
+    });
   }
 
   function initLogin() {
@@ -228,6 +272,8 @@ document.addEventListener('DOMContentLoaded', () => {
       setText('dashboardRoleId', user.role_id || '-');
       setText('dashboardEmail', user.email || '-');
       setText('dashboardAccount', user.account_number || user.id || '-');
+      const adminAccess = document.getElementById('dashboardAdminAccess');
+      if (adminAccess) adminAccess.hidden = Number(user.role_id) !== 1;
     }
   }
 
@@ -620,10 +666,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function normalizeFlatRateOptions(response) {
     const options = [
-      response?.options,
-      response?.data?.options,
       response?.all_options,
-      response?.data?.all_options
+      response?.data?.all_options,
+      response?.options,
+      response?.data?.options
     ].find(Array.isArray) || [];
 
     return options.map((option) => normalizeFlatRateOption(option)).filter((option) => option.slug);
@@ -649,14 +695,80 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function fallbackFlatRateOptions() {
+    const flatRate = (slug, label, group, weight, length, width, height) => ({
+      slug,
+      label,
+      group,
+      defaults: { package_count_ind: 1, weight, length, width, height },
+      readonly: true
+    });
+
     return [
-      { slug: 'contains_document', label: 'DOCUMENT', group: 'DOCUMENT', defaults: { package_count_ind: 1, weight: 0.5, length: 12, width: 8, height: 1 }, readonly: true },
-      { slug: 'phone_new', label: 'NEW PHONE', group: 'PHONE', defaults: { package_count_ind: 1, weight: 2, length: 9, width: 6, height: 2 }, readonly: true },
-      { slug: 'phone_used', label: 'USED PHONE', group: 'PHONE', defaults: { package_count_ind: 1, weight: 2, length: 9, width: 6, height: 2 }, readonly: true },
-      { slug: 'tablet_new', label: 'NEW TABLET', group: 'TABLET', defaults: { package_count_ind: 1, weight: 2, length: 12, width: 9, height: 3 }, readonly: true },
-      { slug: 'laptop_used', label: 'USED LAPTOP', group: 'LAPTOP', defaults: { package_count_ind: 1, weight: 5, length: 18, width: 12, height: 4 }, readonly: true },
-      { slug: 'barrel_55_gal', label: 'BARREL 55 GAL', group: 'SPECIAL', defaults: { package_count_ind: 1, weight: 200, length: 34, width: 24, height: 24 }, readonly: true },
-      { slug: 'bins', label: 'BINS', group: 'SPECIAL', defaults: { package_count_ind: 1, weight: 80, length: 36, width: 16, height: 16 }, readonly: true }
+      flatRate('blender', 'BLENDER', 'MOTHER`S DAY SPECIAL', 5, 14, 6, 6),
+      flatRate('juicer', 'JUICER', 'MOTHER`S DAY SPECIAL', 7, 12, 10, 8),
+      flatRate('toaster', 'TOASTER', 'MOTHER`S DAY SPECIAL', 12, 16, 14, 12),
+      flatRate('microwave', 'MICROWAVE', 'MOTHER`S DAY SPECIAL', 14, 14, 14, 14),
+      flatRate('dryer', 'DRYER', 'MOTHER`S DAY SPECIAL', 45, 20, 20, 20),
+      flatRate('washer', 'WASHER', 'MOTHER`S DAY SPECIAL', 50, 20, 20, 20),
+      flatRate('contains_document', 'DOCUMENT', 'DOCUMENT', 0.5, 12, 8, 1),
+      flatRate('phone_new', 'NEW PHONE', 'PHONE', 2, 9, 6, 2),
+      flatRate('phone_used', 'USED PHONE', 'PHONE', 2, 9, 6, 2),
+      flatRate('tablet_new', 'NEW TABLET', 'TABLET', 2, 12, 9, 3),
+      flatRate('tablet_used', 'USED TABLET', 'TABLET', 2, 12, 9, 3),
+      flatRate('laptop_new', 'NEW LAPTOP', 'LAPTOP', 5, 18, 12, 4),
+      flatRate('laptop_used', 'USED LAPTOP', 'LAPTOP', 5, 18, 12, 4),
+      flatRate('tv_24', 'TV 24"', 'TV', 12, 22, 15, 4),
+      flatRate('tv_32', 'TV 32"', 'TV', 14, 29, 19, 4),
+      flatRate('tv_40', 'TV 40"', 'TV', 16, 37, 22, 6),
+      flatRate('tv_42', 'TV 42"', 'TV', 20, 38, 24, 6),
+      flatRate('tv_50', 'TV 50"', 'TV', 25, 44, 27, 7),
+      flatRate('tv_55', 'TV 55"', 'TV', 35, 49, 30, 7),
+      flatRate('tv_60', 'TV 60"', 'TV', 40, 54, 33, 8),
+      flatRate('tv_65', 'TV 65"', 'TV', 50, 58, 35, 8),
+      flatRate('tv_70', 'TV 70"', 'TV', 60, 62, 37, 9),
+      flatRate('tv_75', 'TV 75"', 'TV', 70, 66, 40, 9),
+      flatRate('tv_80', 'TV 80"', 'TV', 80, 70, 45, 10),
+      flatRate('tv_85', 'TV 85"', 'TV', 95, 75, 45, 10),
+      flatRate('luggage_checked', 'LUGGAGE (CHECKED BAG)', 'SPECIAL', 50, 30, 20, 12),
+      flatRate('bins', 'BINS', 'SPECIAL', 80, 36, 16, 16),
+      flatRate('barrel_55_gal', 'BARREL 55 GAL', 'SPECIAL', 200, 34, 24, 24),
+      flatRate('barrel_77_gallons', 'BARREL 77 GAL', 'SPECIAL', 250, 20, 20, 45),
+      flatRate('econtainer', 'E-CONTAINER', 'SPECIAL', 250, 42, 29, 25),
+      flatRate('hub_14_14_14', 'HUB20 14X14X14', 'HUB20', 20, 14, 14, 14),
+      flatRate('hub_18_18_16', 'HUB20 18X18X16', 'HUB20', 40, 18, 18, 16),
+      flatRate('hub_18_18_24', 'HUB20 18X18X24', 'HUB20', 60, 18, 18, 24),
+      flatRate('hub_18_24_24', 'HUB20 18X24X24', 'HUB20', 80, 18, 24, 24),
+      flatRate('bag_of_food_100', 'BAG OF FOOD 100 LBS', 'OTHER', 100, 24, 14, 10),
+      flatRate('bag_of_food_50', 'BAG OF FOOD 50 LBS', 'OTHER', 50, 18, 12, 8),
+      flatRate('regular_tires', 'REGULAR TIRES', 'OTHER', 20, 24, 24, 8),
+      flatRate('suv_pickup_tires', 'SUV OR PICKUP TIRES', 'OTHER', 30, 30, 30, 10),
+      flatRate('gallon_5_litter', '5 LITTER GALLON', 'OTHER', 10, 5, 6, 12),
+      flatRate('gallons_5', '5 GALLONS', 'OTHER', 50, 14, 16, 18),
+      flatRate('foldable_table', 'FOLDABLE TABLE', 'OTHER', 15, 4, 20, 40),
+      flatRate('foldable_chair', 'FOLDABLE CHAIR', 'OTHER', 10, 3, 14, 34),
+      flatRate('one_door_fridge', 'ONE DOOR FRIDGE', 'OTHER', 100, 24, 24, 70),
+      flatRate('two_door_fridge', 'TWO DOORS FRIDGE', 'OTHER', 150, 36, 36, 70),
+      flatRate('twin_bed', 'TWIN BED', 'OTHER', 150, 10, 60, 110),
+      flatRate('twin_bedroom', 'TWIN BEDROOM', 'OTHER', 250, 80, 80, 20),
+      flatRate('queen_bed', 'QUEEN BED', 'OTHER', 200, 20, 60, 110),
+      flatRate('queen_bedroom', 'QUEEN BEDROOM', 'OTHER', 300, 80, 80, 40),
+      flatRate('king_bed', 'KING BED', 'OTHER', 300, 30, 60, 110),
+      flatRate('king_bedroom', 'KING BEDROOM', 'OTHER', 400, 80, 80, 60),
+      flatRate('oven', 'OVEN', 'OTHER', 100, 40, 40, 50),
+      flatRate('box_truck_tires', 'BOX TRUCK TIRES', 'OTHER', 50, 40, 40, 14),
+      flatRate('car_battery', 'CAR BATTERY (SUDDEN)', 'OTHER', 50, 10, 8, 6),
+      flatRate('truck_battery', 'TRUCK BATTERY', 'OTHER', 60, 12, 10, 8),
+      flatRate('inverter_battery', 'INVERTER BATTERY', 'OTHER', 70, 12, 10, 8),
+      flatRate('bucket_5', 'BUCKET (5 GALLONS)', 'OTHER', 50, 20, 12, 12),
+      flatRate('regular_door', 'REGULAR DOOR', 'OTHER', 75, 80, 30, 2),
+      flatRate('kid_bicycle', 'KID BICYCLE', 'OTHER', 25, 30, 14, 8),
+      flatRate('adult_bicycle', 'ADULT BICYCLE', 'OTHER', 35, 50, 18, 12),
+      flatRate('regular_chair', 'REGULAR CHAIR', 'OTHER', 20, 24, 24, 18),
+      flatRate('solar_panel_200w', 'SOLAR PANEL 200W', 'OTHER', 50, 40, 30, 4),
+      flatRate('solar_panel_400w', 'SOLAR PANEL 400W', 'OTHER', 75, 60, 40, 4),
+      flatRate('generator_0_2_5kw', 'GENERATOR 0KW - 2.5KW', 'OTHER', 100, 24, 18, 20),
+      flatRate('generator_2_5_5kw', 'GENERATOR 2.5KW - 5KW', 'OTHER', 150, 30, 24, 24),
+      flatRate('generator_5_10kw', 'GENERATOR 5KW - 10KW', 'OTHER', 250, 40, 30, 30)
     ];
   }
 
@@ -756,11 +868,11 @@ document.addEventListener('DOMContentLoaded', () => {
       const pendingPayload = {
         ...quotePayload,
         quote_id: quoteId,
-        partner: String(card.carrier || card.carrier_name || 'zion').toUpperCase(),
+        partner: String(quoteCardCarrier(card) || 'zion').toUpperCase(),
         payment_type: 'PAID AT AGENT',
-        deliveryEstimatePrice: card.total || card.price || card.amount || undefined,
-        deliveryEstimateDate: card.arrives_on || card.arrival_date || card.eta || undefined,
-        delivery_option: card.service_name || card.service || card.name || undefined
+        deliveryEstimatePrice: quoteCardTotal(card) || undefined,
+        deliveryEstimateDate: quoteCardEta(card) || undefined,
+        delivery_option: quoteCardService(card) || undefined
       };
 
       window.localStorage.setItem(pendingShipmentKey, JSON.stringify({
@@ -791,7 +903,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
       try {
         const pending = storedJson(pendingShipmentKey, { payload: {}, card: {}, quote: {} });
-        const payload = mergeShipmentFormPayload(pending.payload || {});
+        const payload = await ensureConsigneeForShipment(mergeShipmentFormPayload(pending.payload || {}));
         const response = await postJson(route('shipping', '/api/kay-paolo/shipping'), payload);
         window.localStorage.setItem(shipmentResponseKey, JSON.stringify({ response, payload, selected: pending.card || {} }));
         window.location.href = route('receipt', '/receipt');
@@ -934,7 +1046,7 @@ document.addEventListener('DOMContentLoaded', () => {
       || responseData.invoice_num
       || shipping.invoice_num
       || tracking;
-    const description = payload.package_description || shipping.package_description || 'General merchandise';
+    const description = payload.package_description || shipping.package_description || '';
     const items = packageRowsFromPayload(payload, description);
     const totalWeight = items.reduce((sum, item) => sum + numberValue(item.weight, 0), 0) || 1;
 
@@ -1079,8 +1191,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const toCountryName = selectedCountryName(toCountry);
     const fromCountryName = selectedCountryName(fromCountry);
-    const deliveryLocation = firstValue('deliveryLocation', 'delivery_location');
-    const packageDescription = firstValue('packageDescription', 'package_description') || 'General merchandise';
+    const deliveryLocation = normalizeDeliveryLocation(firstValue('deliveryLocation', 'delivery_location'));
+    const packageDescription = firstValue('packageDescription', 'package_description');
 
     const quoteCustomerId = firstValue('quoteUserId') || queryParam('customer');
 
@@ -1167,7 +1279,10 @@ document.addEventListener('DOMContentLoaded', () => {
       from_name: value('shipmentFromName') || basePayload.from_name,
       from_email: value('shipmentFromEmail') || basePayload.from_email,
       from_phone: value('shipmentFromPhone') || basePayload.from_phone,
+      from_country_name: value('shipmentFromCountry') || basePayload.from_country_name,
+      from_country: countryCode(value('shipmentFromCountry') || basePayload.from_country_name || basePayload.from_country),
       from_address: value('shipmentFromAddress') || basePayload.from_address,
+      from_apt: value('shipmentFromApt') || basePayload.from_apt,
       from_city: value('shipmentFromCity') || basePayload.from_city,
       from_state: value('shipmentFromState') || basePayload.from_state,
       from_zip: value('shipmentFromZip') || basePayload.from_zip,
@@ -1182,10 +1297,34 @@ document.addEventListener('DOMContentLoaded', () => {
       to_city: value('shipmentToCity') || basePayload.to_city,
       to_state: value('shipmentToState') || basePayload.to_state,
       to_zip: value('shipmentToZip') || basePayload.to_zip,
-      delivery_location: value('shipmentDeliveryLocation') || basePayload.delivery_location,
-      package_description: value('shipmentPackageDescription') || basePayload.package_description || 'General merchandise',
+      delivery_location: normalizeDeliveryLocation(value('shipmentDeliveryLocation') || basePayload.delivery_location),
+      package_description: value('shipmentPackageDescription') || basePayload.package_description || '',
       fragile_shipment: document.getElementById('shipmentFragile')?.checked ? 1 : basePayload.fragile_shipment,
       payment_type: value('shipmentPaymentType') || basePayload.payment_type || 'PAID AT AGENT'
+    };
+  }
+
+  async function ensureConsigneeForShipment(payload) {
+    if (payload.consignee_id || payload.consignees_id) {
+      return payload;
+    }
+
+    const response = await postJson(route('saveConsignee', '/api/kay-paolo/save-consignee'), {
+      ...payload,
+      consignee_name: payload.consignee_name || payload.to_name,
+      consignee_phone: payload.consignee_phone || payload.to_phone_1,
+      consignee_homephone: payload.consignee_homephone || payload.to_phone_2
+    });
+
+    const consigneeId = response.consignee_id || response.id || response.data?.consignee_id || response.data?.id;
+    if (!consigneeId) {
+      return payload;
+    }
+
+    return {
+      ...payload,
+      consignee_id: consigneeId,
+      consignees_id: consigneeId
     };
   }
 
@@ -1194,24 +1333,42 @@ document.addEventListener('DOMContentLoaded', () => {
     const payload = pending.payload || {};
     const card = pending.card || {};
     const quote = pending.quote || {};
+    const hasSelection = Boolean(payload.quote_id || quote.quote_id || quote.quoteId || quote.id || Object.keys(card).length);
+    const service = quoteCardService(card) || payload.delivery_option || 'Selected service';
+    const total = quoteCardTotal(card) || payload.deliveryEstimatePrice || payload.total || '0.00';
+    const carrier = quoteCardCarrier(card) || payload.partner || 'Zion';
+    const eta = quoteCardEta(card) || payload.deliveryEstimateDate || '-';
+    const deliveredBy = quoteCardDeliveryTime(card) || payload.delivered_by || '-';
 
-    setText('selectedServiceName', card.service_name || card.service || card.name || 'Selected service');
-    setText('selectedServiceTotal', `USD ${card.total || card.price || card.amount || '0.00'}`);
+    const notice = document.getElementById('selectedServiceNotice');
+    if (notice) notice.hidden = hasSelection;
+
+    setText('selectedServiceName', service);
+    setText('selectedServiceTotal', moneyText(total));
     setText('selectedQuoteId', quote.quote_id || quote.quoteId || quote.id || payload.quote_id || '-');
-    setText('selectedCarrier', card.carrier_name || card.carrier || payload.partner || 'Zion');
-    setText('selectedArrivesOn', card.arrives_on || card.arrival_date || card.eta || '-');
-    setText('selectedDeliveredBy', card.delivered_by || card.delivery_time || '-');
+    setText('selectedCarrier', carrier);
+    setText('selectedArrivesOn', eta);
+    setText('selectedDeliveredBy', deliveredBy);
 
+    setValue('shipmentFromName', payload.from_name);
+    setValue('shipmentFromEmail', payload.from_email);
+    setValue('shipmentFromPhone', payload.from_phone);
+    setSelectValue('shipmentFromCountry', payload.from_country_name || payload.from_country);
+    setValue('shipmentFromZip', payload.from_zip);
+    setValue('shipmentFromAddress', payload.from_address);
+    setValue('shipmentFromApt', payload.from_apt);
+    setValue('shipmentFromCity', payload.from_city);
+    setValue('shipmentFromState', payload.from_state);
     setValue('shipmentToName', payload.to_name || payload.consignee_name);
     setValue('shipmentToPhone', payload.to_phone_1 || payload.consignee_phone);
     setValue('shipmentToHomePhone', payload.to_phone_2);
-    setValue('shipmentToCountry', payload.to_country_name || payload.to_country);
+    setSelectValue('shipmentToCountry', payload.to_country_name || payload.to_country);
     setValue('shipmentToZip', payload.to_zip);
     setValue('shipmentToAddress', payload.to_address);
     setValue('shipmentToApt', payload.to_apt);
     setValue('shipmentToCity', payload.to_city);
     setValue('shipmentToState', payload.to_state);
-    setValue('shipmentDeliveryLocation', payload.delivery_location);
+    setSelectValue('shipmentDeliveryLocation', normalizeDeliveryLocation(payload.delivery_location));
     setValue('shipmentPackageDescription', payload.package_description);
 
     const summary = document.getElementById('shipmentPackageSummary');
@@ -1250,15 +1407,15 @@ document.addEventListener('DOMContentLoaded', () => {
     if (card.type === 'message' || card.message_only) {
       return `
         <div class="carrier-unavailable-card">
-          <div class="carrier-logo-container"><div class="carrier-logo-img"><img src="" alt=""></div></div>
+          <div class="carrier-logo-container">${carrierLogoMarkup(card)}</div>
           <div class="carrier-details"><p>${escapeHtml(card.message || 'This shipping option is unavailable.')}</p></div>
         </div>
       `;
     }
 
-    const carrier = card.carrier_name || card.carrier || 'Kay Paolo Shipping';
-    const service = card.service_name || card.service || card.name || 'Shipping Service';
-    const total = card.total || card.price || card.amount || '0.00';
+    const carrier = quoteCardCarrier(card) || 'Kay Paolo Shipping';
+    const service = quoteCardService(card) || 'Shipping Service';
+    const total = quoteCardTotal(card) || '0.00';
     const freight = card.freight || card.base_rate || '0.00';
     const insurance = card.insurance || '0.00';
     const homeDelivery = card.home_delivery || card.delivery || '0.00';
@@ -1267,13 +1424,13 @@ document.addEventListener('DOMContentLoaded', () => {
     return `
       <div class="quote-rate-card">
         <div class="rate-brand">
-          <img src="${escapeHtml(assetUrl('logo'))}" alt="Kay Paolo Shipping Logo" width="100" height="50">
+          ${carrierLogoMarkup(card)}
         </div>
         <div class="rate-info">
           <h4>${escapeHtml(service)}</h4>
           <div class="rate-delivery">
-            <span class="delivery-date">Arrives on ${escapeHtml(card.arrives_on || card.arrival_date || card.eta || '-')}</span>
-            <span class="delivery-time">Delivered by ${escapeHtml(card.delivered_by || card.delivery_time || '-')}</span>
+            <span class="delivery-date">Arrives on ${escapeHtml(quoteCardEta(card) || '-')}</span>
+            <span class="delivery-time">Delivered by ${escapeHtml(quoteCardDeliveryTime(card) || '-')}</span>
           </div>
           <div class="mono" style="font-size: 12px; color: var(--ink-400); margin-top: 6px">${escapeHtml(carrier)}</div>
         </div>
@@ -1293,6 +1450,95 @@ document.addEventListener('DOMContentLoaded', () => {
         </div>
       </div>
     `;
+  }
+
+  function quoteCardCarrier(card) {
+    return card.carrier_name
+      || card.carrier
+      || card.partner
+      || card.shipper
+      || card.shipping_company
+      || card.provider
+      || '';
+  }
+
+  function quoteCardService(card) {
+    return card.service_name
+      || card.service
+      || card.name
+      || card.delivery_option
+      || card.selected_shipper
+      || '';
+  }
+
+  function quoteCardTotal(card) {
+    return card.total
+      || card.price
+      || card.amount
+      || card.deliveryEstimatePrice
+      || card.delivery_estimate_price
+      || card.rate
+      || '';
+  }
+
+  function quoteCardEta(card) {
+    return card.arrives_on
+      || card.arrival_date
+      || card.eta
+      || card.deliveryEstimateDate
+      || card.delivery_estimate_date
+      || card.commitment
+      || '';
+  }
+
+  function quoteCardDeliveryTime(card) {
+    return card.delivered_by
+      || card.delivery_time
+      || card.delivery_by
+      || card.transit_time
+      || '';
+  }
+
+  function carrierLogoMarkup(card) {
+    const carrier = quoteCardCarrier(card) || 'Carrier';
+    const logo = card.logo
+      || card.logo_url
+      || card.carrier_logo
+      || card.carrier_logo_url
+      || card.image
+      || card.image_url
+      || card.icon
+      || '';
+
+    if (logo) {
+      return `<img src="${escapeHtml(resolveAssetUrl(logo))}" alt="${escapeHtml(carrier)} logo" width="100" height="50">`;
+    }
+
+    return `<div class="carrier-logo-fallback" aria-label="${escapeHtml(carrier)}">${escapeHtml(carrierInitials(carrier))}</div>`;
+  }
+
+  function carrierInitials(name) {
+    const normalized = String(name || 'Carrier').replace(/[^a-z0-9\s]/gi, ' ').trim();
+    const known = {
+      dhl: 'DHL',
+      fedex: 'FEDEX',
+      ups: 'UPS',
+      usps: 'USPS',
+      endicia: 'ENDICIA',
+      zion: 'ZION',
+      'kay paolo': 'KAY'
+    };
+    const lower = normalized.toLowerCase();
+    const knownKey = Object.keys(known).find((key) => lower.includes(key));
+    if (knownKey) return known[knownKey];
+
+    return normalized
+      .split(/\s+/)
+      .filter(Boolean)
+      .slice(0, 3)
+      .map((part) => part[0])
+      .join('')
+      .toUpperCase() || 'CAR';
   }
 
   function normalizeQuoteCards(response) {
@@ -1454,18 +1700,55 @@ document.addEventListener('DOMContentLoaded', () => {
     return map[raw.toLowerCase()] || raw;
   }
 
-  function assetUrl(type) {
-    if (type === 'logo') {
-      const icon = document.querySelector('link[rel="icon"]')?.href || '';
-      return icon || '/kay-paolo/assets/logo/kay-paolo.svg';
-    }
+  function normalizeDeliveryLocation(rawValue) {
+    const raw = String(rawValue || '').trim();
+    const lower = raw.toLowerCase();
+    if (!lower) return '';
+    if (lower.includes('office') || lower.includes('pickup')) return 'Pickup in Office';
+    if (lower.includes('home')) return 'Home Delivery';
+    return raw;
+  }
 
-    return '';
+  function resolveAssetUrl(url) {
+    const raw = String(url || '').trim();
+    if (!raw) return '';
+    if (/^(https?:)?\/\//i.test(raw) || raw.startsWith('data:')) return raw;
+    if (raw.startsWith('/')) return raw;
+
+    const base = config.zionWebUrl || 'https://dev.zionshipping.com/';
+    return `${base.replace(/\/+$/, '')}/${raw.replace(/^\/+/, '')}`;
   }
 
   function showLoader(id, visible) {
     const loader = document.getElementById(id);
     if (loader) loader.hidden = !visible;
+    toggleProcessOverlay(id, visible);
+  }
+
+  function toggleProcessOverlay(loaderId, visible) {
+    const overlay = document.getElementById('kayProcessOverlay');
+    if (!overlay || !['quoteLoader', 'shippingLoader'].includes(loaderId)) return;
+
+    const image = document.getElementById('kayProcessImage');
+    const title = document.getElementById('kayProcessTitle');
+    const message = document.getElementById('kayProcessMessage');
+    const isQuote = loaderId === 'quoteLoader';
+
+    if (image) {
+      image.src = isQuote
+        ? (config.assets?.generatingQuote || '/kay-paolo/assets/generating-quote.gif')
+        : (config.assets?.processingShipping || '/kay-paolo/assets/processing-shipping.gif');
+      image.alt = isQuote ? 'Generating quote' : 'Processing shipment';
+    }
+    if (title) title.textContent = isQuote ? 'Generating Quote' : 'Processing Shipment';
+    if (message) {
+      message.textContent = isQuote
+        ? 'Checking live Kay Paolo rates through the Zion Shipping API.'
+        : 'Completing the shipment through the Zion Shipping API.';
+    }
+
+    overlay.hidden = !visible;
+    document.body.classList.toggle('kay-process-open', visible);
   }
 
   function showError(container, message) {

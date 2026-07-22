@@ -18,10 +18,17 @@
 @section('content')
 <section class="page-follows-banner">
     <div class="wrap quote-page-grid">
+        <div class="page-back-actions" style="grid-column: 1 / -1">
+            <button type="button" class="btn btn-secondary btn-back" data-go-back>&larr; Back</button>
+        </div>
+
         <form id="createShipmentForm" class="contact-form" style="padding: 0; background: none; border: none; box-shadow: none; grid-column: 1 / -1">
             <div class="shipment-card selected-service-card" style="margin-bottom: 30px; border: 1px solid var(--line); border-radius: var(--radius); background: #f8fafc; padding: 22px 28px; box-shadow: 0 4px 15px -2px rgba(15, 37, 64, 0.04)">
                 <div style="font-size: 11px; font-weight: 700; color: var(--ink-400); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 10px">
                     Selected Service
+                </div>
+                <div class="api-alert error" id="selectedServiceNotice" hidden>
+                    No quote option is selected yet. Go back to quote results and choose Book Now.
                 </div>
                 <div style="display: grid; grid-template-columns: 2fr 1fr 1fr 1fr 1fr; gap: 20px; align-items: center" class="form-row-5">
                     <div>
@@ -173,7 +180,7 @@
                         <div id="shipmentPackageSummary" class="api-inline-result success">Package details will be filled from your selected quote.</div>
                         <div class="field">
                             <label>Package Description</label>
-                            <textarea id="shipmentPackageDescription" placeholder="Package description">General merchandise</textarea>
+                            <textarea id="shipmentPackageDescription" placeholder="Package description"></textarea>
                         </div>
                         <div class="checkbox-field" style="margin-top: 16px">
                             <input type="checkbox" id="shipmentFragile">
@@ -192,11 +199,8 @@
                                 <label>Delivery location *</label>
                                 <select id="shipmentDeliveryLocation" required>
                                     <option value="">-- Select Delivery Location --</option>
-                                    <option>Door to Door</option>
-                                    <option>Port to Port</option>
-                                    <option>Door to Port</option>
-                                    <option>Port to Door</option>
-                                    <option>Home Delivery</option>
+                                    <option value="Pickup in Office">Pickup in Office</option>
+                                    <option value="Home Delivery">Home Delivery</option>
                                 </select>
                             </div>
                             <div class="field">

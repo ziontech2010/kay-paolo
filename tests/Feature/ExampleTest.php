@@ -147,6 +147,73 @@ class ExampleTest extends TestCase
             ->assertSee('name="shipment_type[]"', false);
     }
 
+    public function test_quote_details_matches_bocicot_delivery_and_party_layout(): void
+    {
+        $this->get('/quote-details?lookup=9400&customer=7020')
+            ->assertStatus(200)
+            ->assertSee('quote-party-card', false)
+            ->assertSee('data-go-back', false)
+            ->assertSee('<option value="Pickup in Office">Pickup in Office</option>', false)
+            ->assertSee('<option value="Home Delivery">Home Delivery</option>', false)
+            ->assertDontSee('Door to Door', false)
+            ->assertDontSee('Port to Port', false)
+            ->assertDontSee('General merchandise', false);
+    }
+
+    public function test_create_shipment_shows_selected_service_controls_without_description_default(): void
+    {
+        $this->get('/create-shipment')
+            ->assertStatus(200)
+            ->assertSee('selectedServiceTotal', false)
+            ->assertSee('selectedServiceNotice', false)
+            ->assertSee('data-go-back', false)
+            ->assertSee('<option value="Pickup in Office">Pickup in Office</option>', false)
+            ->assertSee('<option value="Home Delivery">Home Delivery</option>', false)
+            ->assertDontSee('Door to Door', false)
+            ->assertDontSee('Port to Port', false)
+            ->assertDontSee('General merchandise', false);
+    }
+
+    public function test_layout_exposes_save_consignee_and_gif_overlay(): void
+    {
+        $this->get('/quote-details')
+            ->assertStatus(200)
+            ->assertSee('kayProcessOverlay', false)
+            ->assertSee('generating-quote.gif', false)
+            ->assertSee('processing-shipping.gif', false)
+            ->assertSee('app.js?v=', false)
+            ->assertSee('kay-paolo.css?v=', false)
+            ->assertSee('saveConsignee', false)
+            ->assertSee('save-consignee', false);
+    }
+
+    public function test_delivery_location_runtime_guard_limits_options(): void
+    {
+        $script = file_get_contents(public_path('kay-paolo/assets/app.js'));
+
+        $this->assertStringContainsString('initDeliveryLocationSelects', $script);
+        $this->assertStringContainsString("select.dataset.kayDeliveryLocked = '1'", $script);
+        $this->assertStringContainsString('Pickup in Office', $script);
+        $this->assertStringContainsString('Home Delivery', $script);
+        $this->assertStringNotContainsString('Door to Door', $script);
+        $this->assertStringNotContainsString('Port to Port', $script);
+    }
+
+    public function test_account_shows_admin_access_notice_for_admin_session(): void
+    {
+        $this->withSession([
+            'zion.access_token' => 'session-token',
+            'zion.user' => [
+                'name' => 'Admin User',
+                'role_id' => 1,
+                'role' => ['name' => 'Admin'],
+            ],
+        ])
+            ->get('/account')
+            ->assertStatus(200)
+            ->assertSee('Admin access is active', false);
+    }
+
     public function test_receipt_and_invoice_render_documents_not_raw_json(): void
     {
         foreach (['/receipt', '/invoice', '/receipt-a4'] as $path) {

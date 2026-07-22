@@ -49,7 +49,7 @@
                 <section class="awb-grid">
                     <div>
                         <h3>Package</h3>
-                        <p id="receiptA4Package">General merchandise / 1 package</p>
+                        <p id="receiptA4Package">1 package</p>
                     </div>
                     <div>
                         <h3>Payment</h3>
