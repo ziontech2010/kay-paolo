@@ -57,7 +57,7 @@
             </thead>
             <tbody id="documentItems">
                 <tr>
-                    <td>General merchandise</td>
+                    <td></td>
                     <td>1</td>
                     <td>1 lb</td>
                     <td>1 x 1 x 1</td>

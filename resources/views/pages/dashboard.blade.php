@@ -30,6 +30,9 @@
                 <div><dt>Email</dt><dd id="dashboardEmail">{{ $zionUser['email'] ?? '-' }}</dd></div>
                 <div><dt>Account</dt><dd id="dashboardAccount">{{ $zionUser['account_number'] ?? '-' }}</dd></div>
             </dl>
+            <div class="api-inline-result success" id="dashboardAdminAccess" @if (($zionUser['role_id'] ?? null) != 1) hidden @endif>
+                Admin access is active for Kay Paolo API calls through dev Zion Shipping.
+            </div>
         </div>
         <div class="dashboard-actions">
             <a class="service-card action-card" href="{{ route('quote') }}">

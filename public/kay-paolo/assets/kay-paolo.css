@@ -184,6 +184,96 @@
     color: var(--ink-600);
 }
 
+.page-back-actions {
+    display: flex;
+    justify-content: flex-start;
+    margin: 0 0 18px;
+}
+
+.btn-back {
+    min-height: 42px;
+}
+
+.quote-party-card {
+    grid-column: 1 / -1;
+}
+
+.kay-process-overlay[hidden] {
+    display: none !important;
+}
+
+body.kay-process-open {
+    overflow: hidden;
+}
+
+.kay-process-overlay {
+    align-items: center;
+    background: rgba(15, 23, 42, 0.66);
+    backdrop-filter: blur(4px);
+    display: flex;
+    inset: 0;
+    justify-content: center;
+    padding: 24px;
+    position: fixed;
+    z-index: 9999;
+}
+
+.kay-process-card {
+    background: #fff;
+    border: 1px solid rgba(148, 163, 184, 0.38);
+    border-radius: 8px;
+    box-shadow: 0 24px 70px rgba(15, 23, 42, 0.26);
+    max-width: 760px;
+    overflow: hidden;
+    width: min(760px, 100%);
+}
+
+.kay-process-card img {
+    display: block;
+    height: auto;
+    width: 100%;
+}
+
+.kay-process-copy {
+    padding: 18px 22px 22px;
+    text-align: center;
+}
+
+.kay-process-copy h3 {
+    color: var(--navy-950);
+    font-family: "Inter", sans-serif;
+    font-size: 20px;
+    font-weight: 800;
+    margin: 0 0 6px;
+}
+
+.kay-process-copy p {
+    color: var(--ink-600);
+    font-size: 14px;
+    margin: 0;
+}
+
+.carrier-logo-fallback {
+    align-items: center;
+    background: #f8fafc;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    color: var(--navy-900);
+    display: flex;
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 14px;
+    font-weight: 800;
+    height: 44px;
+    justify-content: center;
+    min-width: 88px;
+    padding: 0 12px;
+    text-transform: uppercase;
+}
+
+.carrier-unavailable-card .carrier-logo-fallback {
+    color: var(--ink-400);
+}
+
 .readable {
     max-width: 780px;
 }
@@ -478,5 +568,13 @@
     .shipment-doc-addresses,
     .awb-grid {
         grid-template-columns: 1fr;
+    }
+
+    .kay-process-overlay {
+        padding: 14px;
+    }
+
+    .kay-process-copy {
+        padding: 14px 16px 18px;
     }
 }

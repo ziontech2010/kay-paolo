@@ -85,7 +85,7 @@
                                 <span class="meta-label">Delivery Option</span>
                                 <span class="meta-val">ZION Economical Air</span>
                                 <span class="meta-label">Description</span>
-                                <span class="meta-val" style="font-weight: 600">General merchandise</span>
+                                <span class="meta-val" style="font-weight: 600">Package details pending</span>
                             </div>
                             <div class="history-card-col">
                                 <div class="address-block">
