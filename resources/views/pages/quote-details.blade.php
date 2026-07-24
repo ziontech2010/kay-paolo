@@ -205,11 +205,9 @@
                                         <div class="field" style="margin-bottom: 0">
                                             <label for="pkgCount1">Pkg Count</label>
                                             <select id="pkgCount1" class="pkg-count">
-                                                <option>1</option>
-                                                <option>2</option>
-                                                <option>3</option>
-                                                <option>4</option>
-                                                <option>5</option>
+                                                @for ($i = 1; $i <= 100; $i++)
+                                                    <option value="{{ $i }}">{{ $i }}</option>
+                                                @endfor
                                             </select>
                                         </div>
                                     </div>
@@ -248,10 +246,6 @@
                             <div class="field">
                                 <label for="totalValue">Total Value *</label>
                                 <input type="text" id="totalValue" placeholder="Enter a Total Shipment value" required>
-                            </div>
-                            <div class="field">
-                                <label for="packageDescription">Package Description</label>
-                                <textarea id="packageDescription" placeholder="Documents, clothing, electronics, etc."></textarea>
                             </div>
                         </div>
                         <div class="checkbox-field" style="margin-top: 16px">
