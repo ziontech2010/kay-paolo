@@ -155,6 +155,8 @@ class ExampleTest extends TestCase
             ->assertSee('data-go-back', false)
             ->assertSee('<option value="Pickup in Office">Pickup in Office</option>', false)
             ->assertSee('<option value="Home Delivery">Home Delivery</option>', false)
+            ->assertSee('<option value="100">100</option>', false)
+            ->assertDontSee('id="packageDescription"', false)
             ->assertDontSee('Door to Door', false)
             ->assertDontSee('Port to Port', false)
             ->assertDontSee('General merchandise', false);
@@ -167,6 +169,7 @@ class ExampleTest extends TestCase
             ->assertSee('selectedServiceTotal', false)
             ->assertSee('selectedServiceNotice', false)
             ->assertSee('data-go-back', false)
+            ->assertSee('id="shipmentPackageDescription"', false)
             ->assertSee('<option value="Pickup in Office">Pickup in Office</option>', false)
             ->assertSee('<option value="Home Delivery">Home Delivery</option>', false)
             ->assertDontSee('Door to Door', false)
@@ -197,6 +200,66 @@ class ExampleTest extends TestCase
         $this->assertStringContainsString('Home Delivery', $script);
         $this->assertStringNotContainsString('Door to Door', $script);
         $this->assertStringNotContainsString('Port to Port', $script);
+    }
+
+    public function test_shipping_proxy_sanitizes_bocicot_payload_for_multiple_packages(): void
+    {
+        Http::fake([
+            '*/api/kay-paolo/update-shipping' => Http::response(['status' => 'success']),
+        ]);
+
+        $this->withHeader('Authorization', 'Bearer fake-token')
+            ->postJson('/api/kay-paolo/shipping', [
+                'account_number' => '9400',
+                'phone_or_account' => '9400',
+                'user_id' => 7020,
+                'quote_id' => 24743,
+                'partner' => 'zion_products',
+                'selected_shipper' => 'Regular Air',
+                'from_name' => 'Kay Sender',
+                'from_email' => 'sender@example.com',
+                'from_phone' => '3055551212',
+                'from_country' => 'US',
+                'from_address' => '1117 NE 163rd St.',
+                'from_zip' => '33162',
+                'from_city' => 'North Miami Beach',
+                'from_state' => 'FL',
+                'consignee_id' => 99,
+                'to_name' => 'Kay Receiver',
+                'to_phone_1' => '5095551212',
+                'to_country' => 'HT',
+                'to_address' => '10 Rue Test',
+                'to_zip' => '6110',
+                'to_city' => 'Port-au-Prince',
+                'to_state' => 'Ouest',
+                'package_count' => 3,
+                'dimensions' => [
+                    'package_count_ind' => [3],
+                    'weight' => [25],
+                    'length' => [41],
+                    'width' => [12],
+                    'height' => [16],
+                ],
+                'total_value' => 100,
+                'delivery_location' => 'Pickup in Office',
+                'payment_type' => 'PAID AT AGENT',
+            ])
+            ->assertOk()
+            ->assertJson(['status' => 'success']);
+
+        Http::assertSent(function (\Illuminate\Http\Client\Request $request) {
+            $data = $request->data();
+
+            return str_contains($request->url(), '/api/kay-paolo/update-shipping')
+                && ! array_key_exists('account_number', $data)
+                && ! array_key_exists('phone_or_account', $data)
+                && $data['package_count'] === 1
+                && $data['partner'] === 'ZION'
+                && $data['dimensions']['package_count_ind'] === [3.0]
+                && count($data['packages']) === 3
+                && $data['selected_shipper'] === 'Regular Air'
+                && $data['delivery_option'] === 'Regular Air';
+        });
     }
 
     public function test_account_shows_admin_access_notice_for_admin_session(): void

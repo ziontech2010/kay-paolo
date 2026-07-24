@@ -868,11 +868,12 @@ document.addEventListener('DOMContentLoaded', () => {
       const pendingPayload = {
         ...quotePayload,
         quote_id: quoteId,
-        partner: String(quoteCardCarrier(card) || 'zion').toUpperCase(),
+        partner: quoteCardPartner(card),
         payment_type: 'PAID AT AGENT',
         deliveryEstimatePrice: quoteCardTotal(card) || undefined,
         deliveryEstimateDate: quoteCardEta(card) || undefined,
-        delivery_option: quoteCardService(card) || undefined
+        delivery_option: quoteCardService(card) || undefined,
+        selected_shipper: quoteCardService(card) || undefined
       };
 
       window.localStorage.setItem(pendingShipmentKey, JSON.stringify({
@@ -903,7 +904,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
       try {
         const pending = storedJson(pendingShipmentKey, { payload: {}, card: {}, quote: {} });
-        const payload = await ensureConsigneeForShipment(mergeShipmentFormPayload(pending.payload || {}));
+        const mergedPayload = await ensureConsigneeForShipment(mergeShipmentFormPayload(pending.payload || {}));
+        const payload = buildBocicotShipmentPayload(mergedPayload);
         const response = await postJson(route('shipping', '/api/kay-paolo/shipping'), payload);
         window.localStorage.setItem(shipmentResponseKey, JSON.stringify({ response, payload, selected: pending.card || {} }));
         window.location.href = route('receipt', '/receipt');
@@ -1064,7 +1066,7 @@ document.addEventListener('DOMContentLoaded', () => {
       consigneeContact: [payload.to_phone_1 || payload.consignee_phone, payload.to_phone_2].filter(Boolean).join(' / ') || 'Phone pending',
       description,
       items,
-      packageCount: payload.package_count || items.reduce((sum, item) => sum + numberValue(item.count, 0), 0) || 1,
+      packageCount: packagePieceCount(payload) || items.reduce((sum, item) => sum + numberValue(item.count, 0), 0) || 1,
       totalWeight,
       freight: selected.freight || response.freight || responseData.freight || shipping.freight || 0,
       insurance: selected.insurance || response.insurance || responseData.insurance || shipping.insurance || 0,
@@ -1192,7 +1194,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const toCountryName = selectedCountryName(toCountry);
     const fromCountryName = selectedCountryName(fromCountry);
     const deliveryLocation = normalizeDeliveryLocation(firstValue('deliveryLocation', 'delivery_location'));
-    const packageDescription = firstValue('packageDescription', 'package_description');
+    const fragileShipment = document.getElementById('fragileShipment')?.checked ? 1 : 0;
 
     const quoteCustomerId = firstValue('quoteUserId') || queryParam('customer');
 
@@ -1226,7 +1228,7 @@ document.addEventListener('DOMContentLoaded', () => {
       to_phone_1: firstValue('toPhone', 'to_phone_1'),
       to_phone_2: firstValue('toHomePhone', 'to_phone_2'),
       consignee_phone: firstValue('toPhone', 'to_phone_1'),
-      package_count: dimensions.package_count_ind.reduce((sum, item) => sum + Number(item || 0), 0) || 1,
+      package_count: dimensionRowCountFromDimensions(dimensions),
       total_value: numberValue(firstValue('totalValue', 'package_value'), 10),
       package_value: numberValue(firstValue('totalValue', 'package_value'), 10),
       dimensions,
@@ -1236,8 +1238,8 @@ document.addEventListener('DOMContentLoaded', () => {
       deliveryLocation,
       coupon_code: firstValue('couponCode'),
       extra_service_charge: firstValue('extraServiceCharge'),
-      fragile_shipment: document.getElementById('fragileShipment')?.checked ? 1 : 0,
-      package_description: packageDescription
+      fragile_shipment: fragileShipment,
+      is_fragile_shipment: fragileShipment
     };
   }
 
@@ -1304,17 +1306,216 @@ document.addEventListener('DOMContentLoaded', () => {
     };
   }
 
+  function arrayValue(raw) {
+    if (Array.isArray(raw)) return raw;
+    if (raw === undefined || raw === null || raw === '') return [];
+    return [raw];
+  }
+
+  function padArray(raw, count, fallback) {
+    const values = arrayValue(raw).slice(0, count);
+    while (values.length < count) {
+      values.push(fallback);
+    }
+    return values;
+  }
+
+  function dimensionRowCountFromDimensions(dimensions) {
+    const source = dimensions || {};
+    const lengths = ['package_count_ind', 'weight', 'length', 'width', 'height']
+      .map((key) => Array.isArray(source[key]) ? source[key].length : 0);
+    return Math.max(...lengths, 1);
+  }
+
+  function normalizeShipmentDimensions(payload) {
+    const dimensions = payload.dimensions || {};
+    let counts = arrayValue(dimensions.package_count_ind);
+    let weights = arrayValue(dimensions.weight);
+    let lengths = arrayValue(dimensions.length);
+    let widths = arrayValue(dimensions.width);
+    let heights = arrayValue(dimensions.height);
+
+    if (!weights.length && payload.package_weight !== undefined) weights = [payload.package_weight];
+    if (!lengths.length && payload.package_length !== undefined) lengths = [payload.package_length];
+    if (!widths.length && payload.package_width !== undefined) widths = [payload.package_width];
+    if (!heights.length && payload.package_height !== undefined) heights = [payload.package_height];
+    if (!counts.length) counts = [payload.package_count_ind || 1];
+
+    const rowCount = Math.max(counts.length, weights.length, lengths.length, widths.length, heights.length, 1);
+
+    return {
+      package_count_ind: padArray(counts, rowCount, 1).map((item) => numberValue(item, 1)),
+      weight: padArray(weights, rowCount, 1).map((item) => numberValue(item, 1)),
+      length: padArray(lengths, rowCount, 1).map((item) => numberValue(item, 1)),
+      width: padArray(widths, rowCount, 1).map((item) => numberValue(item, 1)),
+      height: padArray(heights, rowCount, 1).map((item) => numberValue(item, 1))
+    };
+  }
+
+  function packagePieceCount(payload) {
+    const counts = arrayValue(payload?.dimensions?.package_count_ind);
+    if (counts.length) {
+      return counts.reduce((sum, item) => sum + numberValue(item, 1), 0) || 1;
+    }
+
+    return numberValue(payload?.total_packages || payload?.pieces || payload?.package_count, 1);
+  }
+
+  function plannedShippingDateTime() {
+    const date = new Date();
+    const day = date.getDay();
+    if (day === 6) {
+      date.setDate(date.getDate() + 2);
+    } else if (day === 0) {
+      date.setDate(date.getDate() + 1);
+    }
+
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const dateNumber = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${dateNumber}T00:00:00`;
+  }
+
+  function flatRateIsOn(value) {
+    return value === true || value === 1 || ['1', 'true', 'yes', 'on'].includes(String(value || '').toLowerCase());
+  }
+
+  function expandedPackagesFromPayload(payload) {
+    const dimensions = normalizeShipmentDimensions(payload);
+    const rowCount = dimensionRowCountFromDimensions(dimensions);
+    const flatRate = padArray(payload.flat_rate, rowCount, '0');
+    const shipmentType = padArray(payload.shipment_type, rowCount, '');
+    const packages = [];
+
+    for (let index = 0; index < rowCount; index += 1) {
+      const repeat = numberValue(dimensions.package_count_ind[index], 1);
+      const currentShipmentType = String(shipmentType[index] || '').trim();
+      const isFlatRate = flatRateIsOn(flatRate[index]) || currentShipmentType !== '';
+
+      for (let piece = 0; piece < repeat; piece += 1) {
+        const packageItem = {
+          typeCode: currentShipmentType === 'contains_document' ? '2BP' : '3BX',
+          weight: numberValue(dimensions.weight[index], 0),
+          dimensions: {
+            length: numberValue(dimensions.length[index], 0),
+            width: numberValue(dimensions.width[index], 0),
+            height: numberValue(dimensions.height[index], 0)
+          }
+        };
+
+        if (isFlatRate && currentShipmentType) {
+          packageItem.flat_rate_type = currentShipmentType;
+        }
+
+        packages.push(packageItem);
+      }
+    }
+
+    return packages;
+  }
+
+  function compactPayload(payload) {
+    return Object.fromEntries(
+      Object.entries(payload).filter(([, nextValue]) => nextValue !== undefined && nextValue !== null)
+    );
+  }
+
+  function buildBocicotShipmentPayload(payload) {
+    payload = payload || {};
+    const dimensions = normalizeShipmentDimensions(payload || {});
+    const rowCount = dimensionRowCountFromDimensions(dimensions);
+    const flatRate = padArray(payload.flat_rate, rowCount, '0');
+    const shipmentType = padArray(payload.shipment_type, rowCount, '');
+    const deliveryLocation = normalizeDeliveryLocation(payload.delivery_location || payload.deliveryLocation);
+    const selectedShipper = payload.selected_shipper || payload.delivery_option || '';
+    const declaredValue = numberValue(payload.total_value || payload.package_value, 10);
+    const fragileShipment = payload.is_fragile_shipment ?? payload.fragile_shipment ?? 0;
+
+    return compactPayload({
+      user_id: payload.user_id || payload.quote_user_id || storedUser().id || undefined,
+      quote_user_id: payload.quote_user_id || payload.user_id || storedUser().id || undefined,
+      quote_id: payload.quote_id || undefined,
+      partner: normalizePartner(payload.partner),
+      selected_shipper: selectedShipper || undefined,
+      delivery_option: selectedShipper || undefined,
+      from_name: payload.from_name || undefined,
+      from_email: payload.from_email || undefined,
+      from_phone: payload.from_phone || undefined,
+      from_country_name: payload.from_country_name || undefined,
+      from_country: payload.from_country || countryCode(payload.from_country_name),
+      from_address: payload.from_address || undefined,
+      from_apt: payload.from_apt || '',
+      from_zip: payload.from_zip || undefined,
+      from_city: payload.from_city || undefined,
+      from_state: payload.from_state || undefined,
+      consignee_id: payload.consignee_id || payload.consignees_id || undefined,
+      consignees_id: payload.consignees_id || payload.consignee_id || undefined,
+      consignee_name: payload.consignee_name || payload.to_name || undefined,
+      consignee_phone: payload.consignee_phone || payload.to_phone_1 || undefined,
+      consignee_homephone: payload.consignee_homephone || payload.to_phone_2 || '',
+      to_name: payload.to_name || payload.consignee_name || undefined,
+      to_phone_1: payload.to_phone_1 || payload.consignee_phone || undefined,
+      to_phone_2: payload.to_phone_2 || payload.consignee_homephone || '',
+      to_country_name: payload.to_country_name || undefined,
+      to_country: payload.to_country || countryCode(payload.to_country_name),
+      to_address: payload.to_address || undefined,
+      to_apt: payload.to_apt || '',
+      to_zip: payload.to_zip || undefined,
+      to_city: payload.to_city || undefined,
+      to_state: payload.to_state || undefined,
+      package_count: rowCount,
+      package_description: payload.package_description ?? '',
+      total_value: declaredValue,
+      package_value: declaredValue,
+      dimensions,
+      flat_rate: flatRate,
+      shipment_type: shipmentType,
+      packages: expandedPackagesFromPayload({ ...payload, dimensions, flat_rate: flatRate, shipment_type: shipmentType }),
+      monetaryAmount: [
+        {
+          typeCode: 'declaredValue',
+          value: declaredValue,
+          currency: 'USD'
+        }
+      ],
+      plannedShippingDateAndTime: payload.plannedShippingDateAndTime || plannedShippingDateTime(),
+      delivery_location: deliveryLocation,
+      deliveryLocation: deliveryLocation,
+      delivery_description: payload.delivery_description || '',
+      payment_type: payload.payment_type || 'PAID AT AGENT',
+      deliveryEstimatePrice: payload.deliveryEstimatePrice || undefined,
+      deliveryEstimateDate: payload.deliveryEstimateDate || undefined,
+      promo: payload.promo || payload.coupon_code || '',
+      coupon_code: payload.coupon_code || payload.promo || '',
+      extra_service_charge: payload.extra_service_charge || '',
+      flaterateinside: flatRate.some(flatRateIsOn) || shipmentType.some(Boolean) ? 1 : 0,
+      fragile_shipment: fragileShipment,
+      is_fragile_shipment: fragileShipment
+    });
+  }
+
   async function ensureConsigneeForShipment(payload) {
     if (payload.consignee_id || payload.consignees_id) {
       return payload;
     }
 
-    const response = await postJson(route('saveConsignee', '/api/kay-paolo/save-consignee'), {
-      ...payload,
+    const response = await postJson(route('saveConsignee', '/api/kay-paolo/save-consignee'), compactPayload({
+      user_id: payload.user_id || payload.quote_user_id || storedUser().id || undefined,
+      quote_user_id: payload.quote_user_id || payload.user_id || storedUser().id || undefined,
+      to_name: payload.to_name || payload.consignee_name,
+      to_phone_1: payload.to_phone_1 || payload.consignee_phone,
+      to_phone_2: payload.to_phone_2 || payload.consignee_homephone,
+      to_country_name: payload.to_country_name,
+      to_country: payload.to_country || countryCode(payload.to_country_name),
+      to_address: payload.to_address,
+      to_apt: payload.to_apt || '',
+      to_zip: payload.to_zip,
+      to_city: payload.to_city,
+      to_state: payload.to_state,
       consignee_name: payload.consignee_name || payload.to_name,
       consignee_phone: payload.consignee_phone || payload.to_phone_1,
       consignee_homephone: payload.consignee_homephone || payload.to_phone_2
-    });
+    }));
 
     const consigneeId = response.consignee_id || response.id || response.data?.consignee_id || response.data?.id;
     if (!consigneeId) {
@@ -1373,7 +1574,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const summary = document.getElementById('shipmentPackageSummary');
     if (summary && payload.dimensions) {
-      const pieces = payload.package_count || payload.dimensions.weight?.length || 1;
+      const pieces = packagePieceCount(payload);
       const weight = (payload.dimensions.weight || []).join(', ') || '1';
       summary.textContent = `${pieces} package(s), weight: ${weight} lbs, declared value: USD ${payload.total_value || payload.package_value || '0.00'}.`;
     }
@@ -1460,6 +1661,19 @@ document.addEventListener('DOMContentLoaded', () => {
       || card.shipping_company
       || card.provider
       || '';
+  }
+
+  function quoteCardPartner(card) {
+    return normalizePartner(card.carrier || card.partner || card.carrier_key || card.carrier_name);
+  }
+
+  function normalizePartner(value) {
+    const raw = String(value || 'zion').toLowerCase();
+    if (raw.includes('ups')) return 'UPS';
+    if (raw.includes('fedex')) return 'FEDEX';
+    if (raw.includes('usps')) return 'USPS';
+    if (raw.includes('dhl')) return 'DHL';
+    return 'ZION';
   }
 
   function quoteCardService(card) {
