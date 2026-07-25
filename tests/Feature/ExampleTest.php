@@ -262,6 +262,59 @@ class ExampleTest extends TestCase
         });
     }
 
+    public function test_shipping_proxy_recovers_from_zion_account_number_schema_error(): void
+    {
+        Http::fake([
+            '*/api/kay-paolo/update-shipping' => Http::sequence()
+                ->push([
+                    'status' => 'error',
+                    'message' => "SQLSTATE[42S22]: Column not found: 1054 Unknown column 'account_number' in 'field list' (SQL: update `shippings` set `account_number` = 9400 where `id` = 24745)",
+                ], 500)
+                ->push([
+                    'status' => 'success',
+                    'tracking_number' => 'HTE59174',
+                ]),
+        ]);
+
+        $this->withHeader('Authorization', 'Bearer fake-token')
+            ->postJson('/api/kay-paolo/shipping', [
+                'user_id' => 7020,
+                'quote_id' => 59174,
+                'partner' => 'ZION',
+                'selected_shipper' => 'Economical Air',
+                'from_country' => 'US',
+                'from_address' => '1117 NE 163rd St.',
+                'from_zip' => '33162',
+                'from_city' => 'North Miami Beach',
+                'from_state' => 'FL',
+                'consignee_id' => 1632,
+                'to_name' => 'Judith Sainry Cadet',
+                'to_phone_1' => '35853467',
+                'to_country' => 'HT',
+                'to_address' => '#34, Rue Rosa PAP',
+                'to_city' => 'PORT-AU-PRINCE',
+                'to_state' => 'OUEST',
+                'package_description' => 'Test',
+                'dimensions' => [
+                    'package_count_ind' => [1, 1],
+                    'weight' => [8, 2],
+                    'length' => [11, 9],
+                    'width' => [11, 6],
+                    'height' => [11, 2],
+                ],
+                'total_value' => 10,
+                'delivery_location' => 'Pickup in Office',
+                'payment_type' => 'PAID AT AGENT',
+            ])
+            ->assertOk()
+            ->assertJson([
+                'status' => 'success',
+                'tracking_number' => 'HTE59174',
+            ]);
+
+        Http::assertSentCount(2);
+    }
+
     public function test_account_shows_admin_access_notice_for_admin_session(): void
     {
         $this->withSession([

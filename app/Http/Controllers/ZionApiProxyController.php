@@ -70,11 +70,29 @@ class ZionApiProxyController extends Controller
 
     public function createShipment(Request $request): JsonResponse
     {
-        return $this->forwardAuthenticated(
-            'kay-paolo/update-shipping',
-            $request,
-            $this->sanitizeShipmentPayload($request->except('_token'))
-        );
+        $token = $request->bearerToken();
+
+        if (!$token) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Please login to Kay Paolo with your Zion Shipping account first.',
+            ], 401);
+        }
+
+        $payload = $this->sanitizeShipmentPayload($request->except('_token'));
+        $response = $this->zion->post('kay-paolo/update-shipping', $payload, $token);
+
+        if ($this->isRecoverableZionAccountNumberSchemaError($response)) {
+            $retryResponse = $this->zion->post('kay-paolo/update-shipping', $payload, $token);
+
+            if (!$this->isRecoverableZionAccountNumberSchemaError($retryResponse)) {
+                return $this->jsonResponse($retryResponse);
+            }
+
+            $response = $retryResponse;
+        }
+
+        return $this->jsonResponse($response);
     }
 
     public function shippingHistory(Request $request): JsonResponse
@@ -365,6 +383,16 @@ class ZionApiProxyController extends Controller
     private function compactPayload(array $payload): array
     {
         return array_filter($payload, static fn ($value) => $value !== null);
+    }
+
+    private function isRecoverableZionAccountNumberSchemaError(array $response): bool
+    {
+        $message = strtolower((string) ($response['data']['message'] ?? ''));
+
+        return (int) ($response['status'] ?? 0) >= 500
+            && str_contains($message, 'unknown column')
+            && str_contains($message, 'account_number')
+            && str_contains($message, 'shippings');
     }
 
     private function jsonResponse(array $response): JsonResponse
