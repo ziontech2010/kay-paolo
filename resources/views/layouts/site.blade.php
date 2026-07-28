@@ -180,6 +180,7 @@
             quotePage: @json(route('quote')),
             quoteDetails: @json(route('quote.details')),
             createShipmentPage: @json(route('create-shipment')),
+            shipmentConfirmation: @json(route('shipment.confirmation')),
             trackingPage: @json(route('tracking')),
             trackingDetail: @json(route('tracking.detail')),
             receipt: @json(route('receipt')),

@@ -123,6 +123,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initCreateShipmentForm();
   initTrackingForm();
   initTrackingDetailPage();
+  initShipmentConfirmationPage();
   initReceiptPages();
   initShipmentHistoryFilters();
 
@@ -908,7 +909,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const payload = buildBocicotShipmentPayload(mergedPayload);
         const response = await postJson(route('shipping', '/api/kay-paolo/shipping'), payload);
         window.localStorage.setItem(shipmentResponseKey, JSON.stringify({ response, payload, selected: pending.card || {} }));
-        window.location.href = route('receipt', '/receipt');
+        window.location.href = route('shipmentConfirmation', '/shipment-confirmation');
       } catch (error) {
         showError(result, error.message);
       } finally {
@@ -991,6 +992,44 @@ document.addEventListener('DOMContentLoaded', () => {
       .catch(() => {
         populateTrackingDetail({}, trackingNumber);
       });
+  }
+
+  function initShipmentConfirmationPage() {
+    const confirmationRoot = document.querySelector('[data-shipment-confirmation]');
+    if (!confirmationRoot) return;
+
+    const shipment = storedJson(shipmentResponseKey, {});
+    const response = shipment.response || {};
+    const payload = shipment.payload || {};
+    const selected = shipment.selected || {};
+    const data = buildShipmentDocumentData(response, payload, selected);
+
+    const service = quoteCardService(selected) || payload.selected_shipper || payload.delivery_option || 'Selected service';
+    const carrier = quoteCardCarrier(selected) || payload.partner || 'Zion';
+    const eta = quoteCardEta(selected) || payload.deliveryEstimateDate || 'Pending';
+    const deliveryLocation = payload.delivery_location || payload.deliveryLocation || 'Pickup in Office';
+    const declaredValue = payload.total_value || payload.package_value || 0;
+
+    setText('confirmationTrackingInline', data.tracking);
+    setText('confirmationNumber', data.documentNumber);
+    setText('confirmationStatus', data.status);
+    setText('confirmationTracking', data.tracking);
+    setText('confirmationDate', data.date);
+    setText('confirmationService', service);
+    setText('confirmationCarrier', carrier);
+    setText('confirmationDeliveryLocation', deliveryLocation);
+    setText('confirmationEta', eta);
+    setText('confirmationPayment', data.paymentType);
+    setText('confirmationTotal', moneyText(data.total));
+    setText('confirmationShipperName', data.shipperName);
+    setText('confirmationShipperAddress', data.shipperAddress);
+    setText('confirmationShipperContact', data.shipperContact);
+    setText('confirmationConsigneeName', data.consigneeName);
+    setText('confirmationConsigneeAddress', data.consigneeAddress);
+    setText('confirmationConsigneeContact', data.consigneeContact);
+    setText('confirmationPackageSummary', `${data.packageCount} package(s) / ${data.totalWeight} lb`);
+    setText('confirmationPackageDescription', data.description || 'Package description pending');
+    setText('confirmationDeclaredValue', moneyText(declaredValue));
   }
 
   function initReceiptPages() {
