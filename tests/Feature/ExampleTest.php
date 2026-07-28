@@ -104,9 +104,14 @@ class ExampleTest extends TestCase
         $this->get('/shipment-confirmation')
             ->assertStatus(200)
             ->assertSee('data-shipment-confirmation', false)
-            ->assertSee('Shipment Confirmed', false)
+            ->assertSee('Create Shipment', false)
+            ->assertSee('Shipment booked successfully.', false)
+            ->assertSee('VIEW LABELS DOCUMENTS AND RECEIPT', false)
+            ->assertSee('SHIPMENT NUMBER', false)
+            ->assertSee('CARRIER DETAILS', false)
+            ->assertSee('Open Label', false)
             ->assertSee('Open Receipt', false)
-            ->assertSee('Open A4 Receipt', false)
+            ->assertSee('Return to Home', false)
             ->assertSee('kayPaoloMarkConfirmationSeen', false);
 
         $this->get('/receipt')
