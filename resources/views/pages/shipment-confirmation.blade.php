@@ -12,6 +12,34 @@
 @endsection
 
 @section('content')
+<script>
+    (function kayPaoloMarkConfirmationSeen() {
+        try {
+            var raw = window.localStorage.getItem('kayPaoloShipmentResponse');
+            if (!raw) return;
+
+            var shipment = JSON.parse(raw);
+            var response = shipment.response || {};
+            var responseData = response.data || {};
+            var shipping = response.shipping_data || response.shipping || responseData.shipping_data || responseData.shipping || {};
+            var payload = shipment.payload || {};
+            var token = response.tracking_number
+                || response.invoice_num
+                || response.awb
+                || responseData.tracking_number
+                || shipping.tracking_number
+                || shipping.invoice_num
+                || payload.tracking_number
+                || payload.quote_id
+                || '';
+
+            if (token) {
+                window.localStorage.setItem('kayPaoloShipmentConfirmationSeen', String(token));
+            }
+        } catch (error) {}
+    })();
+</script>
+
 <section class="page-follows-banner">
     <div class="wrap shipment-confirmation-page" data-shipment-confirmation>
         <div class="payment-success-banner shipment-confirmation-banner">

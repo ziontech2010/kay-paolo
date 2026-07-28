@@ -106,7 +106,13 @@ class ExampleTest extends TestCase
             ->assertSee('data-shipment-confirmation', false)
             ->assertSee('Shipment Confirmed', false)
             ->assertSee('Open Receipt', false)
-            ->assertSee('Open A4 Receipt', false);
+            ->assertSee('Open A4 Receipt', false)
+            ->assertSee('kayPaoloMarkConfirmationSeen', false);
+
+        $this->get('/receipt')
+            ->assertStatus(200)
+            ->assertSee('kayPaoloReceiptConfirmationGuard', false)
+            ->assertSee('kayPaoloShipmentConfirmationSeen', false);
 
         $this->get('/confirmation.html')
             ->assertRedirect('/shipment-confirmation');
