@@ -184,6 +184,7 @@
             trackingPage: @json(route('tracking')),
             trackingDetail: @json(route('tracking.detail')),
             receipt: @json(route('receipt')),
+            receiptA4: @json(route('receipt.a4')),
             login: @json(route('api.kay-paolo.login')),
             quote: @json(route('api.kay-paolo.quote')),
             shipping: @json(route('api.kay-paolo.shipping')),
