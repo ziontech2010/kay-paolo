@@ -303,6 +303,123 @@ body.kay-process-open {
     margin-bottom: 18px;
 }
 
+.shipment-confirmation-page {
+    max-width: 1040px;
+}
+
+.shipment-confirmation-banner {
+    margin-bottom: 18px;
+}
+
+.shipment-confirmation-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    justify-content: flex-end;
+    margin-bottom: 18px;
+}
+
+.shipment-confirmation-card {
+    background: #fff;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    box-shadow: var(--shadow);
+    color: var(--ink-900);
+    padding: 34px;
+}
+
+.shipment-confirmation-header {
+    align-items: flex-start;
+    border-bottom: 1px solid var(--line);
+    display: flex;
+    gap: 24px;
+    justify-content: space-between;
+    padding-bottom: 22px;
+}
+
+.shipment-confirmation-header span,
+.shipment-confirmation-grid span,
+.shipment-confirmation-parties h3,
+.shipment-confirmation-package span {
+    color: var(--ink-400);
+    display: block;
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0;
+    text-transform: uppercase;
+}
+
+.shipment-confirmation-header h2 {
+    color: var(--navy-950);
+    font-family: "Fraunces", serif;
+    font-size: 42px;
+    margin: 4px 0 8px;
+}
+
+.shipment-confirmation-header p {
+    color: var(--teal-600);
+    font-size: 14px;
+    font-weight: 800;
+    margin: 0;
+    text-transform: uppercase;
+}
+
+.shipment-confirmation-grid {
+    display: grid;
+    gap: 14px;
+    grid-template-columns: repeat(4, 1fr);
+    margin: 24px 0;
+}
+
+.shipment-confirmation-grid div {
+    background: #f8fafc;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 14px;
+}
+
+.shipment-confirmation-grid strong,
+.shipment-confirmation-package strong {
+    display: block;
+    font-size: 14px;
+    margin-top: 5px;
+}
+
+.shipment-confirmation-parties {
+    display: grid;
+    gap: 18px;
+    grid-template-columns: 1fr 1fr;
+    margin-bottom: 24px;
+}
+
+.shipment-confirmation-parties > div,
+.shipment-confirmation-package {
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 18px;
+}
+
+.shipment-confirmation-parties strong {
+    display: block;
+    font-size: 16px;
+    margin: 8px 0;
+}
+
+.shipment-confirmation-parties p,
+.shipment-confirmation-package p {
+    color: var(--ink-600);
+    font-size: 14px;
+    line-height: 1.65;
+    margin: 0;
+}
+
+.shipment-confirmation-package {
+    align-items: flex-start;
+    display: grid;
+    gap: 18px;
+    grid-template-columns: 1.2fr 0.8fr;
+}
+
 .shipment-doc,
 .awb-sheet {
     background: #fff;
@@ -566,8 +683,27 @@ body.kay-process-open {
 
     .shipment-doc-meta,
     .shipment-doc-addresses,
-    .awb-grid {
+    .awb-grid,
+    .shipment-confirmation-grid,
+    .shipment-confirmation-parties,
+    .shipment-confirmation-package {
         grid-template-columns: 1fr;
+    }
+
+    .shipment-confirmation-actions {
+        justify-content: stretch;
+    }
+
+    .shipment-confirmation-actions .btn {
+        width: 100%;
+    }
+
+    .shipment-confirmation-card {
+        padding: 22px;
+    }
+
+    .shipment-confirmation-header {
+        display: grid;
     }
 
     .kay-process-overlay {

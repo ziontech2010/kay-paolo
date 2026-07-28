@@ -28,6 +28,7 @@ class ExampleTest extends TestCase
             '/shipment-history',
             '/tracking',
             '/tracking-detail',
+            '/shipment-confirmation',
             '/account',
             '/invoice',
             '/receipt',
@@ -96,6 +97,28 @@ class ExampleTest extends TestCase
             ->assertStatus(200)
             ->assertSee('sessionToken: "session-token"', false)
             ->assertSee('loginPage: "http:\/\/localhost\/login"', false);
+    }
+
+    public function test_shipment_confirmation_page_and_legacy_redirects_render(): void
+    {
+        $this->get('/shipment-confirmation')
+            ->assertStatus(200)
+            ->assertSee('data-shipment-confirmation', false)
+            ->assertSee('Shipment Confirmed', false)
+            ->assertSee('Open Receipt', false)
+            ->assertSee('Open A4 Receipt', false)
+            ->assertSee('kayPaoloMarkConfirmationSeen', false);
+
+        $this->get('/receipt')
+            ->assertStatus(200)
+            ->assertSee('kayPaoloReceiptConfirmationGuard', false)
+            ->assertSee('kayPaoloShipmentConfirmationSeen', false);
+
+        $this->get('/confirmation.html')
+            ->assertRedirect('/shipment-confirmation');
+
+        $this->get('/shipment-confirmation.html')
+            ->assertRedirect('/shipment-confirmation');
     }
 
     public function test_header_shows_my_profile_for_logged_in_users(): void
@@ -195,6 +218,8 @@ class ExampleTest extends TestCase
         $script = file_get_contents(public_path('kay-paolo/assets/app.js'));
 
         $this->assertStringContainsString('initDeliveryLocationSelects', $script);
+        $this->assertStringContainsString('initShipmentConfirmationPage', $script);
+        $this->assertStringContainsString("route('shipmentConfirmation', '/shipment-confirmation')", $script);
         $this->assertStringContainsString("select.dataset.kayDeliveryLocked = '1'", $script);
         $this->assertStringContainsString('Pickup in Office', $script);
         $this->assertStringContainsString('Home Delivery', $script);

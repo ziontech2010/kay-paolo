@@ -24,6 +24,8 @@ Route::get('/create-shipment', fn () => view('pages.create-shipment'))->name('cr
 Route::get('/shipment-history', fn () => view('pages.shipment-history'))->name('shipment-history');
 Route::get('/tracking', fn () => view('pages.tracking'))->name('tracking');
 Route::get('/tracking-detail', fn () => view('pages.tracking-detail'))->name('tracking.detail');
+Route::get('/shipment-confirmation', fn () => view('pages.shipment-confirmation'))->name('shipment.confirmation');
+Route::redirect('/confirmation', '/shipment-confirmation');
 Route::get('/invoice', fn () => view('pages.invoice'))->name('invoice');
 Route::get('/receipt', fn () => view('pages.receipt'))->name('receipt');
 Route::get('/receipt-a4', fn () => view('pages.receipt-a4'))->name('receipt.a4');
@@ -42,6 +44,8 @@ Route::redirect('/shipment-history.html', '/shipment-history');
 Route::redirect('/tracking.html', '/tracking');
 Route::redirect('/tracking-detail.html', '/tracking-detail');
 Route::redirect('/account.html', '/account');
+Route::redirect('/confirmation.html', '/shipment-confirmation');
+Route::redirect('/shipment-confirmation.html', '/shipment-confirmation');
 Route::redirect('/invoice.html', '/invoice');
 Route::redirect('/receipt.html', '/receipt');
 Route::redirect('/receipt-a4.html', '/receipt-a4');
