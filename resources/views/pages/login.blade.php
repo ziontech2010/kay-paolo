@@ -22,7 +22,7 @@
                 </svg>
             </div>
             <h2>Agent &amp; Client Login</h2>
-            <p class="sub">Sign in with an active Zion Shipping user to manage Kay Paolo quotes, shipments, and tracking.</p>
+            <p class="sub">Sign in with an active Kay Paolo-enabled account to manage quotes, shipments, and tracking.</p>
 
             @if ($errors->any())
                 <div class="api-alert error">{{ $errors->first() }}</div>
@@ -34,7 +34,7 @@
             <div class="api-alert error" id="loginApiError" hidden></div>
             <div class="api-alert success" id="loginApiSuccess" hidden></div>
 
-            <form class="login-form" method="POST" action="{{ route('login.submit') }}" id="loginForm" data-api-login data-api-endpoint="{{ route('api.kay-paolo.login') }}">
+            <form class="login-form" method="POST" action="{{ route('login.submit') }}" id="loginForm" data-api-login data-api-endpoint="{{ route('zion-api.login') }}">
                 @csrf
                 <input type="hidden" name="redirect" value="{{ request('redirect') }}">
                 <div class="field">

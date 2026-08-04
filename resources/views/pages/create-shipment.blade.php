@@ -79,10 +79,8 @@
                         <div class="form-row-3">
                             <div class="field" style="grid-column: span 2">
                                 <label>Country *</label>
-                                <select id="shipmentFromCountry" required>
-                                    <option>United States</option>
-                                    <option>Canada</option>
-                                    <option>France</option>
+                                <select id="shipmentFromCountry" data-country-select required>
+                                    <option value="US">United States</option>
                                 </select>
                             </div>
                             <div class="field">
@@ -135,13 +133,8 @@
                         <div class="form-row-3">
                             <div class="field" style="grid-column: span 2">
                                 <label>Country *</label>
-                                <select id="shipmentToCountry" required>
-                                    <option>Haiti</option>
-                                    <option>Dominican Republic</option>
-                                    <option>United States</option>
-                                    <option>Canada</option>
-                                    <option>Peru</option>
-                                    <option>Germany</option>
+                                <select id="shipmentToCountry" data-country-select required>
+                                    <option value="">Select Country</option>
                                 </select>
                             </div>
                             <div class="field">
@@ -183,7 +176,7 @@
                             <textarea id="shipmentPackageDescription" placeholder="Package description"></textarea>
                         </div>
                         <div class="checkbox-field" style="margin-top: 16px">
-                            <input type="checkbox" id="shipmentFragile">
+                            <input type="checkbox" id="shipmentFragile" disabled>
                             <label for="shipmentFragile">Fragile shipment</label>
                         </div>
                     </div>
@@ -205,9 +198,8 @@
                             </div>
                             <div class="field">
                                 <label>Payment Type</label>
-                                <select id="shipmentPaymentType">
-                                    <option>PAID AT AGENT</option>
-                                    <option>Collect</option>
+                                <select id="shipmentPaymentType" data-payment-options>
+                                    <option value="">Loading payment options...</option>
                                 </select>
                             </div>
                         </div>

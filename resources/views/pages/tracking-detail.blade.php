@@ -30,7 +30,7 @@
         <div class="tracking-details-card">
             <div class="tracking-details-header">
                 <div class="tracking-title-left">
-                    <span class="tracking-brand-label">ZION TRACKING DETAILS</span>
+                    <span class="tracking-brand-label">KAY PAOLO TRACKING DETAILS</span>
                     <h3 id="shipmentTitle">Shipment #{{ request('id', 'Pending') }}</h3>
                 </div>
                 <div class="tracking-title-right">
@@ -120,7 +120,7 @@
                             <div class="timeline-event-date">Pending</div>
                             <div class="timeline-event-content">
                                 <h5>Tracking data will appear here</h5>
-                                <p>Use the tracking search page or the field above to load Zion tracking details.</p>
+                                <p>Use the tracking search page or the field above to load tracking details.</p>
                             </div>
                         </div>
                     </div>

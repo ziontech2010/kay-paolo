@@ -25,7 +25,7 @@
 
             <h2 style="font-family: 'Fraunces', serif; font-size: 32px; font-weight: 600; color: var(--navy-950); margin: 0 0 16px">Track Your Shipment</h2>
             <p style="color: var(--ink-600); font-size: 15px; line-height: 1.6; max-width: 500px; margin: 0 auto 32px">
-                Enter a tracking number to view the latest shipment status from dev Zion Shipping.
+                Enter a tracking number to view the latest Kay Paolo shipment status.
             </p>
 
             <form id="trackingForm" class="tracking-form" style="max-width: 460px; margin: 0 auto">

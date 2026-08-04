@@ -1,7 +1,11 @@
 @extends('layouts.site')
 
+@php
+    $content = app(\App\Services\KayPaoloContent::class)->all();
+@endphp
+
 @section('title', 'Kay Paolo Shipping | Global Freight and Logistics')
-@section('description', 'Kay Paolo Shipping moves freight across 120+ countries with quotes, shipments, and tracking powered by dev Zion Shipping.')
+@section('description', $content['meta_description'])
 
 @section('content')
 <section class="hero" id="home">
@@ -34,15 +38,8 @@
                     <div class="field-row">
                         <div class="field">
                             <label for="destCountry">To Destination</label>
-                            <select id="destCountry">
-                                <option>United States</option>
-                                <option>United Kingdom</option>
-                                <option>Canada</option>
-                                <option>Germany</option>
-                                <option>France</option>
-                                <option>Haiti</option>
-                                <option>Dominican Republic</option>
-                                <option>Jamaica</option>
+                            <select id="destCountry" data-country-select>
+                                <option value="">Select Destination</option>
                             </select>
                         </div>
                         <div class="field">
@@ -51,7 +48,7 @@
                         </div>
                     </div>
                     <a href="{{ route('quote') }}" class="btn btn-navy btn-block">Get A Quote</a>
-                    <p class="qc-note">Login with your Zion account to generate live Kay Paolo quotes.</p>
+                    <p class="qc-note">Sign in to generate live Kay Paolo quotes.</p>
                 </div>
 
                 <div class="tab-panel" id="panel-track">
@@ -149,17 +146,15 @@
 
 <section class="about" id="about">
     <div class="wrap about-grid">
-        <div class="about-art" aria-hidden="true">
-            <div class="plate plate-1"></div>
-            <div class="plate plate-2"></div>
+        <div class="about-art about-photo-stack" aria-hidden="true">
+            <img class="about-photo-primary" src="{{ asset($content['who_image_primary']) }}" alt="">
+            <img class="about-photo-secondary" src="{{ asset($content['who_image_secondary']) }}" alt="">
         </div>
         <div>
             <div class="eyebrow">Who We Are</div>
-            <h2>Any location, any time - we'll be there</h2>
+            <h2>{{ $content['who_headline'] }}</h2>
             <p style="margin-top: 18px; color: var(--ink-600); font-size: 15.5px; line-height: 1.75">
-                Kay Paolo Shipping is a full-service logistics provider dedicated to streamlining your global supply
-                chain. This Laravel Blade portal keeps the Kay Paolo experience separate while using dev Zion Shipping
-                as the third-party API for login, quotes, shipment creation, and tracking.
+                {{ $content['who_body'] }}
             </p>
             <ul class="about-list">
                 <li><span class="tick">&#10003;</span> Safe and secure handling</li>
@@ -192,9 +187,9 @@
         </div>
         <div class="process-grid">
             <div class="process-step">
-                <span class="step-num">01</span>
-                <h3>Consult &amp; Quote</h3>
-                <p>Share shipment details and generate live rate cards through the Zion API bridge.</p>
+                <span class="step-num">01 <span class="step-dash">---</span></span>
+                <h3>{{ $content['process_step_1_title'] }}</h3>
+                <p>{{ $content['process_step_1_body'] }}</p>
             </div>
             <div class="process-step">
                 <span class="step-num">02</span>
@@ -204,7 +199,7 @@
             <div class="process-step">
                 <span class="step-num">03</span>
                 <h3>Safe &amp; Timely Delivery</h3>
-                <p>Use Zion responses for shipment documents, tracking payloads, and customer shipping data.</p>
+                <p>View shipment documents, tracking payloads, and customer shipping data from one Kay Paolo flow.</p>
             </div>
         </div>
     </div>

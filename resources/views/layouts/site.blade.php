@@ -12,7 +12,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>@yield('title', 'Kay Paolo Shipping')</title>
-    <meta name="description" content="@yield('description', 'Kay Paolo Shipping ocean, air and land freight, customs clearance, quotes, shipments, and tracking powered by the dev Zion Shipping API.')">
+    <meta name="description" content="@yield('description', 'Kay Paolo Shipping ocean, air and land freight, customs clearance, quotes, shipments, and tracking.')">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;0,9..144,700;1,9..144,500&family=Inter:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
@@ -161,7 +161,7 @@
         <img id="kayProcessImage" src="{{ asset('kay-paolo/assets/generating-quote.gif') }}" alt="Processing request">
         <div class="kay-process-copy">
             <h3 id="kayProcessTitle">Processing</h3>
-            <p id="kayProcessMessage">Please wait while Kay Paolo talks to Zion Shipping.</p>
+            <p id="kayProcessMessage">Please wait while Kay Paolo processes your request.</p>
         </div>
     </div>
 </div>
@@ -175,6 +175,7 @@
         sessionUser: @json($zionUser),
         zionWebUrl: @json(rtrim((string) config('services.zion_shipping.web_url'), '/') . '/'),
         routes: {
+            home: @json(route('home')),
             loginPage: @json(route('login')),
             account: @json(route('account')),
             quotePage: @json(route('quote')),
@@ -185,7 +186,12 @@
             trackingDetail: @json(route('tracking.detail')),
             receipt: @json(route('receipt')),
             receiptA4: @json(route('receipt.a4')),
+            shipmentLabel: @json(route('shipment.label')),
+            shipmentReceipt: @json(route('shipment.receipt')),
+            admin: @json(route('admin')),
             login: @json(route('api.kay-paolo.login')),
+            countries: @json(route('api.kay-paolo.countries')),
+            paymentOptions: @json(route('api.kay-paolo.payment-options')),
             quote: @json(route('api.kay-paolo.quote')),
             shipping: @json(route('api.kay-paolo.shipping')),
             tracking: @json(route('api.kay-paolo.validate-tracking')),
@@ -193,11 +199,13 @@
             consigneeList: @json(route('api.kay-paolo.consignee-list')),
             flatRates: @json(route('api.kay-paolo.flat-rates')),
             saveConsignee: @json(route('api.kay-paolo.save-consignee')),
-            shippingHistory: @json(route('api.kay-paolo.shipping-history'))
+            shippingHistory: @json(route('api.kay-paolo.shipping-history')),
+            emailShipment: @json(route('api.kay-paolo.email-shipment'))
         },
         assets: {
             generatingQuote: @json(asset('kay-paolo/assets/generating-quote.gif')),
-            processingShipping: @json(asset('kay-paolo/assets/processing-shipping.gif'))
+            processingShipping: @json(asset('kay-paolo/assets/processing-shipping.gif')),
+            zionCarrierLogo: @json(asset('kay-paolo/assets/images/zion-carrier-logo.png'))
         }
     };
 </script>

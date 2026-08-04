@@ -21,9 +21,9 @@
                     <circle cx="12" cy="7" r="4"></circle>
                 </svg>
             </div>
-            <div class="eyebrow">Zion Session</div>
-            <h2 id="dashboardUserName">{{ $zionUser['name'] ?? 'Zion user' }}</h2>
-            <p class="muted-text">Logged in through dev Zion Shipping and stored in the Kay Paolo session.</p>
+            <div class="eyebrow">Kay Paolo Session</div>
+            <h2 id="dashboardUserName">{{ $zionUser['name'] ?? 'Kay Paolo user' }}</h2>
+            <p class="muted-text">Logged in and stored in the Kay Paolo session.</p>
             <dl class="session-list">
                 <div><dt>Role</dt><dd id="dashboardRole">{{ $zionUser['role']['name'] ?? 'User' }}</dd></div>
                 <div><dt>Role ID</dt><dd id="dashboardRoleId">{{ $zionUser['role_id'] ?? '-' }}</dd></div>
@@ -31,19 +31,24 @@
                 <div><dt>Account</dt><dd id="dashboardAccount">{{ $zionUser['account_number'] ?? '-' }}</dd></div>
             </dl>
             <div class="api-inline-result success" id="dashboardAdminAccess" @if (($zionUser['role_id'] ?? null) != 1) hidden @endif>
-                Admin access is active for Kay Paolo API calls through dev Zion Shipping.
+                Admin access is active for Kay Paolo content and API calls.
             </div>
         </div>
         <div class="dashboard-actions">
             <a class="service-card action-card" href="{{ route('quote') }}">
                 <span class="num">LIVE API</span>
                 <h3>Create Quote</h3>
-                <p>Generate rates through Kay Paolo routes that forward to dev Zion Shipping.</p>
+                <p>Generate rates through Kay Paolo routes backed by live shipping data.</p>
             </a>
             <a class="service-card action-card" href="{{ route('tracking') }}">
                 <span class="num">TRACK</span>
                 <h3>Track Shipment</h3>
-                <p>Validate tracking numbers with Zion data inside the Kay Paolo UI.</p>
+                <p>Validate tracking numbers inside the Kay Paolo UI.</p>
+            </a>
+            <a class="service-card action-card" href="{{ route('admin') }}" id="dashboardAdminAction" @if (($zionUser['role_id'] ?? null) != 1) hidden @endif>
+                <span class="num">ADMIN</span>
+                <h3>Manage Content</h3>
+                <p>Update Kay Paolo page text and Who We Are pictures.</p>
             </a>
             <form method="POST" action="{{ route('logout') }}" class="contact-form compact-form">
                 @csrf

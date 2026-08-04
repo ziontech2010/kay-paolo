@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 // use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 class ExampleTest extends TestCase
@@ -52,13 +53,13 @@ class ExampleTest extends TestCase
             ->assertStatus(200)
             ->assertSee('action="http://localhost/login"', false)
             ->assertSee('loginPage', false)
-            ->assertSee('data-api-endpoint="http://localhost/api/kay-paolo/login"', false)
+            ->assertSee('data-api-endpoint="http://localhost/zion-api/login"', false)
             ->assertSee('data-api-login', false);
 
         $this->postJson('/api/kay-paolo/login')->assertStatus(422);
     }
 
-    public function test_api_login_redirects_browser_submits_to_account(): void
+    public function test_api_login_redirects_browser_submits_to_home(): void
     {
         Http::fake([
             '*/api/kay-paolo/login' => Http::response([
@@ -83,8 +84,36 @@ class ExampleTest extends TestCase
         ])
             ->assertOk()
             ->assertSee('kayPaoloZionToken', false)
-            ->assertSee('window.location.replace("http:\/\/localhost\/account")', false)
+            ->assertSee('window.location.replace("http:\/\/localhost")', false)
             ->assertDontSee('/dashboard', false);
+    }
+
+    public function test_web_login_api_endpoint_sets_session_for_admin_role(): void
+    {
+        Http::fake([
+            '*/api/kay-paolo/login' => Http::response([
+                'message' => 'Logged in Successfully',
+                'message_type' => 'success',
+                'error' => 'false',
+                'token_type' => 'Bearer',
+                'access_token' => 'fake-token',
+                'user' => [
+                    'id' => 1,
+                    'name' => 'Admin User',
+                    'role_id' => 1,
+                    'role' => ['name' => 'Admin'],
+                ],
+            ]),
+        ]);
+
+        $this->postJson('/zion-api/login', [
+            'email' => 'admin@example.com',
+            'password' => 'password',
+            'role_id' => 1,
+        ])
+            ->assertOk()
+            ->assertSessionHas('zion.access_token', 'fake-token')
+            ->assertSessionHas('zion.user.role_id', 1);
     }
 
     public function test_layout_exposes_session_token_for_quote_api_calls(): void
@@ -96,6 +125,7 @@ class ExampleTest extends TestCase
             ->get('/quote-details')
             ->assertStatus(200)
             ->assertSee('sessionToken: "session-token"', false)
+            ->assertSee('home: "http:\/\/localhost"', false)
             ->assertSee('loginPage: "http:\/\/localhost\/login"', false);
     }
 
@@ -108,9 +138,10 @@ class ExampleTest extends TestCase
             ->assertSee('Shipment booked successfully.', false)
             ->assertSee('VIEW LABELS DOCUMENTS AND RECEIPT', false)
             ->assertSee('SHIPMENT NUMBER', false)
-            ->assertSee('CARRIER DETAILS', false)
-            ->assertSee('Open Label', false)
-            ->assertSee('Open Receipt', false)
+            ->assertSee('packageAmountDisplay', false)
+            ->assertDontSee('CARRIER DETAILS', false)
+            ->assertSee('Open Label PDF', false)
+            ->assertSee('Open Receipt PDF', false)
             ->assertSee('Return to Home', false)
             ->assertSee('kayPaoloMarkConfirmationSeen', false);
 
@@ -181,6 +212,9 @@ class ExampleTest extends TestCase
             ->assertStatus(200)
             ->assertSee('quote-party-card', false)
             ->assertSee('data-go-back', false)
+            ->assertSee('From: Therlande Louis Jean | Account #9400', false)
+            ->assertSee('data-country-select', false)
+            ->assertSee('Address 2', false)
             ->assertSee('<option value="Pickup in Office">Pickup in Office</option>', false)
             ->assertSee('<option value="Home Delivery">Home Delivery</option>', false)
             ->assertSee('<option value="100">100</option>', false)
@@ -198,6 +232,8 @@ class ExampleTest extends TestCase
             ->assertSee('selectedServiceNotice', false)
             ->assertSee('data-go-back', false)
             ->assertSee('id="shipmentPackageDescription"', false)
+            ->assertSee('id="shipmentFragile" disabled', false)
+            ->assertSee('data-payment-options', false)
             ->assertSee('<option value="Pickup in Office">Pickup in Office</option>', false)
             ->assertSee('<option value="Home Delivery">Home Delivery</option>', false)
             ->assertDontSee('Door to Door', false)
@@ -215,7 +251,12 @@ class ExampleTest extends TestCase
             ->assertSee('app.js?v=', false)
             ->assertSee('kay-paolo.css?v=', false)
             ->assertSee('saveConsignee', false)
-            ->assertSee('save-consignee', false);
+            ->assertSee('save-consignee', false)
+            ->assertSee('countries', false)
+            ->assertSee('paymentOptions', false)
+            ->assertSee('emailShipment', false)
+            ->assertSee('shipmentLabel', false)
+            ->assertSee('shipmentReceipt', false);
     }
 
     public function test_delivery_location_runtime_guard_limits_options(): void
@@ -230,6 +271,100 @@ class ExampleTest extends TestCase
         $this->assertStringContainsString('Home Delivery', $script);
         $this->assertStringNotContainsString('Door to Door', $script);
         $this->assertStringNotContainsString('Port to Port', $script);
+    }
+
+    public function test_countries_and_payment_options_proxy_to_shipping_api(): void
+    {
+        Http::fake([
+            '*/api/kay-paolo/countries' => Http::response(['status' => 'missing'], 404),
+            '*/api/countries' => Http::response([
+                'data' => [
+                    ['country_name' => 'Haiti', 'alpha_2_code' => 'HT', 'dial_code' => '509'],
+                    ['country_name' => 'United States', 'alpha_2_code' => 'US', 'dial_code' => '1'],
+                ],
+            ]),
+            '*/api/kay-paolo/payment-options' => Http::response([
+                'options' => ['PAID AT AGENT', 'COLLECT'],
+            ]),
+        ]);
+
+        $this->getJson('/api/kay-paolo/countries')
+            ->assertOk()
+            ->assertJsonPath('countries.0.code', 'HT')
+            ->assertJsonPath('countries.1.code', 'US');
+
+        $this->withHeader('Authorization', 'Bearer fake-token')
+            ->getJson('/api/kay-paolo/payment-options')
+            ->assertOk()
+            ->assertJsonPath('options.0.value', 'PAID AT AGENT')
+            ->assertJsonPath('options.1.value', 'COLLECT');
+    }
+
+    public function test_shipment_document_routes_redirect_to_pdf_generators(): void
+    {
+        $this->get('/shipment-label?shipment_id=24745')
+            ->assertRedirect('https://dev.zionshipping.com/get_shipping_label/24745');
+
+        $this->get('/shipment-receipt?invoice=HTE59174')
+            ->assertRedirect('https://dev.zionshipping.com/receipt/receipt_HTE59174.pdf');
+    }
+
+    public function test_quote_proxy_falls_back_when_api_endpoint_requires_session_store(): void
+    {
+        Http::fake([
+            '*/api/kay-paolo/get-quote-result' => Http::response([
+                'message' => 'Session store not set on request.',
+            ], 500),
+            '*/web-api/get-quote-result-bocicot' => Http::response([
+                'status' => 'success',
+                'quotes' => [
+                    ['carrier' => 'ZION', 'service' => 'Economical Air', 'total' => '25.00'],
+                ],
+            ]),
+        ]);
+
+        $this->withHeader('Authorization', 'Bearer fake-token')
+            ->postJson('/api/kay-paolo/quote', [
+                'user_id' => 7020,
+                'from_country' => 'US',
+                'to_country' => 'HT',
+            ])
+            ->assertOk()
+            ->assertJsonPath('status', 'success')
+            ->assertJsonPath('quotes.0.service', 'Economical Air');
+    }
+
+    public function test_admin_page_is_role_gated_and_updates_content(): void
+    {
+        Storage::fake('local');
+
+        $this->get('/admin')->assertForbidden();
+
+        $session = [
+            'zion.access_token' => 'session-token',
+            'zion.user' => [
+                'name' => 'Admin User',
+                'role_id' => 1,
+                'role' => ['name' => 'Admin'],
+            ],
+        ];
+
+        $this->withSession($session)
+            ->get('/admin')
+            ->assertOk()
+            ->assertSee('Who We Are Pictures', false);
+
+        $this->withSession($session)
+            ->post('/admin', [
+                'meta_description' => 'Updated Kay Paolo logistics description.',
+                'who_headline' => 'Updated Who Headline',
+                'who_body' => 'Updated body copy for Kay Paolo content.',
+                'process_step_1_title' => 'Updated Step One',
+                'process_step_1_body' => 'Updated step copy.',
+            ])
+            ->assertRedirect('/admin');
+
+        Storage::disk('local')->assertExists('kay-paolo/content.json');
     }
 
     public function test_shipping_proxy_sanitizes_bocicot_payload_for_multiple_packages(): void
@@ -295,15 +430,14 @@ class ExampleTest extends TestCase
     public function test_shipping_proxy_recovers_from_zion_account_number_schema_error(): void
     {
         Http::fake([
-            '*/api/kay-paolo/update-shipping' => Http::sequence()
-                ->push([
-                    'status' => 'error',
-                    'message' => "SQLSTATE[42S22]: Column not found: 1054 Unknown column 'account_number' in 'field list' (SQL: update `shippings` set `account_number` = 9400 where `id` = 24745)",
-                ], 500)
-                ->push([
-                    'status' => 'success',
-                    'tracking_number' => 'HTE59174',
-                ]),
+            '*/api/kay-paolo/update-shipping' => Http::response([
+                'status' => 'error',
+                'message' => "SQLSTATE[42S22]: Column not found: 1054 Unknown column 'account_number' in 'field list' (SQL: update `shippings` set `account_number` = 9400 where `id` = 24745)",
+            ], 500),
+            '*/web-api/update-shipping-bocicot' => Http::response([
+                'status' => 'success',
+                'tracking_number' => 'HTE59174',
+            ]),
         ]);
 
         $this->withHeader('Authorization', 'Bearer fake-token')
@@ -342,7 +476,9 @@ class ExampleTest extends TestCase
                 'tracking_number' => 'HTE59174',
             ]);
 
-        Http::assertSentCount(2);
+        Http::assertSent(function (\Illuminate\Http\Client\Request $request) {
+            return str_contains($request->url(), '/web-api/update-shipping-bocicot');
+        });
     }
 
     public function test_account_shows_admin_access_notice_for_admin_session(): void

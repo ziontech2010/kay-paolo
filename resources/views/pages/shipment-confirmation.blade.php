@@ -59,19 +59,16 @@
             </p>
 
             <div class="confirm-details-grid">
-                <div class="confirm-detail-box">
+                <div class="confirm-detail-box confirm-detail-box-wide">
                     <span class="confirm-detail-label">SHIPMENT NUMBER</span>
                     <span class="confirm-detail-value" id="shipmentNoDisplay">Pending</span>
-                </div>
-                <div class="confirm-detail-box">
-                    <span class="confirm-detail-label">CARRIER DETAILS</span>
-                    <span class="confirm-detail-value" id="carrierDisplay">ZION</span>
+                    <span class="confirm-detail-subvalue" id="packageAmountDisplay">1 package</span>
                 </div>
             </div>
 
             <div class="confirm-actions-row">
-                <a href="{{ route('receipt.a4') }}" target="_blank" class="btn btn-gold" id="openLabelBtn">Open Label</a>
-                <a href="{{ route('receipt') }}" target="_blank" class="btn btn-gold" id="openReceiptBtn">Open Receipt</a>
+                <a href="{{ route('shipment.label') }}" target="_blank" class="btn btn-gold" id="openLabelBtn">Open Label PDF</a>
+                <a href="{{ route('shipment.receipt') }}" target="_blank" class="btn btn-gold" id="openReceiptBtn">Open Receipt PDF</a>
             </div>
         </div>
 
