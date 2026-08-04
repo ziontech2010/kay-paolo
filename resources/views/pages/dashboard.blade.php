@@ -1,5 +1,9 @@
 @extends('layouts.site')
 
+@php
+    $isAdminRole = in_array((int) ($zionUser['role_id'] ?? 0), [1, 12, 13, 14, 15], true);
+@endphp
+
 @section('title', 'Account | Kay Paolo Shipping')
 
 @section('banner')
@@ -30,7 +34,7 @@
                 <div><dt>Email</dt><dd id="dashboardEmail">{{ $zionUser['email'] ?? '-' }}</dd></div>
                 <div><dt>Account</dt><dd id="dashboardAccount">{{ $zionUser['account_number'] ?? '-' }}</dd></div>
             </dl>
-            <div class="api-inline-result success" id="dashboardAdminAccess" @if (($zionUser['role_id'] ?? null) != 1) hidden @endif>
+            <div class="api-inline-result success" id="dashboardAdminAccess" @unless ($isAdminRole) hidden @endunless>
                 Admin access is active for Kay Paolo content and API calls.
             </div>
         </div>
@@ -45,7 +49,7 @@
                 <h3>Track Shipment</h3>
                 <p>Validate tracking numbers inside the Kay Paolo UI.</p>
             </a>
-            <a class="service-card action-card" href="{{ route('admin') }}" id="dashboardAdminAction" @if (($zionUser['role_id'] ?? null) != 1) hidden @endif>
+            <a class="service-card action-card" href="{{ route('admin') }}" id="dashboardAdminAction" @unless ($isAdminRole) hidden @endunless>
                 <span class="num">ADMIN</span>
                 <h3>Manage Content</h3>
                 <p>Update Kay Paolo page text and Who We Are pictures.</p>
