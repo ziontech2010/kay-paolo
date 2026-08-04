@@ -66,9 +66,11 @@ class ZionApiProxyController extends Controller
     {
         $token = $request->bearerToken();
         $response = $this->zion->get('kay-paolo/countries', $request->query(), $token);
+        $countries = $response['ok'] ? $this->normalizeCountries($response['data']) : [];
 
-        if (!$response['ok']) {
+        if (!$response['ok'] || empty($countries)) {
             $response = $this->zion->get('countries', $request->query(), $token);
+            $countries = $response['ok'] ? $this->normalizeCountries($response['data']) : [];
         }
 
         if (!$response['ok']) {
@@ -81,7 +83,7 @@ class ZionApiProxyController extends Controller
 
         return response()->json([
             'status' => 'success',
-            'countries' => $this->normalizeCountries($response['data']),
+            'countries' => $countries,
         ]);
     }
 
@@ -89,14 +91,16 @@ class ZionApiProxyController extends Controller
     {
         $token = $request->bearerToken();
         $response = $this->zion->get('kay-paolo/payment-options', [], $token);
-
-        if (!$response['ok']) {
-            $response = $this->zion->get('payment-options', [], $token);
-        }
-
         $options = $response['ok']
             ? $this->normalizePaymentOptions($response['data'])
             : [];
+
+        if (!$response['ok'] || empty($options)) {
+            $response = $this->zion->get('payment-options', [], $token);
+            $options = $response['ok']
+                ? $this->normalizePaymentOptions($response['data'])
+                : [];
+        }
 
         if (empty($options)) {
             $options = $this->defaultPaymentOptions();
@@ -553,6 +557,7 @@ class ZionApiProxyController extends Controller
     private function normalizeCountries(array $payload): array
     {
         $rows = $payload['countries']
+            ?? $payload['data']['countries']
             ?? $payload['data']['data']
             ?? $payload['data']
             ?? [];
@@ -562,12 +567,30 @@ class ZionApiProxyController extends Controller
         }
 
         return collect($rows)
-            ->map(function ($country) {
+            ->map(function ($country, $key) {
+                if (is_string($country)) {
+                    $code = strtoupper(trim((string) $key));
+                    $name = trim($country);
+
+                    if ($code === '' || $name === '') {
+                        return null;
+                    }
+
+                    return [
+                        'id' => null,
+                        'code' => $code,
+                        'name' => $name,
+                        'dial_code' => null,
+                        'zip_code_supported' => null,
+                        'flat_rate_supported' => null,
+                    ];
+                }
+
                 if (!is_array($country)) {
                     return null;
                 }
 
-                $code = strtoupper(trim((string) ($country['alpha_2_code'] ?? $country['code'] ?? $country['value'] ?? '')));
+                $code = strtoupper(trim((string) ($country['alpha_2_code'] ?? $country['code'] ?? $country['value'] ?? (is_string($key) ? $key : ''))));
                 $name = trim((string) ($country['country_name'] ?? $country['name'] ?? $country['label'] ?? ''));
 
                 if ($code === '' || $name === '') {
@@ -594,6 +617,7 @@ class ZionApiProxyController extends Controller
         $rows = $payload['options']
             ?? $payload['payment_options']
             ?? $payload['data']['options']
+            ?? $payload['data']['payment_options']
             ?? $payload['data']
             ?? [];
 
@@ -602,11 +626,11 @@ class ZionApiProxyController extends Controller
         }
 
         return collect($rows)
-            ->map(function ($option) {
+            ->map(function ($option, $key) {
                 if (is_string($option)) {
                     return [
-                        'value' => $option,
-                        'label' => $this->paymentLabel($option),
+                        'value' => is_string($key) ? $key : $option,
+                        'label' => is_string($key) ? $option : $this->paymentLabel($option),
                     ];
                 }
 
@@ -614,7 +638,7 @@ class ZionApiProxyController extends Controller
                     return null;
                 }
 
-                $value = trim((string) ($option['value'] ?? $option['code'] ?? $option['type'] ?? $option['name'] ?? ''));
+                $value = trim((string) ($option['value'] ?? $option['code'] ?? $option['type'] ?? $option['name'] ?? (is_string($key) ? $key : '')));
                 if ($value === '') {
                     return null;
                 }
