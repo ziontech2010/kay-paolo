@@ -259,6 +259,32 @@ class ExampleTest extends TestCase
             ->assertSee('shipmentReceipt', false);
     }
 
+    public function test_shipment_history_uses_archive_layout_with_dynamic_cards(): void
+    {
+        $this->get('/shipment-history')
+            ->assertStatus(200)
+            ->assertSee('Ready to Ship', false)
+            ->assertSee('Not Deliverable', false)
+            ->assertSee('Voided', false)
+            ->assertSee('data-history-status-badge="Available"', false)
+            ->assertSee('data-history-category-badge="International"', false)
+            ->assertSee('historyCardList', false)
+            ->assertSee('history-card-main', false)
+            ->assertSee('historyResult', false);
+
+        $script = file_get_contents(public_path('kay-paolo/assets/app.js'));
+
+        $this->assertStringContainsString('history-card-details', $script);
+        $this->assertStringContainsString('Detailed Pricing', $script);
+        $this->assertStringContainsString('Package Specs', $script);
+        $this->assertStringContainsString('Carrier Tracking Details', $script);
+        $this->assertStringContainsString('extractHistoryCards', $script);
+        $this->assertStringContainsString('updateHistoryBadgesFromRows', $script);
+        $this->assertStringContainsString('Object.entries(rawCountries)', $script);
+        $this->assertStringContainsString('Object.entries(rawOptions)', $script);
+        $this->assertStringContainsString('response?.data?.flat_rates', $script);
+    }
+
     public function test_delivery_location_runtime_guard_limits_options(): void
     {
         $script = file_get_contents(public_path('kay-paolo/assets/app.js'));
@@ -276,15 +302,19 @@ class ExampleTest extends TestCase
     public function test_countries_and_payment_options_proxy_to_shipping_api(): void
     {
         Http::fake([
-            '*/api/kay-paolo/countries' => Http::response(['status' => 'missing'], 404),
+            '*/api/kay-paolo/countries' => Http::response(['countries' => []]),
             '*/api/countries' => Http::response([
-                'data' => [
-                    ['country_name' => 'Haiti', 'alpha_2_code' => 'HT', 'dial_code' => '509'],
-                    ['country_name' => 'United States', 'alpha_2_code' => 'US', 'dial_code' => '1'],
+                'countries' => [
+                    'HT' => 'Haiti',
+                    'US' => 'United States',
                 ],
             ]),
-            '*/api/kay-paolo/payment-options' => Http::response([
-                'options' => ['PAID AT AGENT', 'COLLECT'],
+            '*/api/kay-paolo/payment-options' => Http::response(['options' => []]),
+            '*/api/payment-options' => Http::response([
+                'payment_options' => [
+                    'PAID AT AGENT' => 'Paid at Store',
+                    'COLLECT' => 'Collect',
+                ],
             ]),
         ]);
 
