@@ -6,6 +6,8 @@ document.addEventListener('DOMContentLoaded', () => {
   const pendingShipmentKey = 'kayPaoloPendingShipment';
   const shipmentResponseKey = 'kayPaoloShipmentResponse';
   const trackingResponseKey = 'kayPaoloTrackingResponse';
+  const countryCacheKey = 'kayPaoloCountries';
+  const paymentOptionsCacheKey = 'kayPaoloPaymentOptions';
   const flatRateCache = new Map();
 
   const route = (name, fallback) => config.routes?.[name] || fallback;
@@ -41,7 +43,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (match) {
       element.value = match.value;
+      delete element.dataset.previousValue;
     } else {
+      element.dataset.previousValue = raw;
       element.value = raw;
     }
   };
@@ -109,6 +113,8 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   initDeliveryLocationSelects();
+  initCountrySelects();
+  initPaymentOptions();
   initBackButtons();
   initContactModal();
   initCounters();
@@ -145,6 +151,41 @@ document.addEventListener('DOMContentLoaded', () => {
       body: JSON.stringify(payload || {})
     });
 
+    const text = await response.text();
+    let data = {};
+    try {
+      data = text ? JSON.parse(text) : {};
+    } catch (error) {
+      data = { status: 'error', message: text || 'Unexpected response.' };
+    }
+
+    if (!response.ok) {
+      const message = data.message || data.error || 'Request failed.';
+      throw Object.assign(new Error(message), { response: data, status: response.status });
+    }
+
+    return data;
+  }
+
+  async function getJson(url, query = {}, options = {}) {
+    const headers = {
+      Accept: 'application/json',
+      'X-CSRF-TOKEN': csrf
+    };
+
+    const token = options.token === undefined ? storedToken() : options.token;
+    if (token) {
+      headers.Authorization = `Bearer ${token}`;
+    }
+
+    const params = new URLSearchParams();
+    Object.entries(query || {}).forEach(([key, nextValue]) => {
+      if (nextValue !== undefined && nextValue !== null && nextValue !== '') {
+        params.set(key, nextValue);
+      }
+    });
+
+    const response = await fetch(params.toString() ? `${url}?${params}` : url, { headers });
     const text = await response.text();
     let data = {};
     try {
@@ -203,6 +244,160 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
+  function initCountrySelects() {
+    const selects = Array.from(document.querySelectorAll('[data-country-select], #destCountry, #from_country, #toCountry, #shipmentFromCountry, #shipmentToCountry'));
+    if (!selects.length) return;
+
+    const cached = normalizeCountries(storedJson(countryCacheKey, []));
+    if (cached.length) {
+      populateCountrySelects(selects, cached);
+    }
+
+    getJson(route('countries', '/api/kay-paolo/countries'), {}, { token: storedToken() })
+      .then((response) => {
+        const countries = normalizeCountries(response.countries || response.data?.countries || response.data || []);
+        if (!countries.length) return;
+
+        window.localStorage.setItem(countryCacheKey, JSON.stringify(countries));
+        populateCountrySelects(selects, countries);
+      })
+      .catch(() => {
+        if (!cached.length) {
+          selects.forEach((select) => {
+            if (select.options.length === 0) {
+              select.innerHTML = '<option value="">Countries unavailable</option>';
+            }
+          });
+        }
+      });
+  }
+
+  function normalizeCountries(rawCountries) {
+    if (!Array.isArray(rawCountries)) return [];
+
+    const seen = new Set();
+    return rawCountries
+      .map((country) => {
+        if (!country || typeof country !== 'object') return null;
+        const code = String(country.code || country.alpha_2_code || country.value || '').trim().toUpperCase();
+        const name = String(country.name || country.country_name || country.label || '').trim();
+        if (!code || !name || seen.has(code)) return null;
+        seen.add(code);
+        return { code, name };
+      })
+      .filter(Boolean)
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }
+
+  function populateCountrySelects(selects, countries) {
+    selects.forEach((select) => {
+      const previous = select.value || select.dataset.previousValue || '';
+      const selectedText = select.options?.[select.selectedIndex]?.text || '';
+      const placeholder = firstPlaceholderOption(select);
+
+      select.innerHTML = '';
+      if (placeholder) {
+        select.appendChild(placeholder);
+      }
+
+      countries.forEach((country) => {
+        const option = document.createElement('option');
+        option.value = country.code;
+        option.textContent = country.name;
+        select.appendChild(option);
+      });
+
+      setSelectValue(select.id, previous || selectedText);
+      select.dataset.kayCountriesLoaded = '1';
+    });
+  }
+
+  function firstPlaceholderOption(select) {
+    const first = select.options?.[0];
+    if (!first || String(first.value || '').trim() !== '') return null;
+
+    const option = document.createElement('option');
+    option.value = '';
+    option.textContent = first.textContent || 'Select Country';
+    return option;
+  }
+
+  function initPaymentOptions() {
+    const selects = Array.from(document.querySelectorAll('[data-payment-options], #shipmentPaymentType'));
+    if (!selects.length) return;
+
+    const cached = normalizePaymentOptions(storedJson(paymentOptionsCacheKey, []));
+    if (cached.length) {
+      populatePaymentOptions(selects, cached);
+    }
+
+    getJson(route('paymentOptions', '/api/kay-paolo/payment-options'), {}, { token: storedToken() })
+      .then((response) => {
+        const options = normalizePaymentOptions(response.options || response.payment_options || response.data?.options || response.data || []);
+        if (!options.length) return;
+
+        window.localStorage.setItem(paymentOptionsCacheKey, JSON.stringify(options));
+        populatePaymentOptions(selects, options);
+      })
+      .catch(() => {
+        if (!cached.length) {
+          populatePaymentOptions(selects, [{ value: 'PAID AT AGENT', label: 'Paid at Store' }]);
+        }
+      });
+  }
+
+  function normalizePaymentOptions(rawOptions) {
+    if (!Array.isArray(rawOptions)) return [];
+
+    const seen = new Set();
+    return rawOptions
+      .map((option) => {
+        if (typeof option === 'string') {
+          return { value: option, label: paymentLabel(option) };
+        }
+
+        if (!option || typeof option !== 'object') return null;
+        const value = String(option.value || option.code || option.type || option.name || '').trim();
+        if (!value || seen.has(value)) return null;
+
+        seen.add(value);
+        return { value, label: String(option.label || option.name || paymentLabel(value)).trim() };
+      })
+      .filter(Boolean);
+  }
+
+  function populatePaymentOptions(selects, options) {
+    const pending = storedJson(pendingShipmentKey, { payload: {} });
+    selects.forEach((select) => {
+      const previous = select.value || pending.payload?.payment_type || '';
+      select.innerHTML = '';
+
+      options.forEach((option) => {
+        const optionElement = document.createElement('option');
+        optionElement.value = option.value;
+        optionElement.textContent = option.label;
+        select.appendChild(optionElement);
+      });
+
+      setSelectValue(select.id, previous || 'PAID AT AGENT');
+      select.dataset.kayPaymentsLoaded = '1';
+    });
+  }
+
+  function paymentLabel(rawValue) {
+    const labels = {
+      'PAID AT AGENT': 'Paid at Store',
+      COLLECT: 'Collect',
+      'CREDIT OR DEBIT CARD': 'Credit or Debit Card',
+      PAYPAL: 'PayPal',
+      SQUARE: 'Square',
+      SPLIT: 'Split Payment',
+      'PARTIAL PAYMENT': 'Partial Payment'
+    };
+    const value = String(rawValue || '').trim();
+    return labels[value] || value.toLowerCase().replace(/(^|\s|-|_)\S/g, (match) => match.toUpperCase()).replace(/[_-]/g, ' ');
+  }
+
   function initLogin() {
     const loginForm = document.getElementById('loginForm');
     if (!loginForm || loginForm.dataset.apiLogin === undefined) return;
@@ -229,7 +424,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const response = await postJson(loginForm.dataset.apiEndpoint || route('login', '/api/kay-paolo/login'), payload, { token: '' });
 
         if (response.error === 'true' || !response.access_token) {
-          throw new Error(response.message || 'Unable to login with Zion Shipping.');
+          throw new Error(response.message || 'Unable to login to Kay Paolo.');
         }
 
         window.localStorage.setItem(tokenKey, response.access_token);
@@ -242,7 +437,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const redirectInput = loginForm.querySelector('[name="redirect"]')?.value || '';
         window.location.href = redirectInput.startsWith('/') && !redirectInput.startsWith('//')
           ? redirectInput
-          : route('account', '/account');
+          : route('home', '/');
       } catch (error) {
         if (errorBox) {
           errorBox.textContent = error.message;
@@ -268,13 +463,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const user = storedUser();
     if (user && Object.keys(user).length) {
-      dashboardName.textContent = user.name || 'Zion user';
+      dashboardName.textContent = user.name || 'Kay Paolo user';
       setText('dashboardRole', user.role?.name || 'User');
       setText('dashboardRoleId', user.role_id || '-');
       setText('dashboardEmail', user.email || '-');
       setText('dashboardAccount', user.account_number || user.id || '-');
       const adminAccess = document.getElementById('dashboardAdminAccess');
       if (adminAccess) adminAccess.hidden = Number(user.role_id) !== 1;
+      const adminAction = document.getElementById('dashboardAdminAction');
+      if (adminAction) adminAction.hidden = Number(user.role_id) !== 1;
     }
   }
 
@@ -328,7 +525,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
       if (result) {
         result.className = 'api-inline-result';
-        result.textContent = 'Searching Zion customer records...';
+        result.textContent = 'Searching customer records...';
       }
 
       try {
@@ -412,7 +609,7 @@ document.addEventListener('DOMContentLoaded', () => {
       loading = true;
       existingSelect.disabled = true;
       existingSelect.innerHTML = '<option value="">Loading consignees...</option>';
-      showMessage('Loading existing consignees from Zion...');
+      showMessage('Loading existing consignees...');
 
       try {
         const response = await postJson(route('consigneeList', '/api/kay-paolo/consignee-list'), payload);
@@ -635,7 +832,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     select.disabled = true;
     select.innerHTML = '<option value="">Loading flat rate items...</option>';
-    setNote('Loading flat rate items from Zion...');
+    setNote('Loading live flat rate items...');
 
     try {
       const response = await postJson(route('flatRates', '/api/kay-paolo/flat-rates'), {
@@ -656,21 +853,21 @@ document.addEventListener('DOMContentLoaded', () => {
       select.disabled = false;
       setNote(options.length ? `${options.length} flat rate item(s) loaded.` : 'No flat rate items available for this destination.', options.length === 0);
     } catch (error) {
-      const fallbackOptions = flatRateCache.get('fallback') || fallbackFlatRateOptions();
-      flatRateCache.set('fallback', fallbackOptions);
-      populateFlatRateSelect(select, fallbackOptions);
+      populateFlatRateSelect(select, []);
       select.dataset.loadedFor = cacheKey;
       select.disabled = false;
-      setNote('Showing standard flat rate items until Zion returns live options.', true);
+      setNote('Unable to load live flat rate items from the shipping API.', true);
     }
   }
 
   function normalizeFlatRateOptions(response) {
     const options = [
-      response?.all_options,
-      response?.data?.all_options,
       response?.options,
-      response?.data?.options
+      response?.data?.options,
+      response?.rates,
+      response?.data?.rates,
+      response?.all_options,
+      response?.data?.all_options
     ].find(Array.isArray) || [];
 
     return options.map((option) => normalizeFlatRateOption(option)).filter((option) => option.slug);
@@ -693,84 +890,6 @@ document.addEventListener('DOMContentLoaded', () => {
         height: defaults.height || option.height || ''
       }
     };
-  }
-
-  function fallbackFlatRateOptions() {
-    const flatRate = (slug, label, group, weight, length, width, height) => ({
-      slug,
-      label,
-      group,
-      defaults: { package_count_ind: 1, weight, length, width, height },
-      readonly: true
-    });
-
-    return [
-      flatRate('blender', 'BLENDER', 'MOTHER`S DAY SPECIAL', 5, 14, 6, 6),
-      flatRate('juicer', 'JUICER', 'MOTHER`S DAY SPECIAL', 7, 12, 10, 8),
-      flatRate('toaster', 'TOASTER', 'MOTHER`S DAY SPECIAL', 12, 16, 14, 12),
-      flatRate('microwave', 'MICROWAVE', 'MOTHER`S DAY SPECIAL', 14, 14, 14, 14),
-      flatRate('dryer', 'DRYER', 'MOTHER`S DAY SPECIAL', 45, 20, 20, 20),
-      flatRate('washer', 'WASHER', 'MOTHER`S DAY SPECIAL', 50, 20, 20, 20),
-      flatRate('contains_document', 'DOCUMENT', 'DOCUMENT', 0.5, 12, 8, 1),
-      flatRate('phone_new', 'NEW PHONE', 'PHONE', 2, 9, 6, 2),
-      flatRate('phone_used', 'USED PHONE', 'PHONE', 2, 9, 6, 2),
-      flatRate('tablet_new', 'NEW TABLET', 'TABLET', 2, 12, 9, 3),
-      flatRate('tablet_used', 'USED TABLET', 'TABLET', 2, 12, 9, 3),
-      flatRate('laptop_new', 'NEW LAPTOP', 'LAPTOP', 5, 18, 12, 4),
-      flatRate('laptop_used', 'USED LAPTOP', 'LAPTOP', 5, 18, 12, 4),
-      flatRate('tv_24', 'TV 24"', 'TV', 12, 22, 15, 4),
-      flatRate('tv_32', 'TV 32"', 'TV', 14, 29, 19, 4),
-      flatRate('tv_40', 'TV 40"', 'TV', 16, 37, 22, 6),
-      flatRate('tv_42', 'TV 42"', 'TV', 20, 38, 24, 6),
-      flatRate('tv_50', 'TV 50"', 'TV', 25, 44, 27, 7),
-      flatRate('tv_55', 'TV 55"', 'TV', 35, 49, 30, 7),
-      flatRate('tv_60', 'TV 60"', 'TV', 40, 54, 33, 8),
-      flatRate('tv_65', 'TV 65"', 'TV', 50, 58, 35, 8),
-      flatRate('tv_70', 'TV 70"', 'TV', 60, 62, 37, 9),
-      flatRate('tv_75', 'TV 75"', 'TV', 70, 66, 40, 9),
-      flatRate('tv_80', 'TV 80"', 'TV', 80, 70, 45, 10),
-      flatRate('tv_85', 'TV 85"', 'TV', 95, 75, 45, 10),
-      flatRate('luggage_checked', 'LUGGAGE (CHECKED BAG)', 'SPECIAL', 50, 30, 20, 12),
-      flatRate('bins', 'BINS', 'SPECIAL', 80, 36, 16, 16),
-      flatRate('barrel_55_gal', 'BARREL 55 GAL', 'SPECIAL', 200, 34, 24, 24),
-      flatRate('barrel_77_gallons', 'BARREL 77 GAL', 'SPECIAL', 250, 20, 20, 45),
-      flatRate('econtainer', 'E-CONTAINER', 'SPECIAL', 250, 42, 29, 25),
-      flatRate('hub_14_14_14', 'HUB20 14X14X14', 'HUB20', 20, 14, 14, 14),
-      flatRate('hub_18_18_16', 'HUB20 18X18X16', 'HUB20', 40, 18, 18, 16),
-      flatRate('hub_18_18_24', 'HUB20 18X18X24', 'HUB20', 60, 18, 18, 24),
-      flatRate('hub_18_24_24', 'HUB20 18X24X24', 'HUB20', 80, 18, 24, 24),
-      flatRate('bag_of_food_100', 'BAG OF FOOD 100 LBS', 'OTHER', 100, 24, 14, 10),
-      flatRate('bag_of_food_50', 'BAG OF FOOD 50 LBS', 'OTHER', 50, 18, 12, 8),
-      flatRate('regular_tires', 'REGULAR TIRES', 'OTHER', 20, 24, 24, 8),
-      flatRate('suv_pickup_tires', 'SUV OR PICKUP TIRES', 'OTHER', 30, 30, 30, 10),
-      flatRate('gallon_5_litter', '5 LITTER GALLON', 'OTHER', 10, 5, 6, 12),
-      flatRate('gallons_5', '5 GALLONS', 'OTHER', 50, 14, 16, 18),
-      flatRate('foldable_table', 'FOLDABLE TABLE', 'OTHER', 15, 4, 20, 40),
-      flatRate('foldable_chair', 'FOLDABLE CHAIR', 'OTHER', 10, 3, 14, 34),
-      flatRate('one_door_fridge', 'ONE DOOR FRIDGE', 'OTHER', 100, 24, 24, 70),
-      flatRate('two_door_fridge', 'TWO DOORS FRIDGE', 'OTHER', 150, 36, 36, 70),
-      flatRate('twin_bed', 'TWIN BED', 'OTHER', 150, 10, 60, 110),
-      flatRate('twin_bedroom', 'TWIN BEDROOM', 'OTHER', 250, 80, 80, 20),
-      flatRate('queen_bed', 'QUEEN BED', 'OTHER', 200, 20, 60, 110),
-      flatRate('queen_bedroom', 'QUEEN BEDROOM', 'OTHER', 300, 80, 80, 40),
-      flatRate('king_bed', 'KING BED', 'OTHER', 300, 30, 60, 110),
-      flatRate('king_bedroom', 'KING BEDROOM', 'OTHER', 400, 80, 80, 60),
-      flatRate('oven', 'OVEN', 'OTHER', 100, 40, 40, 50),
-      flatRate('box_truck_tires', 'BOX TRUCK TIRES', 'OTHER', 50, 40, 40, 14),
-      flatRate('car_battery', 'CAR BATTERY (SUDDEN)', 'OTHER', 50, 10, 8, 6),
-      flatRate('truck_battery', 'TRUCK BATTERY', 'OTHER', 60, 12, 10, 8),
-      flatRate('inverter_battery', 'INVERTER BATTERY', 'OTHER', 70, 12, 10, 8),
-      flatRate('bucket_5', 'BUCKET (5 GALLONS)', 'OTHER', 50, 20, 12, 12),
-      flatRate('regular_door', 'REGULAR DOOR', 'OTHER', 75, 80, 30, 2),
-      flatRate('kid_bicycle', 'KID BICYCLE', 'OTHER', 25, 30, 14, 8),
-      flatRate('adult_bicycle', 'ADULT BICYCLE', 'OTHER', 35, 50, 18, 12),
-      flatRate('regular_chair', 'REGULAR CHAIR', 'OTHER', 20, 24, 24, 18),
-      flatRate('solar_panel_200w', 'SOLAR PANEL 200W', 'OTHER', 50, 40, 30, 4),
-      flatRate('solar_panel_400w', 'SOLAR PANEL 400W', 'OTHER', 75, 60, 40, 4),
-      flatRate('generator_0_2_5kw', 'GENERATOR 0KW - 2.5KW', 'OTHER', 100, 24, 18, 20),
-      flatRate('generator_2_5_5kw', 'GENERATOR 2.5KW - 5KW', 'OTHER', 150, 30, 24, 24),
-      flatRate('generator_5_10kw', 'GENERATOR 5KW - 10KW', 'OTHER', 250, 40, 30, 30)
-    ];
   }
 
   function populateFlatRateSelect(select, options) {
@@ -908,6 +1027,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const mergedPayload = await ensureConsigneeForShipment(mergeShipmentFormPayload(pending.payload || {}));
         const payload = buildBocicotShipmentPayload(mergedPayload);
         const response = await postJson(route('shipping', '/api/kay-paolo/shipping'), payload);
+        await queueShipmentEmailNotifications(response, payload);
         window.localStorage.setItem(shipmentResponseKey, JSON.stringify({ response, payload, selected: pending.card || {} }));
         window.location.href = route('shipmentConfirmation', '/shipment-confirmation');
       } catch (error) {
@@ -1005,21 +1125,21 @@ document.addEventListener('DOMContentLoaded', () => {
     const data = buildShipmentDocumentData(response, payload, selected);
     const params = new URLSearchParams(window.location.search);
     const shipmentNo = params.get('id') || data.tracking || data.documentNumber || 'Pending';
-    const carrier = params.get('carrier') || quoteCardPartner(selected) || normalizePartner(payload.partner) || 'ZION';
 
     setText('shipmentNoDisplay', shipmentNo);
-    setText('carrierDisplay', carrier);
-    setHrefWithQuery('openLabelBtn', route('receiptA4', '/receipt-a4'), shipmentNo, carrier);
-    setHrefWithQuery('openReceiptBtn', route('receipt', '/receipt'), shipmentNo, carrier);
+    setText('packageAmountDisplay', `${data.packageCount} package${Number(data.packageCount) === 1 ? '' : 's'}`);
+    setDocumentHref('openLabelBtn', route('shipmentLabel', '/shipment-label'), data, shipmentNo);
+    setDocumentHref('openReceiptBtn', route('shipmentReceipt', '/shipment-receipt'), data, shipmentNo);
   }
 
-  function setHrefWithQuery(id, baseUrl, shipmentNo, carrier) {
+  function setDocumentHref(id, baseUrl, data, shipmentNo) {
     const link = document.getElementById(id);
     if (!link) return;
 
     const params = new URLSearchParams();
+    if (data.shipmentId) params.set('shipment_id', data.shipmentId);
+    if (data.documentNumber && data.documentNumber !== 'Pending') params.set('invoice', data.documentNumber);
     if (shipmentNo && shipmentNo !== 'Pending') params.set('id', shipmentNo);
-    if (carrier) params.set('carrier', carrier);
     link.href = params.toString() ? `${baseUrl}?${params}` : baseUrl;
   }
 
@@ -1083,6 +1203,15 @@ document.addEventListener('DOMContentLoaded', () => {
     const totalWeight = items.reduce((sum, item) => sum + numberValue(item.weight, 0), 0) || 1;
 
     return {
+      shipmentId: response.shipment_id
+        || response.shipping_id
+        || response.id
+        || responseData.shipment_id
+        || responseData.shipping_id
+        || responseData.id
+        || shipping.id
+        || shipping.shipment_id
+        || '',
       documentNumber,
       tracking,
       date: readableDate(response.created_at || responseData.created_at || shipping.created_at || new Date()),
@@ -1164,6 +1293,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const list = document.getElementById('historyCardList');
     if (!list) return;
 
+    const result = document.getElementById('historyResult');
+    const loader = document.getElementById('historyLoader');
+
     const filter = () => {
       const query = value('searchInput').toLowerCase();
       const statuses = Array.from(document.querySelectorAll('.status-filter:checked')).map((item) => item.value);
@@ -1176,8 +1308,141 @@ document.addEventListener('DOMContentLoaded', () => {
       });
     };
 
+    const load = async () => {
+      if (!result || !storedToken()) return;
+
+      result.innerHTML = '<div class="api-inline-result">Loading shipment history...</div>';
+      if (loader) loader.hidden = false;
+
+      try {
+        const response = await postJson(route('shippingHistory', '/api/kay-paolo/shipping-history'), {
+          limit: firstValue('entriesSelect') || 100,
+          created_in: firstValue('timeSelect'),
+          search: firstValue('searchInput'),
+          user_id: storedUser().id || storedUser().account_number || undefined
+        });
+
+        if (response.html) {
+          result.innerHTML = response.html;
+        } else {
+          renderHistoryRows(result, normalizeHistoryRows(response));
+        }
+        filter();
+      } catch (error) {
+        showError(result, error.message);
+      } finally {
+        if (loader) loader.hidden = true;
+      }
+    };
+
     document.getElementById('searchInput')?.addEventListener('input', filter);
+    document.getElementById('entriesSelect')?.addEventListener('change', load);
+    document.getElementById('timeSelect')?.addEventListener('change', load);
     document.querySelectorAll('.status-filter,.category-filter').forEach((input) => input.addEventListener('change', filter));
+
+    load();
+  }
+
+  function normalizeHistoryRows(response) {
+    const candidates = [
+      response?.shippings,
+      response?.shipping_history,
+      response?.history,
+      response?.data?.shippings,
+      response?.data?.shipping_history,
+      response?.data?.history,
+      response?.data?.data,
+      response?.data
+    ].find((item) => Array.isArray(item) || (item && typeof item === 'object'));
+
+    if (!candidates) return [];
+
+    return Array.isArray(candidates) ? candidates : Object.values(candidates);
+  }
+
+  function renderHistoryRows(container, rows) {
+    if (!rows.length) {
+      container.innerHTML = '<div class="api-inline-result">No shipments found for this account.</div>';
+      return;
+    }
+
+    container.innerHTML = rows.map((row) => {
+      const tracking = historyField(row, ['tracking_number', 'invoice_num', 'invoice', 'awb', 'id'], '-');
+      const status = historyField(row, ['status_name', 'shipping_status', 'status'], 'Ready to Ship');
+      const createdBy = historyField(row, ['created_by', 'shipper_name', 'from_name'], 'Kay Paolo Shipping');
+      const date = readableDate(historyField(row, ['created_at', 'shipment_date', 'date'], ''));
+      const option = historyField(row, ['delivery_option', 'selected_shipper', 'service_name'], 'Shipping service');
+      const description = historyField(row, ['package_description', 'description'], 'Package details pending');
+      const fromAddress = historyAddress(row, 'from');
+      const toAddress = historyAddress(row, 'to');
+      const category = historyCategory(row);
+      const searchPool = [tracking, status, createdBy, option, description, fromAddress, toAddress].join(' ');
+
+      return `
+        <div class="shipment-card" data-status="${escapeHtml(status)}" data-category="${escapeHtml(category)}" data-search-pool="${escapeHtml(searchPool)}" style="margin-bottom: 0">
+          <div class="history-card-main">
+            <div class="history-card-col">
+              <h4 style="color: var(--navy-800)">${escapeHtml(tracking)}</h4>
+              <span class="status-lbl">${escapeHtml(status)}</span>
+              <span class="meta-label">Created By</span>
+              <span class="meta-val">${escapeHtml(createdBy)}</span>
+            </div>
+            <div class="history-card-col">
+              <span class="meta-label">Shipment Date</span>
+              <span class="meta-val" style="font-weight: 700">${escapeHtml(date || '-')}</span>
+              <span class="meta-label">Delivery Option</span>
+              <span class="meta-val">${escapeHtml(option)}</span>
+              <span class="meta-label">Description</span>
+              <span class="meta-val" style="font-weight: 600">${escapeHtml(description)}</span>
+            </div>
+            <div class="history-card-col">
+              <div class="address-block">
+                <span class="meta-label">Ship From</span>
+                <strong>${escapeHtml(historyField(row, ['shipper_name', 'from_name'], 'Sender'))}</strong>
+                ${escapeHtml(fromAddress)}
+              </div>
+            </div>
+            <div class="history-card-col">
+              <div class="address-block">
+                <span class="meta-label">Ship To</span>
+                <strong>${escapeHtml(historyField(row, ['consignee_name', 'to_name'], 'Customer'))}</strong>
+                ${escapeHtml(toAddress)}
+              </div>
+              <a class="quick-view-link" href="${route('trackingDetail', '/tracking-detail')}?id=${encodeURIComponent(tracking)}">Quick View</a>
+            </div>
+          </div>
+        </div>
+      `;
+    }).join('');
+  }
+
+  function historyField(row, keys, fallback = '') {
+    for (const key of keys) {
+      const value = row?.[key] ?? row?.shipping?.[key] ?? row?.shipping_data?.[key];
+      if (value !== undefined && value !== null && value !== '') {
+        return String(value);
+      }
+    }
+
+    return fallback;
+  }
+
+  function historyAddress(row, side) {
+    const prefix = side === 'from' ? 'shipper' : 'consignee';
+    const alt = side === 'from' ? 'from' : 'to';
+    return [
+      historyField(row, [`${prefix}_address`, `${alt}_address`]),
+      historyField(row, [`${prefix}_city`, `${prefix}_address_city`, `${alt}_city`]),
+      historyField(row, [`${prefix}_state`, `${prefix}_address_state`, `${alt}_state`]),
+      historyField(row, [`${prefix}_zip`, `${prefix}_address_zip`, `${alt}_zip`]),
+      historyField(row, [`${prefix}_country`, `${prefix}_address_country`, `${alt}_country_name`, `${alt}_country`])
+    ].filter(Boolean).join(', ') || 'Address pending';
+  }
+
+  function historyCategory(row) {
+    const from = countryCode(historyField(row, ['shipper_country', 'from_country', 'from_country_name']));
+    const to = countryCode(historyField(row, ['consignee_country', 'consignee_address_country', 'to_country', 'to_country_name']));
+    return from === 'US' && to === 'US' ? 'Domestic' : 'International';
   }
 
   function buildQuotePayload() {
@@ -1277,7 +1542,8 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!customer || typeof customer !== 'object') return;
 
     const name = customer.name || customer.business_name || '';
-    setText('fromCardTitle', `From: ${name || 'Customer'}`);
+    const account = customer.account_number || customer.id || firstValue('from_account');
+    setText('fromCardTitle', `From: ${name || 'Customer'}${account ? ` | Account #${account}` : ''}`);
     setValue('from_name', name);
     setValue('from_email', customer.email);
     setValue('from_phone', customer.shipper_phone || customer.phone || customer.mobile);
@@ -1306,13 +1572,18 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function mergeShipmentFormPayload(basePayload) {
+    const fromCountrySelect = firstElement('shipmentFromCountry');
+    const toCountrySelect = firstElement('shipmentToCountry');
+    const fromCountryName = selectedCountryName(fromCountrySelect) || basePayload.from_country_name;
+    const toCountryName = selectedCountryName(toCountrySelect) || basePayload.to_country_name;
+
     return {
       ...basePayload,
       from_name: value('shipmentFromName') || basePayload.from_name,
       from_email: value('shipmentFromEmail') || basePayload.from_email,
       from_phone: value('shipmentFromPhone') || basePayload.from_phone,
-      from_country_name: value('shipmentFromCountry') || basePayload.from_country_name,
-      from_country: countryCode(value('shipmentFromCountry') || basePayload.from_country_name || basePayload.from_country),
+      from_country_name: fromCountryName,
+      from_country: countryCode(fromCountrySelect?.value || basePayload.from_country || fromCountryName),
       from_address: value('shipmentFromAddress') || basePayload.from_address,
       from_apt: value('shipmentFromApt') || basePayload.from_apt,
       from_city: value('shipmentFromCity') || basePayload.from_city,
@@ -1322,8 +1593,8 @@ document.addEventListener('DOMContentLoaded', () => {
       consignee_name: value('shipmentToName') || basePayload.consignee_name,
       to_phone_1: value('shipmentToPhone') || basePayload.to_phone_1,
       to_phone_2: value('shipmentToHomePhone') || basePayload.to_phone_2,
-      to_country_name: value('shipmentToCountry') || basePayload.to_country_name,
-      to_country: countryCode(value('shipmentToCountry') || basePayload.to_country_name || basePayload.to_country),
+      to_country_name: toCountryName,
+      to_country: countryCode(toCountrySelect?.value || basePayload.to_country || toCountryName),
       to_address: value('shipmentToAddress') || basePayload.to_address,
       to_apt: value('shipmentToApt') || basePayload.to_apt,
       to_city: value('shipmentToCity') || basePayload.to_city,
@@ -1559,6 +1830,24 @@ document.addEventListener('DOMContentLoaded', () => {
     };
   }
 
+  async function queueShipmentEmailNotifications(response, payload) {
+    const data = buildShipmentDocumentData(response || {}, payload || {}, {});
+    const emails = Array.from(new Set([
+      payload?.from_email,
+      storedUser().email
+    ].filter(Boolean)));
+
+    if (!emails.length) return;
+
+    await Promise.allSettled(emails.map((email) => postJson(route('emailShipment', '/api/kay-paolo/email-shipment'), {
+      email,
+      shipment_id: data.shipmentId || undefined,
+      shipping_id: data.shipmentId || undefined,
+      id: data.shipmentId || data.documentNumber || data.tracking || undefined,
+      invoice: data.documentNumber || undefined
+    })));
+  }
+
   function fillCreateShipmentPage() {
     const pending = storedJson(pendingShipmentKey, { payload: {}, card: {}, quote: {} });
     const payload = pending.payload || {};
@@ -1567,7 +1856,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const hasSelection = Boolean(payload.quote_id || quote.quote_id || quote.quoteId || quote.id || Object.keys(card).length);
     const service = quoteCardService(card) || payload.delivery_option || 'Selected service';
     const total = quoteCardTotal(card) || payload.deliveryEstimatePrice || payload.total || '0.00';
-    const carrier = quoteCardCarrier(card) || payload.partner || 'Zion';
+    const carrier = quoteCardCarrier(card) || payload.partner || 'ZION';
     const eta = quoteCardEta(card) || payload.deliveryEstimateDate || '-';
     const deliveredBy = quoteCardDeliveryTime(card) || payload.delivered_by || '-';
 
@@ -1601,6 +1890,12 @@ document.addEventListener('DOMContentLoaded', () => {
     setValue('shipmentToState', payload.to_state);
     setSelectValue('shipmentDeliveryLocation', normalizeDeliveryLocation(payload.delivery_location));
     setValue('shipmentPackageDescription', payload.package_description);
+    setSelectValue('shipmentPaymentType', payload.payment_type || 'PAID AT AGENT');
+
+    const fragileInput = document.getElementById('shipmentFragile');
+    if (fragileInput) {
+      fragileInput.checked = Boolean(Number(payload.is_fragile_shipment ?? payload.fragile_shipment ?? 0));
+    }
 
     const summary = document.getElementById('shipmentPackageSummary');
     if (summary && payload.dimensions) {
@@ -1618,7 +1913,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const quoteId = response.quote_id || response.quoteId || response.id || '';
 
     if (!cards.length) {
-      showError(container, response.message || 'No quote cards returned from Zion.');
+      showError(container, response.message || 'No quote cards returned from the shipping API.');
       return;
     }
 
@@ -1756,6 +2051,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (logo) {
       return `<img src="${escapeHtml(resolveAssetUrl(logo))}" alt="${escapeHtml(carrier)} logo" width="100" height="50">`;
+    }
+
+    if (normalizePartner(carrier) === 'ZION') {
+      return `<img src="${escapeHtml(config.assets?.zionCarrierLogo || '/kay-paolo/assets/images/zion-carrier-logo.png')}" alt="Full integration logo" width="100" height="50">`;
     }
 
     return `<div class="carrier-logo-fallback" aria-label="${escapeHtml(carrier)}">${escapeHtml(carrierInitials(carrier))}</div>`;
@@ -1907,13 +2206,14 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function selectedCountryName(select) {
-    return select?.options?.[select.selectedIndex]?.text || select?.value || '';
+    if (!select || !select.value) return '';
+    return select.options?.[select.selectedIndex]?.text || select.value || '';
   }
 
   function countryCode(country) {
     const raw = String(country || '').trim();
     if (!raw) return '';
-    if (raw.length <= 3 && raw.toUpperCase() === raw) return raw;
+    if (/^[a-z]{2,3}$/i.test(raw)) return raw.toUpperCase();
 
     const map = {
       'united states': 'US',
@@ -1987,8 +2287,8 @@ document.addEventListener('DOMContentLoaded', () => {
     if (title) title.textContent = isQuote ? 'Generating Quote' : 'Processing Shipment';
     if (message) {
       message.textContent = isQuote
-        ? 'Checking live Kay Paolo rates through the Zion Shipping API.'
-        : 'Completing the shipment through the Zion Shipping API.';
+        ? 'Checking live Kay Paolo rates.'
+        : 'Completing the shipment.';
     }
 
     overlay.hidden = !visible;

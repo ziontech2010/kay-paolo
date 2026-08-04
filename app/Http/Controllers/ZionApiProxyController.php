@@ -26,17 +26,26 @@ class ZionApiProxyController extends Controller
             return $value !== null && $value !== '';
         }));
 
-        if ($request->expectsJson()) {
-            return $this->jsonResponse($response);
-        }
-
         $data = $response['data'] ?? [];
         $failed = !$response['ok']
             || (($data['error'] ?? 'false') === 'true')
             || empty($data['access_token']);
 
+        if (!$failed && $request->hasSession()) {
+            $request->session()->regenerate();
+            $request->session()->put([
+                'zion.access_token' => $data['access_token'],
+                'zion.token_type' => $data['token_type'] ?? 'Bearer',
+                'zion.user' => $data['user'] ?? [],
+            ]);
+        }
+
+        if ($request->expectsJson()) {
+            return $this->jsonResponse($response);
+        }
+
         if ($failed) {
-            return redirect()->route('login', ['login_error' => $data['message'] ?? 'Unable to log in with Zion Shipping.']);
+            return redirect()->route('login', ['login_error' => $data['message'] ?? 'Unable to log in to Kay Paolo.']);
         }
 
         return response($this->browserRedirectScript($data))
@@ -53,9 +62,59 @@ class ZionApiProxyController extends Controller
         return $this->forwardAuthenticated('kay-paolo/consignee-list', $request);
     }
 
+    public function countries(Request $request): JsonResponse
+    {
+        $token = $request->bearerToken();
+        $response = $this->zion->get('kay-paolo/countries', $request->query(), $token);
+
+        if (!$response['ok']) {
+            $response = $this->zion->get('countries', $request->query(), $token);
+        }
+
+        if (!$response['ok']) {
+            return response()->json([
+                'status' => 'error',
+                'message' => $response['data']['message'] ?? 'Unable to load countries from the shipping API.',
+                'countries' => [],
+            ], $response['status'] > 0 ? $response['status'] : 502);
+        }
+
+        return response()->json([
+            'status' => 'success',
+            'countries' => $this->normalizeCountries($response['data']),
+        ]);
+    }
+
+    public function paymentOptions(Request $request): JsonResponse
+    {
+        $token = $request->bearerToken();
+        $response = $this->zion->get('kay-paolo/payment-options', [], $token);
+
+        if (!$response['ok']) {
+            $response = $this->zion->get('payment-options', [], $token);
+        }
+
+        $options = $response['ok']
+            ? $this->normalizePaymentOptions($response['data'])
+            : [];
+
+        if (empty($options)) {
+            $options = $this->defaultPaymentOptions();
+        }
+
+        return response()->json([
+            'status' => 'success',
+            'options' => $options,
+            'source' => $response['ok'] ? 'api' : 'fallback',
+        ]);
+    }
+
     public function flatRates(Request $request): JsonResponse
     {
-        return $this->forwardAuthenticated('kay-paolo/get-flat-rates', $request);
+        return $this->forwardAuthenticatedWithFallback([
+            ['endpoint' => 'kay-paolo/get-flat-rates'],
+            ['endpoint' => 'web-api/get-flat-rates-bocicot', 'web' => true],
+        ], $request);
     }
 
     public function saveConsignee(Request $request): JsonResponse
@@ -65,7 +124,10 @@ class ZionApiProxyController extends Controller
 
     public function quote(Request $request): JsonResponse
     {
-        return $this->forwardAuthenticated('kay-paolo/get-quote-result', $request);
+        return $this->forwardAuthenticatedWithFallback([
+            ['endpoint' => 'kay-paolo/get-quote-result'],
+            ['endpoint' => 'web-api/get-quote-result-bocicot', 'web' => true],
+        ], $request);
     }
 
     public function createShipment(Request $request): JsonResponse
@@ -75,15 +137,19 @@ class ZionApiProxyController extends Controller
         if (!$token) {
             return response()->json([
                 'status' => 'error',
-                'message' => 'Please login to Kay Paolo with your Zion Shipping account first.',
+                'message' => 'Please login to Kay Paolo first.',
             ], 401);
         }
 
         $payload = $this->sanitizeShipmentPayload($request->except('_token'));
         $response = $this->zion->post('kay-paolo/update-shipping', $payload, $token);
 
+        if (!$response['ok'] && $this->shouldTryFallback($response)) {
+            $response = $this->zion->postWeb('web-api/update-shipping-bocicot', $payload, $token);
+        }
+
         if ($this->isRecoverableZionAccountNumberSchemaError($response)) {
-            $retryResponse = $this->zion->post('kay-paolo/update-shipping', $payload, $token);
+            $retryResponse = $this->zion->postWeb('web-api/update-shipping-bocicot', $payload, $token);
 
             if (!$this->isRecoverableZionAccountNumberSchemaError($retryResponse)) {
                 return $this->jsonResponse($retryResponse);
@@ -97,12 +163,55 @@ class ZionApiProxyController extends Controller
 
     public function shippingHistory(Request $request): JsonResponse
     {
-        return $this->forwardAuthenticated('kay-paolo/shipping-history-filter', $request);
+        return $this->forwardAuthenticatedWithFallback([
+            ['endpoint' => 'kay-paolo/shipping-history-filter'],
+            ['endpoint' => 'bocicot/shipping-history-filter'],
+            ['endpoint' => 'web-api/shipping-history-filter-bocicot', 'web' => true],
+        ], $request);
     }
 
     public function tracking(Request $request): JsonResponse
     {
         return $this->forward('kay-paolo/validate-tracking', $request);
+    }
+
+    public function emailShipment(Request $request): JsonResponse
+    {
+        $request->validate([
+            'email' => ['required', 'email'],
+            'shipment_id' => ['nullable'],
+            'shipping_id' => ['nullable'],
+            'id' => ['nullable'],
+        ]);
+
+        $token = $request->bearerToken();
+        if (!$token) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Please login to Kay Paolo first.',
+            ], 401);
+        }
+
+        $shipmentId = $request->input('shipment_id', $request->input('shipping_id', $request->input('id')));
+        $response = $this->zion->post('kay-paolo/email-shipment', $request->except('_token'), $token);
+
+        if (!$response['ok'] && $shipmentId) {
+            $response = $this->zion->postWeb('email-shipment/'.urlencode((string) $shipmentId), [
+                'email' => $request->input('email'),
+            ], $token);
+        }
+
+        return $this->jsonResponse($response);
+    }
+
+    public function shipmentLabel(Request $request): RedirectResponse
+    {
+        return redirect()->away($this->documentUrl($request, 'label'));
+    }
+
+    public function shipmentReceipt(Request $request): RedirectResponse
+    {
+        return redirect()->away($this->documentUrl($request, 'receipt'));
     }
 
     private function forwardAuthenticated(string $endpoint, Request $request, ?array $payload = null): JsonResponse
@@ -112,7 +221,7 @@ class ZionApiProxyController extends Controller
         if (!$token) {
             return response()->json([
                 'status' => 'error',
-                'message' => 'Please login to Kay Paolo with your Zion Shipping account first.',
+                'message' => 'Please login to Kay Paolo first.',
             ], 401);
         }
 
@@ -124,6 +233,43 @@ class ZionApiProxyController extends Controller
         $response = $this->zion->post($endpoint, $payload ?? $request->except('_token'), $token);
 
         return $this->jsonResponse($response);
+    }
+
+    private function forwardAuthenticatedWithFallback(array $targets, Request $request, ?array $payload = null): JsonResponse
+    {
+        $token = $request->bearerToken();
+
+        if (!$token) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Please login to Kay Paolo first.',
+            ], 401);
+        }
+
+        $lastResponse = null;
+        foreach ($targets as $target) {
+            $endpoint = $target['endpoint'];
+            $lastResponse = !empty($target['web'])
+                ? $this->zion->postWeb($endpoint, $payload ?? $request->except('_token'), $token)
+                : $this->zion->post($endpoint, $payload ?? $request->except('_token'), $token);
+
+            if ($lastResponse['ok']) {
+                return $this->jsonResponse($lastResponse);
+            }
+
+            if (!$this->shouldTryFallback($lastResponse)) {
+                return $this->jsonResponse($lastResponse);
+            }
+        }
+
+        return $this->jsonResponse($lastResponse ?? [
+            'ok' => false,
+            'status' => 502,
+            'data' => [
+                'status' => 'error',
+                'message' => 'Unable to reach the shipping API.',
+            ],
+        ]);
     }
 
     private function sanitizeShipmentPayload(array $payload): array
@@ -395,6 +541,140 @@ class ZionApiProxyController extends Controller
             && str_contains($message, 'shippings');
     }
 
+    private function shouldTryFallback(array $response): bool
+    {
+        $status = (int) ($response['status'] ?? 0);
+        $message = strtolower((string) ($response['data']['message'] ?? ''));
+
+        return in_array($status, [404, 405], true)
+            || ($status >= 500 && str_contains($message, 'session store not set'));
+    }
+
+    private function normalizeCountries(array $payload): array
+    {
+        $rows = $payload['countries']
+            ?? $payload['data']['data']
+            ?? $payload['data']
+            ?? [];
+
+        if (!is_array($rows)) {
+            return [];
+        }
+
+        return collect($rows)
+            ->map(function ($country) {
+                if (!is_array($country)) {
+                    return null;
+                }
+
+                $code = strtoupper(trim((string) ($country['alpha_2_code'] ?? $country['code'] ?? $country['value'] ?? '')));
+                $name = trim((string) ($country['country_name'] ?? $country['name'] ?? $country['label'] ?? ''));
+
+                if ($code === '' || $name === '') {
+                    return null;
+                }
+
+                return [
+                    'id' => $country['id'] ?? null,
+                    'code' => $code,
+                    'name' => $name,
+                    'dial_code' => $country['dial_code'] ?? null,
+                    'zip_code_supported' => $country['zip_code_supported'] ?? null,
+                    'flat_rate_supported' => $country['flatrate_support'] ?? $country['flat_rate_supported'] ?? null,
+                ];
+            })
+            ->filter()
+            ->sortBy('name')
+            ->values()
+            ->all();
+    }
+
+    private function normalizePaymentOptions(array $payload): array
+    {
+        $rows = $payload['options']
+            ?? $payload['payment_options']
+            ?? $payload['data']['options']
+            ?? $payload['data']
+            ?? [];
+
+        if (!is_array($rows)) {
+            return [];
+        }
+
+        return collect($rows)
+            ->map(function ($option) {
+                if (is_string($option)) {
+                    return [
+                        'value' => $option,
+                        'label' => $this->paymentLabel($option),
+                    ];
+                }
+
+                if (!is_array($option)) {
+                    return null;
+                }
+
+                $value = trim((string) ($option['value'] ?? $option['code'] ?? $option['type'] ?? $option['name'] ?? ''));
+                if ($value === '') {
+                    return null;
+                }
+
+                return [
+                    'value' => $value,
+                    'label' => trim((string) ($option['label'] ?? $option['name'] ?? $this->paymentLabel($value))),
+                ];
+            })
+            ->filter()
+            ->unique('value')
+            ->values()
+            ->all();
+    }
+
+    private function defaultPaymentOptions(): array
+    {
+        return collect(['PAID AT AGENT', 'COLLECT', 'CREDIT OR DEBIT CARD', 'PAYPAL', 'SQUARE', 'SPLIT', 'PARTIAL PAYMENT'])
+            ->map(fn ($value) => [
+                'value' => $value,
+                'label' => $this->paymentLabel($value),
+            ])
+            ->all();
+    }
+
+    private function paymentLabel(string $value): string
+    {
+        return match ($value) {
+            'PAID AT AGENT' => 'Paid at Store',
+            'COLLECT' => 'Collect',
+            'CREDIT OR DEBIT CARD' => 'Credit or Debit Card',
+            'PAYPAL' => 'PayPal',
+            'SQUARE' => 'Square',
+            'SPLIT' => 'Split Payment',
+            'PARTIAL PAYMENT' => 'Partial Payment',
+            default => ucwords(strtolower(str_replace(['_', '-'], ' ', $value))),
+        };
+    }
+
+    private function documentUrl(Request $request, string $type): string
+    {
+        $shipmentId = trim((string) $request->query('shipment_id', $request->query('shipping_id', '')));
+        $invoice = trim((string) $request->query('invoice', $request->query('id', '')));
+
+        if ($shipmentId !== '' && ctype_digit($shipmentId)) {
+            return $this->zion->webUrl($type === 'label'
+                ? 'get_shipping_label/'.$shipmentId
+                : 'get_shipping_receipt/'.$shipmentId);
+        }
+
+        $cleanInvoice = preg_replace('/[^A-Za-z0-9_-]/', '', $invoice);
+        if ($cleanInvoice !== '') {
+            return $this->zion->webUrl($type === 'label'
+                ? 'label/label_'.$cleanInvoice.'.pdf'
+                : 'receipt/receipt_'.$cleanInvoice.'.pdf');
+        }
+
+        return $this->zion->webUrl('/');
+    }
+
     private function jsonResponse(array $response): JsonResponse
     {
         $status = $response['status'] > 0 ? $response['status'] : 502;
@@ -406,7 +686,7 @@ class ZionApiProxyController extends Controller
     {
         $token = json_encode($data['access_token'] ?? '');
         $user = json_encode($data['user'] ?? []);
-        $account = json_encode(route('account'));
+        $home = json_encode(route('home'));
 
         return <<<HTML
 <!doctype html>
@@ -416,7 +696,7 @@ class ZionApiProxyController extends Controller
 <script>
 window.localStorage.setItem('kayPaoloZionToken', {$token});
 window.localStorage.setItem('kayPaoloZionUser', JSON.stringify({$user}));
-window.location.replace({$account});
+window.location.replace({$home});
 </script>
 </body>
 </html>

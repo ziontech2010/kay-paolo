@@ -70,7 +70,7 @@
     <section class="shipment-doc-summary">
         <div class="shipment-doc-note">
             <h3>Shipment Notes</h3>
-            <p id="documentNotes">This document is generated from the Kay Paolo shipment flow powered by the dev Zion Shipping API.</p>
+            <p id="documentNotes">This document is generated from the Kay Paolo shipment flow.</p>
         </div>
         <dl>
             <div><dt>Freight</dt><dd id="documentFreight">USD 0.00</dd></div>

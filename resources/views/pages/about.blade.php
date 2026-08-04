@@ -1,5 +1,9 @@
 @extends('layouts.site')
 
+@php
+    $content = app(\App\Services\KayPaoloContent::class)->all();
+@endphp
+
 @section('title', 'About Us | Kay Paolo Shipping')
 
 @section('banner')
@@ -14,9 +18,9 @@
 @section('content')
 <section class="page-follows-banner">
     <div class="wrap about-grid">
-        <div class="about-art" style="position: relative">
-            <div class="plate plate-1"></div>
-            <div class="plate plate-2"></div>
+        <div class="about-art about-photo-stack" style="position: relative">
+            <img class="about-photo-primary" src="{{ asset($content['who_image_primary']) }}" alt="Kay Paolo warehouse team">
+            <img class="about-photo-secondary" src="{{ asset($content['who_image_secondary']) }}" alt="Kay Paolo delivery operations">
             <div class="badge-years"><b>14+</b><span>Years Experience</span></div>
         </div>
         <div>
@@ -42,17 +46,17 @@
             <div class="eyebrow" style="color: var(--gold-300)">Why Choose Us?</div>
             <h2 style="font-size: 28px">Your trusted partner in global shipping &amp; logistics</h2>
             <p>
-                Kay Paolo uses a branded Laravel Blade interface while treating dev Zion Shipping as the third-party API
-                for authentication, quoting, shipment creation, customer lookup, and tracking.
+                Kay Paolo uses a branded Laravel Blade interface for authentication, quoting, shipment creation,
+                customer lookup, and tracking.
             </p>
             <p style="margin-top: 12px">
-                That keeps Zion Shipping isolated from Kay Paolo UI changes while allowing Zion users to sign in here
+                That keeps the customer-facing experience focused on Kay Paolo while allowing users to sign in here
                 according to their existing role payload.
             </p>
         </div>
-        <div class="about-art" style="height: 380px">
-            <div class="plate plate-1"></div>
-            <div class="plate plate-2"></div>
+        <div class="about-art about-photo-stack" style="height: 380px">
+            <img class="about-photo-primary" src="{{ asset($content['who_image_secondary']) }}" alt="Kay Paolo package scan workflow">
+            <img class="about-photo-secondary" src="{{ asset($content['who_image_primary']) }}" alt="Kay Paolo logistics support">
         </div>
     </div>
 </section>
