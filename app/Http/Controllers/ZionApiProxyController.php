@@ -342,6 +342,7 @@ class ZionApiProxyController extends Controller
             'promo' => $payload['promo'] ?? $payload['coupon_code'] ?? '',
             'coupon_code' => $payload['coupon_code'] ?? $payload['promo'] ?? '',
             'extra_service_charge' => $payload['extra_service_charge'] ?? '',
+            'include_in_receipt' => $payload['include_in_receipt'] ?? $payload['include_receipt'] ?? 0,
             'flaterateinside' => $this->hasFlatRate($flatRate, $shipmentType) ? 1 : 0,
             'fragile_shipment' => $fragileShipment,
             'is_fragile_shipment' => $fragileShipment,

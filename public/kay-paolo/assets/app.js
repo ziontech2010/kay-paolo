@@ -6,8 +6,8 @@ document.addEventListener('DOMContentLoaded', () => {
   const pendingShipmentKey = 'kayPaoloPendingShipment';
   const shipmentResponseKey = 'kayPaoloShipmentResponse';
   const trackingResponseKey = 'kayPaoloTrackingResponse';
-  const countryCacheKey = 'kayPaoloCountries';
-  const paymentOptionsCacheKey = 'kayPaoloPaymentOptions';
+  const countryCacheKey = 'kayPaoloCountries:v3';
+  const paymentOptionsCacheKey = 'kayPaoloPaymentOptions:v3';
   const flatRateCache = new Map();
 
   const route = (name, fallback) => config.routes?.[name] || fallback;
@@ -61,6 +61,8 @@ document.addEventListener('DOMContentLoaded', () => {
     return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
   };
   const currentPath = () => window.location.pathname + window.location.search;
+  const adminRoleIds = [1, 12, 13, 14, 15];
+  const isAdminRole = (roleId) => adminRoleIds.includes(Number(roleId));
   const loginUrl = (redirectPath = '') => {
     const base = route('loginPage', '/login');
     return redirectPath ? `${base}?redirect=${encodeURIComponent(redirectPath)}` : base;
@@ -493,9 +495,9 @@ document.addEventListener('DOMContentLoaded', () => {
       setText('dashboardEmail', user.email || '-');
       setText('dashboardAccount', user.account_number || user.id || '-');
       const adminAccess = document.getElementById('dashboardAdminAccess');
-      if (adminAccess) adminAccess.hidden = Number(user.role_id) !== 1;
+      if (adminAccess) adminAccess.hidden = !isAdminRole(user.role_id);
       const adminAction = document.getElementById('dashboardAdminAction');
-      if (adminAction) adminAction.hidden = Number(user.role_id) !== 1;
+      if (adminAction) adminAction.hidden = !isAdminRole(user.role_id);
     }
   }
 
@@ -1842,6 +1844,7 @@ document.addEventListener('DOMContentLoaded', () => {
       deliveryLocation,
       coupon_code: firstValue('couponCode'),
       extra_service_charge: firstValue('extraServiceCharge'),
+      include_in_receipt: document.getElementById('includeReceipt')?.checked ? 1 : 0,
       fragile_shipment: fragileShipment,
       is_fragile_shipment: fragileShipment
     };
@@ -2098,6 +2101,7 @@ document.addEventListener('DOMContentLoaded', () => {
       promo: payload.promo || payload.coupon_code || '',
       coupon_code: payload.coupon_code || payload.promo || '',
       extra_service_charge: payload.extra_service_charge || '',
+      include_in_receipt: payload.include_in_receipt ?? payload.include_receipt ?? 0,
       flaterateinside: flatRate.some(flatRateIsOn) || shipmentType.some(Boolean) ? 1 : 0,
       fragile_shipment: fragileShipment,
       is_fragile_shipment: fragileShipment
@@ -2298,11 +2302,12 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function quoteCardPartner(card) {
-    return normalizePartner(card.carrier || card.partner || card.carrier_key || card.carrier_name);
+    return normalizePartner(card.carrier || card.partner || card.carrier_key || card.carrier_name || card.integration || card.full_integration);
   }
 
   function normalizePartner(value) {
     const raw = String(value || 'zion').toLowerCase();
+    if (raw.includes('full integration')) return 'ZION';
     if (raw.includes('ups')) return 'UPS';
     if (raw.includes('fedex')) return 'FEDEX';
     if (raw.includes('usps')) return 'USPS';
@@ -2349,6 +2354,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function carrierLogoMarkup(card) {
     const carrier = quoteCardCarrier(card) || 'Carrier';
+    const partner = quoteCardPartner(card);
     const logo = card.logo
       || card.logo_url
       || card.carrier_logo
@@ -2357,6 +2363,10 @@ document.addEventListener('DOMContentLoaded', () => {
       || card.image_url
       || card.icon
       || '';
+
+    if (partner === 'ZION') {
+      return `<img src="${escapeHtml(config.assets?.zionCarrierLogo || '/kay-paolo/assets/images/zion-carrier-logo.png')}" alt="Full integration logo" width="100" height="50">`;
+    }
 
     if (logo) {
       return `<img src="${escapeHtml(resolveAssetUrl(logo))}" alt="${escapeHtml(carrier)} logo" width="100" height="50">`;

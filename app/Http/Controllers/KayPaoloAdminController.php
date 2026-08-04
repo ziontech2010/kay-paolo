@@ -51,7 +51,7 @@ class KayPaoloAdminController extends Controller
 
     private function authorizeAdmin(): void
     {
-        abort_unless((int) session('zion.user.role_id') === 1, 403);
+        abort_unless(in_array((int) session('zion.user.role_id'), [1, 12, 13, 14, 15], true), 403);
     }
 
     private function storeImage(\Illuminate\Http\UploadedFile $file, string $field): string
