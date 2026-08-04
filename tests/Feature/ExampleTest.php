@@ -283,6 +283,8 @@ class ExampleTest extends TestCase
         $this->assertStringContainsString('Object.entries(rawCountries)', $script);
         $this->assertStringContainsString('Object.entries(rawOptions)', $script);
         $this->assertStringContainsString('response?.data?.flat_rates', $script);
+        $this->assertStringContainsString("const countryCacheKey = 'kayPaoloCountries:v3'", $script);
+        $this->assertStringContainsString("const paymentOptionsCacheKey = 'kayPaoloPaymentOptions:v3'", $script);
     }
 
     public function test_delivery_location_runtime_guard_limits_options(): void
@@ -295,6 +297,9 @@ class ExampleTest extends TestCase
         $this->assertStringContainsString("select.dataset.kayDeliveryLocked = '1'", $script);
         $this->assertStringContainsString('Pickup in Office', $script);
         $this->assertStringContainsString('Home Delivery', $script);
+        $this->assertStringContainsString('include_in_receipt', $script);
+        $this->assertStringContainsString("raw.includes('full integration')", $script);
+        $this->assertStringContainsString('isAdminRole', $script);
         $this->assertStringNotContainsString('Door to Door', $script);
         $this->assertStringNotContainsString('Port to Port', $script);
     }
@@ -384,6 +389,17 @@ class ExampleTest extends TestCase
             ->assertOk()
             ->assertSee('Who We Are Pictures', false);
 
+        $this->withSession([
+            'zion.access_token' => 'session-token',
+            'zion.user' => [
+                'name' => 'Basic Admin User',
+                'role_id' => 12,
+                'role' => ['name' => 'Basic Admin'],
+            ],
+        ])
+            ->get('/admin')
+            ->assertOk();
+
         $this->withSession($session)
             ->post('/admin', [
                 'meta_description' => 'Updated Kay Paolo logistics description.',
@@ -438,6 +454,7 @@ class ExampleTest extends TestCase
                 'total_value' => 100,
                 'delivery_location' => 'Pickup in Office',
                 'payment_type' => 'PAID AT AGENT',
+                'include_in_receipt' => 1,
             ])
             ->assertOk()
             ->assertJson(['status' => 'success']);
@@ -452,6 +469,7 @@ class ExampleTest extends TestCase
                 && $data['partner'] === 'ZION'
                 && $data['dimensions']['package_count_ind'] === [3.0]
                 && count($data['packages']) === 3
+                && $data['include_in_receipt'] === 1
                 && $data['selected_shipper'] === 'Regular Air'
                 && $data['delivery_option'] === 'Regular Air';
         });
