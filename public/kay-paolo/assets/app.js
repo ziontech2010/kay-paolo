@@ -273,14 +273,30 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function normalizeCountries(rawCountries) {
-    if (!Array.isArray(rawCountries)) return [];
+    const rows = Array.isArray(rawCountries)
+      ? rawCountries.map((country) => ['', country])
+      : rawCountries && typeof rawCountries === 'object'
+        ? Object.entries(rawCountries)
+        : [];
+
+    if (!rows.length && !Array.isArray(rawCountries)) {
+      if (!rawCountries || typeof rawCountries !== 'object') return [];
+    }
 
     const seen = new Set();
-    return rawCountries
-      .map((country) => {
+    return rows
+      .map(([key, country]) => {
+        if (typeof country === 'string') {
+          const code = String(key || '').trim().toUpperCase();
+          const name = country.trim();
+          if (!code || !name || seen.has(code)) return null;
+          seen.add(code);
+          return { code, name };
+        }
+
         if (!country || typeof country !== 'object') return null;
-        const code = String(country.code || country.alpha_2_code || country.value || '').trim().toUpperCase();
-        const name = String(country.name || country.country_name || country.label || '').trim();
+        const code = String(country.code || country.alpha_2_code || country.value || key || '').trim().toUpperCase();
+        const name = String(country.name || country.country_name || country.label || country.title || '').trim();
         if (!code || !name || seen.has(code)) return null;
         seen.add(code);
         return { code, name };
@@ -347,10 +363,18 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function normalizePaymentOptions(rawOptions) {
-    if (!Array.isArray(rawOptions)) return [];
+    const rows = Array.isArray(rawOptions)
+      ? rawOptions
+      : rawOptions && typeof rawOptions === 'object'
+        ? Object.entries(rawOptions).map(([key, option]) => {
+          if (typeof option === 'string') return { value: key, label: option };
+          if (option && typeof option === 'object') return { value: option.value || option.code || key, ...option };
+          return option;
+        })
+        : [];
 
     const seen = new Set();
-    return rawOptions
+    return rows
       .map((option) => {
         if (typeof option === 'string') {
           return { value: option, label: paymentLabel(option) };
@@ -864,24 +888,83 @@ document.addEventListener('DOMContentLoaded', () => {
     const options = [
       response?.options,
       response?.data?.options,
+      response?.flat_rates,
+      response?.data?.flat_rates,
+      response?.flat_rate,
+      response?.data?.flat_rate,
+      response?.flatRates,
+      response?.data?.flatRates,
+      response?.flatrates,
+      response?.data?.flatrates,
       response?.rates,
       response?.data?.rates,
+      response?.items,
+      response?.data?.items,
       response?.all_options,
-      response?.data?.all_options
-    ].find(Array.isArray) || [];
+      response?.data?.all_options,
+      response?.data?.data,
+      response?.data
+    ].find((candidate) => {
+      if (Array.isArray(candidate)) return candidate.length > 0;
+      return candidate && typeof candidate === 'object' && Object.keys(candidate).length > 0;
+    }) || [];
 
-    return options.map((option) => normalizeFlatRateOption(option)).filter((option) => option.slug);
+    const rows = Array.isArray(options)
+      ? options.map((option) => ['', option])
+      : Object.entries(options);
+
+    return rows
+      .map(([key, option]) => normalizeFlatRateOption(option, key))
+      .filter((option) => option.slug && !option.restricted);
   }
 
-  function normalizeFlatRateOption(option) {
+  function normalizeFlatRateOption(option, key = '') {
+    if (typeof option === 'string') {
+      return {
+        slug: key || option,
+        label: option,
+        group: 'Flat Rate',
+        price: '',
+        readonly: true,
+        restricted: false,
+        defaults: {
+          package_count_ind: 1,
+          weight: '',
+          length: '',
+          width: '',
+          height: ''
+        }
+      };
+    }
+
+    if (!option || typeof option !== 'object') {
+      return {
+        slug: '',
+        label: '',
+        group: 'Flat Rate',
+        price: '',
+        readonly: true,
+        restricted: true,
+        defaults: {
+          package_count_ind: 1,
+          weight: '',
+          length: '',
+          width: '',
+          height: ''
+        }
+      };
+    }
+
     const defaults = option.default_dimensions || option.dimensions || {};
+    const status = String(option.status || option.state || '').toLowerCase();
 
     return {
-      slug: option.slug || option.value || option.id || '',
-      label: option.label || option.name || option.title || option.slug || 'Flat Rate Item',
+      slug: option.slug || option.value || option.typeCode || option.type_code || option.code || option.shipment_type || option.id || key || '',
+      label: option.label || option.name || option.title || option.description || option.typeCode || option.slug || 'Flat Rate Item',
       group: option.group || option.category || 'Flat Rate',
       price: option.price || option.amount || option.rate || option.total || '',
       readonly: option.readonly_dimensions !== false,
+      restricted: option.restricted === true || option.is_restricted === true || option.disabled === true || ['restricted', 'inactive', 'disabled'].includes(status),
       defaults: {
         package_count_ind: defaults.package_count_ind || defaults.count || 1,
         weight: defaults.weight || option.weight || '',
@@ -1311,7 +1394,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const load = async () => {
       if (!result || !storedToken()) return;
 
-      result.innerHTML = '<div class="api-inline-result">Loading shipment history...</div>';
+      result.innerHTML = historyNoticeCard('Loading', 'Shipment history', 'Loading shipment history from your account.');
       if (loader) loader.hidden = false;
 
       try {
@@ -1323,7 +1406,13 @@ document.addEventListener('DOMContentLoaded', () => {
         });
 
         if (response.html) {
-          result.innerHTML = response.html;
+          const cards = extractHistoryCards(response.html);
+          if (cards) {
+            result.innerHTML = cards;
+            updateHistoryBadgesFromCards();
+          } else {
+            renderHistoryRows(result, normalizeHistoryRows(response));
+          }
         } else {
           renderHistoryRows(result, normalizeHistoryRows(response));
         }
@@ -1339,6 +1428,27 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('entriesSelect')?.addEventListener('change', load);
     document.getElementById('timeSelect')?.addEventListener('change', load);
     document.querySelectorAll('.status-filter,.category-filter').forEach((input) => input.addEventListener('change', filter));
+
+    list.addEventListener('click', (event) => {
+      const quickView = event.target.closest('.quick-view-link');
+      const moreLink = event.target.closest('.more-link');
+      const card = event.target.closest('.shipment-card[data-status]');
+
+      if (quickView && card) {
+        event.preventDefault();
+        const details = card.querySelector('.history-card-details');
+        if (details) {
+          details.classList.add('active');
+          details.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+      }
+
+      if (moreLink && card) {
+        event.preventDefault();
+        const tracking = card.dataset.tracking || card.querySelector('.history-card-col h4')?.textContent?.trim() || '';
+        window.location.href = `${route('trackingDetail', '/tracking-detail')}${tracking ? `?id=${encodeURIComponent(tracking)}` : ''}`;
+      }
+    });
 
     load();
   }
@@ -1362,24 +1472,36 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function renderHistoryRows(container, rows) {
     if (!rows.length) {
-      container.innerHTML = '<div class="api-inline-result">No shipments found for this account.</div>';
+      container.innerHTML = historyNoticeCard('No Shipments', 'Shipment history', 'No shipments found for this account.');
       return;
     }
 
     container.innerHTML = rows.map((row) => {
-      const tracking = historyField(row, ['tracking_number', 'invoice_num', 'invoice', 'awb', 'id'], '-');
-      const status = historyField(row, ['status_name', 'shipping_status', 'status'], 'Ready to Ship');
+      const tracking = historyField(row, ['tracking_number', 'trackingNumber', 'tracking', 'invoice_num', 'invoice', 'invoice_number', 'awb', 'id'], '-');
+      const status = historyStatus(row);
       const createdBy = historyField(row, ['created_by', 'shipper_name', 'from_name'], 'Kay Paolo Shipping');
       const date = readableDate(historyField(row, ['created_at', 'shipment_date', 'date'], ''));
-      const option = historyField(row, ['delivery_option', 'selected_shipper', 'service_name'], 'Shipping service');
-      const description = historyField(row, ['package_description', 'description'], 'Package details pending');
+      const option = historyField(row, ['delivery_option', 'deliveryOption', 'selected_shipper', 'service_name'], 'Shipping service');
+      const description = historyField(row, ['package_description', 'packageDescription', 'description'], 'Package details pending');
       const fromAddress = historyAddress(row, 'from');
       const toAddress = historyAddress(row, 'to');
       const category = historyCategory(row);
-      const searchPool = [tracking, status, createdBy, option, description, fromAddress, toAddress].join(' ');
+      const fromName = historyField(row, ['shipper_name', 'from_name'], 'Sender');
+      const toName = historyField(row, ['consignee_name', 'to_name'], 'Customer');
+      const baseFreight = historyMoney(row, ['base_freight', 'freight', 'freight_amount', 'shipping_cost', 'deliveryEstimatePrice'], 'USD 0.00');
+      const insurance = historyMoney(row, ['insurance', 'insurance_amount'], 'USD 0.00');
+      const tax = historyMoney(row, ['tax', 'tax_amount'], 'USD 0.00');
+      const totalPaid = historyMoney(row, ['total_paid', 'total', 'amount', 'deliveryEstimatePrice'], 'USD 0.00');
+      const weight = historyWeight(row);
+      const dimensions = historyDimensions(row);
+      const packageCount = historyPackageCount(row);
+      const agentId = historyField(row, ['agent_id', 'assigned_agent_id', 'created_by_id', 'created_by'], '-');
+      const pickupDate = readableDate(historyField(row, ['scheduled_pickup', 'pickup_date', 'plannedShippingDateAndTime'], ''));
+      const searchPool = [tracking, status, createdBy, fromName, toName, option, description, fromAddress, toAddress].join(' ');
+      const cardStyle = status === 'Delivered' ? 'margin-bottom: 0; border-top-color: #059669' : 'margin-bottom: 0';
 
       return `
-        <div class="shipment-card" data-status="${escapeHtml(status)}" data-category="${escapeHtml(category)}" data-search-pool="${escapeHtml(searchPool)}" style="margin-bottom: 0">
+        <div class="shipment-card" data-status="${escapeHtml(status)}" data-category="${escapeHtml(category)}" data-tracking="${escapeHtml(tracking)}" data-search-pool="${escapeHtml(searchPool)}" style="${cardStyle}">
           <div class="history-card-main">
             <div class="history-card-col">
               <h4 style="color: var(--navy-800)">${escapeHtml(tracking)}</h4>
@@ -1398,27 +1520,67 @@ document.addEventListener('DOMContentLoaded', () => {
             <div class="history-card-col">
               <div class="address-block">
                 <span class="meta-label">Ship From</span>
-                <strong>${escapeHtml(historyField(row, ['shipper_name', 'from_name'], 'Sender'))}</strong>
+                <strong>${escapeHtml(fromName)}</strong>
                 ${escapeHtml(fromAddress)}
               </div>
             </div>
             <div class="history-card-col">
               <div class="address-block">
                 <span class="meta-label">Ship To</span>
-                <strong>${escapeHtml(historyField(row, ['consignee_name', 'to_name'], 'Customer'))}</strong>
+                <strong>${escapeHtml(toName)}</strong>
                 ${escapeHtml(toAddress)}
               </div>
-              <a class="quick-view-link" href="${route('trackingDetail', '/tracking-detail')}?id=${encodeURIComponent(tracking)}">Quick View</a>
+              <div class="quick-view-link" role="button" tabindex="0">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block; vertical-align:middle; margin-right:4px"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                Quick View
+              </div>
             </div>
+          </div>
+          <div class="history-card-details">
+            <div class="history-detail-grid">
+              <div>
+                <strong>Detailed Pricing</strong>
+                <div style="margin-top:8px; line-height: 1.6">
+                  Base Freight: ${escapeHtml(baseFreight)}<br>
+                  Insurance: ${escapeHtml(insurance)}<br>
+                  Tax: ${escapeHtml(tax)}<br>
+                  <strong>Total Paid: ${escapeHtml(totalPaid)}</strong>
+                </div>
+              </div>
+              <div>
+                <strong>Package Specs</strong>
+                <div style="margin-top:8px; line-height: 1.6">
+                  Weight: ${escapeHtml(weight)}<br>
+                  Dimensions: ${escapeHtml(dimensions)}<br>
+                  Load Type: ${escapeHtml(packageCount)} package${packageCount === '1' ? '' : 's'}
+                </div>
+              </div>
+              <div>
+                <strong>Carrier Tracking Details</strong>
+                <div style="margin-top:8px; line-height: 1.6">
+                  Assigned Agent ID: ${escapeHtml(agentId)}<br>
+                  Scheduled Pickup: ${escapeHtml(pickupDate || '-')}<br>
+                  Status Log: ${escapeHtml(status)} (${escapeHtml(date || '-')})
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="history-card-footer">
+            <span class="more-link">
+              More
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle; margin-left:2px"><polyline points="6 9 12 15 18 9"/></svg>
+            </span>
           </div>
         </div>
       `;
     }).join('');
+
+    updateHistoryBadgesFromRows(rows);
   }
 
   function historyField(row, keys, fallback = '') {
     for (const key of keys) {
-      const value = row?.[key] ?? row?.shipping?.[key] ?? row?.shipping_data?.[key];
+      const value = row?.[key] ?? row?.shipping?.[key] ?? row?.shipping_data?.[key] ?? row?.quote?.[key] ?? row?.details?.[key];
       if (value !== undefined && value !== null && value !== '') {
         return String(value);
       }
@@ -1443,6 +1605,153 @@ document.addEventListener('DOMContentLoaded', () => {
     const from = countryCode(historyField(row, ['shipper_country', 'from_country', 'from_country_name']));
     const to = countryCode(historyField(row, ['consignee_country', 'consignee_address_country', 'to_country', 'to_country_name']));
     return from === 'US' && to === 'US' ? 'Domestic' : 'International';
+  }
+
+  function historyStatus(row) {
+    const raw = historyField(row, ['status_name', 'shipping_status', 'status'], 'Ready to Ship');
+    const status = raw.toLowerCase();
+
+    if (status.includes('void')) return 'Voided';
+    if (status.includes('not deliver')) return 'Not Deliverable';
+    if (status.includes('deliver')) return 'Delivered';
+    if (status.includes('available')) return 'Available';
+    if (status.includes('delay')) return 'Delayed';
+    if (status.includes('custom')) return 'Customs';
+    if (status.includes('transit')) return 'In Transit';
+    if (status.includes('pick')) return 'Picked Up';
+    if (status.includes('ready')) return 'Ready to Ship';
+
+    return raw;
+  }
+
+  function historyMoney(row, keys, fallback) {
+    const amount = historyField(row, keys, '');
+    return amount === '' ? fallback : moneyText(amount);
+  }
+
+  function historyMaybeJson(value) {
+    if (!value) return null;
+    if (typeof value === 'object') return value;
+
+    try {
+      return JSON.parse(value);
+    } catch (error) {
+      return null;
+    }
+  }
+
+  function historyPackageList(row) {
+    const packages = historyMaybeJson(row?.packages || row?.package || row?.shipping?.packages || row?.shipping?.package);
+    if (Array.isArray(packages)) return packages;
+    return [];
+  }
+
+  function historyPackageCount(row) {
+    const explicit = historyField(row, ['package_count', 'packages_count', 'piece_count'], '');
+    if (explicit) return explicit;
+    const packages = historyPackageList(row);
+    return String(packages.length || 1);
+  }
+
+  function historyWeight(row) {
+    const explicit = historyField(row, ['weight', 'total_weight', 'package_weight'], '');
+    if (explicit) return `${explicit} lbs`;
+
+    const dimensions = historyMaybeJson(row?.dimensions || row?.shipping?.dimensions);
+    const weights = Array.isArray(dimensions?.weight) ? dimensions.weight : [];
+    if (weights.length) {
+      const total = weights.reduce((sum, item) => sum + Number(item || 0), 0);
+      return `${total || weights[0]} lbs`;
+    }
+
+    const packages = historyPackageList(row);
+    const total = packages.reduce((sum, item) => sum + Number(item.weight || 0), 0);
+    return total ? `${total} lbs` : '-';
+  }
+
+  function historyDimensions(row) {
+    const explicit = historyField(row, ['dimension', 'dimensions_text', 'package_dimensions'], '');
+    if (explicit) return explicit;
+
+    const dimensions = historyMaybeJson(row?.dimensions || row?.shipping?.dimensions);
+    const length = Array.isArray(dimensions?.length) ? dimensions.length[0] : dimensions?.length;
+    const width = Array.isArray(dimensions?.width) ? dimensions.width[0] : dimensions?.width;
+    const height = Array.isArray(dimensions?.height) ? dimensions.height[0] : dimensions?.height;
+    if (length && width && height) return `${length}" x ${width}" x ${height}"`;
+
+    const firstPackage = historyPackageList(row)[0];
+    if (firstPackage?.dimensions?.length && firstPackage?.dimensions?.width && firstPackage?.dimensions?.height) {
+      return `${firstPackage.dimensions.length}" x ${firstPackage.dimensions.width}" x ${firstPackage.dimensions.height}"`;
+    }
+
+    return '-';
+  }
+
+  function historyNoticeCard(title, status, description) {
+    return `
+      <div class="shipment-card" style="margin-bottom: 0">
+        <div class="history-card-main">
+          <div class="history-card-col">
+            <h4 style="color: var(--navy-800)">${escapeHtml(title)}</h4>
+            <span class="status-lbl">${escapeHtml(status)}</span>
+            <span class="meta-label">Created By</span>
+            <span class="meta-val">Kay Paolo Shipping</span>
+          </div>
+          <div class="history-card-col">
+            <span class="meta-label">Shipment Date</span>
+            <span class="meta-val" style="font-weight: 700">-</span>
+            <span class="meta-label">Delivery Option</span>
+            <span class="meta-val">-</span>
+            <span class="meta-label">Description</span>
+            <span class="meta-val" style="font-weight: 600">${escapeHtml(description)}</span>
+          </div>
+          <div class="history-card-col">
+            <div class="address-block"><span class="meta-label">Ship From</span><strong>-</strong>-</div>
+          </div>
+          <div class="history-card-col">
+            <div class="address-block"><span class="meta-label">Ship To</span><strong>-</strong>-</div>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  function extractHistoryCards(html) {
+    if (!html || typeof DOMParser === 'undefined') return '';
+
+    const doc = new DOMParser().parseFromString(html, 'text/html');
+    const cards = Array.from(doc.querySelectorAll('#historyCardList .shipment-card[data-status], .shipment-card[data-status]'));
+    return cards.map((card) => card.outerHTML).join('');
+  }
+
+  function updateHistoryBadgesFromRows(rows) {
+    updateHistoryBadges(rows.map((row) => ({
+      status: historyStatus(row),
+      category: historyCategory(row)
+    })));
+  }
+
+  function updateHistoryBadgesFromCards() {
+    const rows = Array.from(document.querySelectorAll('#historyResult .shipment-card[data-status]')).map((card) => ({
+      status: card.dataset.status || '',
+      category: card.dataset.category || ''
+    }));
+    updateHistoryBadges(rows);
+  }
+
+  function updateHistoryBadges(rows) {
+    if (!rows.length) return;
+
+    const total = rows.length;
+    const percent = (count) => `${((count / total) * 100).toFixed(2)}%`;
+    document.querySelectorAll('[data-history-status-badge]').forEach((badge) => {
+      const key = badge.dataset.historyStatusBadge;
+      badge.textContent = percent(rows.filter((row) => row.status === key).length);
+    });
+    document.querySelectorAll('[data-history-category-badge]').forEach((badge) => {
+      const key = badge.dataset.historyCategoryBadge;
+      badge.textContent = percent(rows.filter((row) => row.category === key).length);
+    });
   }
 
   function buildQuotePayload() {

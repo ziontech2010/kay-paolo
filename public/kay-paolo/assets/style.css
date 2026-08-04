@@ -3748,6 +3748,12 @@ footer ul li a:hover {
   display: block;
 }
 
+.history-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20px;
+}
+
 @media (max-width: 992px) {
   .history-layout {
     grid-template-columns: 1fr;
@@ -3758,5 +3764,9 @@ footer ul li a:hover {
   .history-card-main {
     grid-template-columns: 1fr;
     gap: 20px;
+  }
+
+  .history-detail-grid {
+    grid-template-columns: 1fr;
   }
 }
