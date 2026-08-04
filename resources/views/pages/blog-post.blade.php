@@ -20,14 +20,14 @@
             <p>
                 Every quote starts with the same fundamentals: origin, destination, cargo size, cargo weight, value,
                 timing, service level, and required documents. Kay Paolo captures those details in Blade and forwards
-                the request to dev Zion Shipping for live carrier pricing.
+                the request through the live shipping bridge for carrier pricing.
             </p>
         </div>
 
         <p>
             The visible price usually combines freight, surcharges, tax, and service fees. When a Kay Paolo user submits
-            the quote form, the app keeps Zion Shipping as the system of record and displays the carrier cards returned
-            by Zion.
+            the quote form, the app keeps the shipment workflow consistent and displays the carrier cards returned
+            by the live rating service.
         </p>
         <p>
             Accurate dimensions and consignee data matter. They decide whether the shipment can use a flat-rate product,
@@ -35,8 +35,8 @@
         </p>
         <p>
             This Kay Paolo project keeps the customer-facing UI independent, but the authenticated API token and role
-            response still come from Zion. That lets agents, clients, admins, and other Zion users work through the new
-            Kay Paolo interface without changing Zion's existing website.
+            response still come from the connected shipping platform. That lets agents, clients, admins, and drivers
+            work through the Kay Paolo interface without changing the source shipping system.
         </p>
 
         <div class="cta-strip" style="margin-top: 44px">

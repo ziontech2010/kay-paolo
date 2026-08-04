@@ -198,6 +198,51 @@
     grid-column: 1 / -1;
 }
 
+.inline-checkbox-row {
+    align-items: end;
+}
+
+.inline-checkbox-row .checkbox-field {
+    margin-bottom: 12px;
+    margin-top: 0;
+}
+
+.about-photo-stack {
+    min-height: 360px;
+    overflow: visible;
+}
+
+.about-photo-stack::before,
+.about-photo-stack::after {
+    display: none;
+}
+
+.about-photo-stack img {
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    box-shadow: var(--shadow);
+    display: block;
+    object-fit: cover;
+    position: absolute;
+}
+
+.about-photo-primary {
+    height: 78%;
+    inset: 0 auto auto 0;
+    width: 72%;
+}
+
+.about-photo-secondary {
+    bottom: 0;
+    height: 58%;
+    right: 0;
+    width: 48%;
+}
+
+.about-photo-stack .badge-years {
+    z-index: 3;
+}
+
 .kay-process-overlay[hidden] {
     display: none !important;
 }
@@ -516,6 +561,18 @@ body.kay-process-open {
     letter-spacing: 0.02em;
 }
 
+.confirm-detail-box-wide {
+    min-width: min(480px, 100%);
+}
+
+.confirm-detail-subvalue {
+    color: #cbd5e1;
+    display: block;
+    font-size: 15px;
+    font-weight: 700;
+    margin-top: 8px;
+}
+
 .confirm-actions-row {
     display: flex;
     flex-wrap: wrap;
@@ -768,6 +825,59 @@ body.kay-process-open {
     text-align: center;
 }
 
+.admin-page-wrap {
+    max-width: 1120px;
+}
+
+.admin-content-form {
+    padding: 0;
+}
+
+.admin-edit-grid {
+    display: grid;
+    gap: 22px;
+    margin-bottom: 24px;
+}
+
+.admin-edit-panel {
+    border-bottom: 1px solid var(--line);
+    padding: 28px;
+}
+
+.admin-edit-panel h2 {
+    color: var(--navy-950);
+    font-family: "Inter", sans-serif;
+    font-size: 20px;
+    font-weight: 800;
+    margin: 0 0 18px;
+}
+
+.admin-image-row {
+    display: grid;
+    gap: 20px;
+    grid-template-columns: repeat(2, 1fr);
+}
+
+.admin-preview-label {
+    color: var(--ink-400);
+    display: block;
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0;
+    margin-bottom: 8px;
+    text-transform: uppercase;
+}
+
+.admin-image-preview {
+    aspect-ratio: 16 / 10;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    display: block;
+    margin-bottom: 16px;
+    object-fit: cover;
+    width: 100%;
+}
+
 @media print {
     .topbar,
     header.site,
@@ -826,6 +936,11 @@ body.kay-process-open {
 
     .shipment-confirmation-actions .btn {
         width: 100%;
+    }
+
+    .inline-checkbox-row,
+    .admin-image-row {
+        grid-template-columns: 1fr;
     }
 
     .shipment-confirmation-card {

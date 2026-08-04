@@ -36,24 +36,28 @@
             <input type="hidden" id="consignee_id" name="consignee_id" value="">
             <input type="hidden" id="shipment_type" name="shipment_type" value="">
 
-            <div class="api-alert error" id="authNotice">Login first to generate authenticated Zion quotes.</div>
+            <div class="api-alert error" id="authNotice">Login first to generate authenticated Kay Paolo quotes.</div>
 
             <div class="create-shipment-grid">
                 <div class="shipment-card quote-party-card" style="height: 100%; display: flex; flex-direction: column; margin-bottom: 0">
                     <div class="shipment-card-header" id="fromCardTitle" style="text-transform: none; font-family: 'Inter', sans-serif; font-size: 18px; font-weight: 700; letter-spacing: 0">
-                        From: {{ $shipperName }}
+                        From: {{ $shipperName }} | Account #{{ $shipperAccount }}
                     </div>
                     <div class="shipment-card-body" style="flex-grow: 1">
                         <div class="form-row-3">
                             <div class="field">
                                 <label for="from_country">Country *</label>
-                                <select id="from_country" name="from_country" required>
+                                <select id="from_country" name="from_country" data-country-select required>
                                     <option value="US" selected>United States</option>
                                 </select>
                             </div>
-                            <div class="field" style="grid-column: span 2">
+                            <div class="field">
                                 <label for="from_address">Address *</label>
                                 <input type="text" id="from_address" value="{{ $shipperAddress }}" required>
+                            </div>
+                            <div class="field">
+                                <label for="from_apt">Address 2</label>
+                                <input type="text" id="from_apt" value="{{ $shipperApt }}" placeholder="Apt/Ste/Unit">
                             </div>
                         </div>
                         <div class="form-row-3">
@@ -84,16 +88,7 @@
                                 <input type="text" id="from_phone" value="{{ $shipperPhone }}" readonly style="background: #f8fafc; font-weight: 600; color: #334155">
                             </div>
                         </div>
-                        <div class="form-row-2">
-                            <div class="field">
-                                <label>Account Number</label>
-                                <input type="text" id="from_account" value="{{ $shipperAccount }}" readonly style="background: #f8fafc; font-weight: 600; color: #334155">
-                            </div>
-                            <div class="field">
-                                <label>Apt/Ste/Unit</label>
-                                <input type="text" id="from_apt" value="{{ $shipperApt }}" placeholder="None specified">
-                            </div>
-                        </div>
+                        <input type="hidden" id="from_account" value="{{ $shipperAccount }}">
                     </div>
                 </div>
 
@@ -124,28 +119,17 @@
                         <div class="form-row-3">
                             <div class="field">
                                 <label for="toCountry">Country *</label>
-                                <select id="toCountry" required>
+                                <select id="toCountry" data-country-select required>
                                     <option value="">Select Country</option>
-                                    <option>Haiti</option>
-                                    <option>Dominican Republic</option>
-                                    <option>United States</option>
-                                    <option>Canada</option>
-                                    <option>Jamaica</option>
-                                    <option>Trinidad and Tobago</option>
-                                    <option>United Kingdom</option>
-                                    <option>Germany</option>
-                                    <option>France</option>
-                                    <option>Nigeria</option>
-                                    <option>Japan</option>
-                                    <option>Australia</option>
-                                    <option>Brazil</option>
-                                    <option>Peru</option>
-                                    <option>India</option>
                                 </select>
                             </div>
-                            <div class="field" style="grid-column: span 2">
+                            <div class="field">
                                 <label for="toAddress">Address *</label>
                                 <input type="text" id="toAddress" placeholder="Enter a location" required>
+                            </div>
+                            <div class="field">
+                                <label for="toApt">Address 2</label>
+                                <input type="text" id="toApt" placeholder="Apt/Ste/Unit">
                             </div>
                         </div>
                         <div class="form-row-3">
@@ -175,10 +159,6 @@
                                 <label for="toHomePhone">Home Phone</label>
                                 <input type="text" id="toHomePhone" placeholder="Home Phone">
                             </div>
-                        </div>
-                        <div class="field">
-                            <label for="toApt">Apt/Ste/Unit</label>
-                            <input type="text" id="toApt" placeholder="Apt/Ste/Unit">
                         </div>
                     </div>
                 </div>
@@ -243,14 +223,16 @@
                                 </div>
                             </div>
 
-                            <div class="field">
-                                <label for="totalValue">Total Value *</label>
-                                <input type="text" id="totalValue" placeholder="Enter a Total Shipment value" required>
+                            <div class="form-row-2 inline-checkbox-row">
+                                <div class="field">
+                                    <label for="totalValue">Total Value *</label>
+                                    <input type="text" id="totalValue" placeholder="Enter a Total Shipment value" required>
+                                </div>
+                                <div class="checkbox-field">
+                                    <input type="checkbox" id="fragileShipment">
+                                    <label for="fragileShipment">Fragile shipment</label>
+                                </div>
                             </div>
-                        </div>
-                        <div class="checkbox-field" style="margin-top: 16px">
-                            <input type="checkbox" id="fragileShipment">
-                            <label for="fragileShipment">Fragile shipment</label>
                         </div>
                     </div>
                 </div>
@@ -276,17 +258,18 @@
                                     <button type="button" class="btn btn-navy" style="padding: 0 20px; font-size: 13px; border-radius: 8px">Apply</button>
                                 </div>
                             </div>
-                            <div class="field">
-                                <label for="extraServiceCharge">Extra Service Charge</label>
-                                <input type="text" id="extraServiceCharge" placeholder="Extra Service Charge">
+                            <div class="form-row-2 inline-checkbox-row">
+                                <div class="field">
+                                    <label for="extraServiceCharge">Extra Service Charge</label>
+                                    <input type="text" id="extraServiceCharge" placeholder="Extra Service Charge">
+                                </div>
+                                <div class="checkbox-field">
+                                    <input type="checkbox" id="includeReceipt">
+                                    <label for="includeReceipt">Include in receipt</label>
+                                </div>
                             </div>
                         </div>
                         <div>
-                            <div class="checkbox-field" style="margin-bottom: 24px; margin-top: 16px">
-                                <input type="checkbox" id="includeReceipt">
-                                <label for="includeReceipt">Include in receipt</label>
-                            </div>
-
                             <button type="submit" class="btn btn-gold btn-block" style="font-size: 16px; font-weight: 700; padding: 14px 28px; border-radius: 8px; display: flex; align-items: center; justify-content: center; gap: 8px">
                                 <span style="font-size: 18px; font-weight: 700; line-height: 1">+</span> Got Quote
                             </button>

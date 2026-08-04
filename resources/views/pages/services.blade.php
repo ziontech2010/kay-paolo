@@ -34,7 +34,7 @@
                 <span class="idx">SERVICE 02</span>
                 <h2>Air Freight Transport</h2>
                 <p>Fast, dependable options for international destinations when speed matters most.</p>
-                <p class="callout">Kay Paolo sends quote requests through Zion and presents returned rate cards here.</p>
+                <p class="callout">Kay Paolo sends quote requests through the live shipping bridge and presents returned rate cards here.</p>
             </div>
         </div>
 
@@ -46,7 +46,7 @@
                 <span class="idx">SERVICE 03</span>
                 <h2>Road Transport</h2>
                 <p>Flexible local and regional transport for timely, secure deliveries.</p>
-                <p class="callout">Live tracking uses the Kay Paolo API namespace backed by dev Zion Shipping.</p>
+                <p class="callout">Live tracking uses the Kay Paolo API namespace.</p>
             </div>
         </div>
 
@@ -58,7 +58,7 @@
                 <span class="idx">SERVICE 04</span>
                 <h2>Shipment Documents</h2>
                 <p>Labels, receipts, and shipment response payloads are available after shipment creation.</p>
-                <p class="callout">Zion remains the system of record; Kay Paolo remains the customer-facing UI.</p>
+                <p class="callout">Kay Paolo keeps shipment documents and customer-facing workflows in one place.</p>
             </div>
         </div>
     </div>

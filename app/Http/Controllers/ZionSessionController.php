@@ -33,7 +33,7 @@ class ZionSessionController extends Controller
             || empty($data['access_token']);
 
         if ($failed) {
-            $message = $data['message'] ?? 'Unable to log in with Zion Shipping.';
+            $message = $data['message'] ?? 'Unable to log in to Kay Paolo.';
 
             if (!$request->hasSession()) {
                 return redirect()->route('login', ['login_error' => $message]);
@@ -59,7 +59,7 @@ class ZionSessionController extends Controller
             return redirect()->to($redirectTo);
         }
 
-        return redirect()->route('account');
+        return redirect()->route('home');
     }
 
     public function logout(Request $request): RedirectResponse

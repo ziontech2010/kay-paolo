@@ -66,44 +66,12 @@
             </div>
 
             <div class="history-card-list" id="historyCardList">
-                <div class="api-alert error" id="authNotice">Login first to view Zion shipment history.</div>
+                <div class="api-alert error" id="authNotice">Login first to view shipment history.</div>
                 <div class="api-loader" id="historyLoader" hidden>
                     <img src="{{ asset('kay-paolo/assets/processing-shipping.gif') }}" alt="Loading shipment history">
                 </div>
                 <div id="historyResult">
-                    <div class="shipment-card" data-status="Ready to Ship" data-category="International" data-search-pool="HTS323312 Kay Paolo Haiti" style="margin-bottom: 0">
-                        <div class="history-card-main">
-                            <div class="history-card-col">
-                                <h4 style="color: var(--navy-800)">HTS323312</h4>
-                                <span class="status-lbl">Ready to Ship</span>
-                                <span class="meta-label">Created By</span>
-                                <span class="meta-val">Kay Paolo Shipping</span>
-                            </div>
-                            <div class="history-card-col">
-                                <span class="meta-label">Shipment Date</span>
-                                <span class="meta-val" style="font-weight: 700">Jul 13, 2026</span>
-                                <span class="meta-label">Delivery Option</span>
-                                <span class="meta-val">ZION Economical Air</span>
-                                <span class="meta-label">Description</span>
-                                <span class="meta-val" style="font-weight: 600">Package details pending</span>
-                            </div>
-                            <div class="history-card-col">
-                                <div class="address-block">
-                                    <span class="meta-label">Ship From</span>
-                                    <strong>Kay Paolo Shipping</strong>
-                                    414 Main St, Asbury Park, NJ 07712
-                                </div>
-                            </div>
-                            <div class="history-card-col">
-                                <div class="address-block">
-                                    <span class="meta-label">Ship To</span>
-                                    <strong>Customer</strong>
-                                    Destination address
-                                </div>
-                                <a class="quick-view-link" href="{{ route('tracking.detail', ['id' => 'HTS323312']) }}">Quick View</a>
-                            </div>
-                        </div>
-                    </div>
+                    <div class="api-inline-result">Shipment history will load from your account.</div>
                 </div>
             </div>
         </div>
