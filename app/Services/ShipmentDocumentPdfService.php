@@ -292,7 +292,7 @@ class ShipmentDocumentPdfService
             'trackingDisplay' => $trackingDisplay,
             'barcodeValue' => $barcodeValue ?: 'Pending',
             'barcodeUri' => $this->barcodeDataUri($barcodeValue ?: '0', 70, 3),
-            'scanBarcodeUri' => $this->barcodeDataUri($barcodeValue ?: '0', 110, 3),
+            'scanBarcodeUri' => $this->barcodeDataUri($barcodeValue ?: '0', 90, 3),
             'deliveryNumber' => $deliveryNumber,
             'deliveryBarcodeUri' => $this->barcodeDataUri($deliveryNumber, 48, 2),
             'chargeStatus' => $chargeStatus,
