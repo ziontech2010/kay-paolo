@@ -4,10 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    <title>A4 Shipping Label | Kay Paolo Shipping</title>
+    <title>Shipping Label | Kay Paolo Shipping</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&family=Libre+Barcode+39&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&display=swap" rel="stylesheet">
     @php
         $rawLabelNumbers = $documentQuery['id'] ?? $documentQuery['tracking'] ?? $documentQuery['tracking_number'] ?? '';
         $labelNumbers = collect(explode(',', (string) $rawLabelNumbers))
@@ -20,10 +20,13 @@
             $labelNumbers = ['Pending'];
         }
 
-        $invoiceNumber = $documentQuery['invoice'] ?? $documentQuery['invoice_num'] ?? 'Pending';
+        $invoiceNumber = trim((string) ($documentQuery['invoice'] ?? $documentQuery['invoice_num'] ?? ''));
+        $barcodeValue = $invoiceNumber !== '' ? $invoiceNumber : preg_replace('/[^A-Za-z0-9\-]/', '', (string) ($labelNumbers[0] ?? 'Pending'));
+        $deliveryNumber = $invoiceNumber !== ''
+            ? 'DLV'.substr(preg_replace('/\D/', '', $invoiceNumber) ?: $invoiceNumber, -6)
+            : 'Pending';
     @endphp
     <style>
-        @page { size: A4 portrait; margin: 0; }
         * { box-sizing: border-box; }
         body {
             align-items: center;
@@ -33,16 +36,15 @@
             flex-direction: column;
             font-family: "Inter", Arial, sans-serif;
             gap: 24px;
-            justify-content: center;
+            justify-content: flex-start;
             margin: 0;
             min-height: 100vh;
-            padding: 24px;
+            padding: 40px 20px;
         }
         .print-btn-container {
-            left: 20px;
-            position: fixed;
-            top: 20px;
-            z-index: 2;
+            text-align: right;
+            width: 700px;
+            max-width: 100%;
         }
         .btn-print {
             align-items: center;
@@ -55,142 +57,165 @@
             font-size: 14px;
             font-weight: 700;
             gap: 8px;
-            padding: 11px 20px;
+            padding: 10px 20px;
         }
-        .page-wrapper {
-            align-items: center;
+        .btn-print:hover { background: #0f172a; }
+        .receipt-container {
             background: #fff;
-            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.06);
-            display: flex;
-            height: 297mm;
-            justify-content: center;
-            overflow: hidden;
-            position: relative;
-            width: 210mm;
+            border-radius: 8px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.05);
+            box-sizing: border-box;
+            padding: 30px;
+            width: 700px;
+            max-width: 100%;
         }
-        .page-wrapper + .page-wrapper {
-            margin-top: 24px;
-        }
-        .label-container {
-            background: #fff;
-            border: 4px solid #000;
-            height: 195mm;
-            position: absolute;
-            transform: rotate(90deg);
-            width: 278mm;
-        }
-        .label-table {
+        .receipt-header {
             border-collapse: collapse;
-            height: 100%;
+            margin-bottom: 5px;
             width: 100%;
         }
-        .label-table td {
-            border-bottom: 3px solid #000;
-            color: #000;
-            padding: 18px 20px;
-            vertical-align: top;
+        .receipt-header td {
+            border: 0;
+            padding: 0;
+            vertical-align: middle;
         }
-        .label-table tr:last-child td { border-bottom: 0; }
-        .header-logo-cell {
-            align-items: center;
-            border-right: 3px solid #000;
-            display: flex;
-            justify-content: center;
-            padding: 25px 15px !important;
-            width: 50%;
-        }
-        .header-logo-cell img {
+        .header-left { text-align: left; }
+        .header-right { text-align: right; }
+        .header-left img {
             display: block;
             filter: grayscale(100%) brightness(0);
             height: auto;
-            width: 170px;
+            width: 130px;
         }
-        .header-from-cell {
+        .barcode-wrap {
+            display: inline-flex;
+            flex-direction: column;
+            align-items: flex-end;
+        }
+        .barcode-wrap svg {
+            display: block;
+            max-width: 100%;
+            height: 56px;
+        }
+        .awb-no-text,
+        .delivery-no-text {
+            color: #000;
             font-size: 14px;
-            line-height: 1.55;
-            width: 50%;
+            font-weight: 600;
+            margin-top: 4px;
         }
-        .inline-table {
-            border-collapse: collapse;
+        .delivery-no-text { font-size: 13px; }
+        .dashed-line {
+            border-top: 2px dashed #cbd5e1;
+            margin: 15px 0;
             width: 100%;
         }
-        .inline-table td {
-            border: 0;
-            padding: 0 0 5px;
+        .details-table {
+            border: 2px solid #000;
+            border-collapse: collapse;
+            margin-bottom: 25px;
+            width: 100%;
         }
-        .inline-label {
-            font-weight: 900;
-            width: 58px;
-        }
-        .receiver-cell {
-            font-size: 18px;
-            line-height: 1.55;
-        }
-        .receiver-cell strong {
-            font-size: 22px;
-            font-weight: 900;
-        }
-        .huge-awb-cell {
-            font-size: 58px;
-            font-weight: 900;
-            letter-spacing: 1px;
-            padding: 30px 10px !important;
-            text-align: center;
-        }
-        .due-cell {
-            border-right: 3px solid #000;
-            font-size: 32px;
-            font-weight: 900;
-            padding: 10px !important;
-            text-align: center;
-            vertical-align: middle !important;
-            width: 30%;
-        }
-        .dest-cell {
-            font-size: 26px;
-            font-weight: 900;
-            padding: 10px 20px !important;
-            vertical-align: middle !important;
-            width: 70%;
-        }
-        .barcode-cell {
-            padding: 34px 20px 18px !important;
-            text-align: center;
-        }
-        .barcode-text {
-            display: inline-block;
-            font-family: "Libre Barcode 39", "Courier New", monospace;
-            font-size: 90px;
-            line-height: 1;
-        }
-        .barcode-label {
-            font-size: 18px;
-            font-weight: 900;
-            letter-spacing: 3px;
-            margin-top: 8px;
-        }
-        .package-line {
-            font-size: 17px;
-            font-weight: 800;
-            margin-top: 12px;
+        .details-table th,
+        .details-table td {
+            border: 1px solid #000;
+            padding: 12px 15px;
             text-align: left;
+            vertical-align: top;
+            width: 50%;
+        }
+        .table-title-due {
+            font-size: 28px;
+            font-weight: 700;
+            padding: 8px !important;
+            text-align: center !important;
+        }
+        .table-title-port {
+            font-size: 22px;
+            font-weight: 700;
+            padding: 8px !important;
+            text-align: center !important;
+        }
+        .section-label {
+            color: #000;
+            font-size: 12px;
+            font-weight: 900;
+            letter-spacing: 0.5px;
+            margin-bottom: 8px;
+            text-transform: uppercase;
+        }
+        .address-text {
+            color: #000;
+            font-size: 14px;
+            line-height: 1.5;
+            margin: 0;
+            white-space: pre-line;
+        }
+        .sender-box {
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            min-height: 180px;
+        }
+        .weight-dim {
+            font-weight: 700;
+            margin-top: 15px;
+        }
+        .huge-awb {
+            color: #000;
+            font-size: 48px;
+            font-weight: 700;
+            letter-spacing: 1px;
+            margin: 25px 0;
+            text-align: center;
+            word-break: break-word;
+        }
+        .lower-barcode-container {
+            align-items: flex-end;
+            display: flex;
+            flex-direction: column;
+            margin-bottom: 25px;
+        }
+        .lower-barcode-container svg {
+            display: block;
+            height: 48px;
+            max-width: 100%;
+        }
+        .package-info-box {
+            border: 2px solid #000;
+            min-height: 80px;
+            padding: 15px;
+        }
+        .package-info-title {
+            color: #000;
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 10px;
+        }
+        .package-info-content {
+            color: #000;
+            font-size: 14px;
+        }
+        @page {
+            size: A4 portrait;
+            margin: 12mm;
         }
         @media print {
-            html, body {
+            body {
                 background: #fff;
-                height: 297mm;
                 padding: 0;
-                width: 210mm;
+                gap: 0;
             }
             .no-print { display: none !important; }
-            .page-wrapper {
-                break-after: page;
+            .receipt-container {
                 box-shadow: none;
-                height: 297mm;
-                margin: 0;
-                width: 210mm;
+                border-radius: 0;
+                break-after: page;
+                margin: 0 auto;
+                padding: 0;
+                width: 100%;
             }
-            .page-wrapper:last-child {
+            .receipt-container:last-child {
                 break-after: auto;
             }
         }
@@ -198,61 +223,80 @@
 </head>
 <body>
     <div class="print-btn-container no-print">
-        <button class="btn-print" onclick="window.print()" type="button">Print Label</button>
+        <button class="btn-print" onclick="window.print()" type="button">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="6 9 6 2 18 2 18 9"></polyline>
+                <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path>
+                <rect x="6" y="14" width="12" height="8"></rect>
+            </svg>
+            Print / Save PDF
+        </button>
     </div>
 
     <div data-package-label-stack>
         @foreach ($labelNumbers as $labelNumber)
-            <div class="page-wrapper" data-package-label="true">
-                <article class="label-container awb-sheet" data-shipment-document>
-                    <table class="label-table">
-                        <tr>
-                            <td class="header-logo-cell">
-                                <img src="{{ asset('kay-paolo/assets/logo/kay-paolo.svg') }}" alt="Kay Paolo Shipping">
-                            </td>
-                            <td class="header-from-cell">
-                                <table class="inline-table">
-                                    <tr>
-                                        <td class="inline-label">From:</td>
-                                        <td><strong>KAY PAOLO SHIPPING</strong></td>
-                                    </tr>
-                                    <tr>
-                                        <td></td>
-                                        <td data-label-field="shipper" @if ($loop->first) id="receiptA4Shipper" @endif>Kay Paolo Shipping</td>
-                                    </tr>
-                                    <tr>
-                                        <td></td>
-                                        <td data-label-field="package" @if ($loop->first) id="receiptA4Package" @endif>1 package</td>
-                                    </tr>
-                                </table>
-                            </td>
-                        </tr>
-                        <tr>
-                            <td colspan="2" class="receiver-cell">
-                                <table class="inline-table">
-                                    <tr>
-                                        <td class="inline-label">To:</td>
-                                        <td><strong data-label-field="receiver" @if ($loop->first) id="receiptA4Receiver" @endif>Destination customer</strong></td>
-                                    </tr>
-                                </table>
-                            </td>
-                        </tr>
-                        <tr>
-                            <td colspan="2" class="huge-awb-cell" data-label-field="tracking" @if ($loop->first) id="receiptA4LargeNumber" @endif>{{ $labelNumber }}</td>
-                        </tr>
-                        <tr>
-                            <td class="due-cell" data-label-field="due" @if ($loop->first) id="labelDueType" @endif>DUE</td>
-                            <td class="dest-cell" data-label-field="destination" @if ($loop->first) id="labelDestination" @endif>Destination</td>
-                        </tr>
-                        <tr>
-                            <td colspan="2" class="barcode-cell">
-                                <div class="barcode-text" data-label-field="barcode" @if ($loop->first) id="receiptA4Barcode" @endif>*{{ $labelNumber }}*</div>
-                                <div class="barcode-label" data-label-field="trackingLabel" @if ($loop->first) id="receiptA4TrackingNumber" @endif>{{ $labelNumber }}</div>
-                                <div class="package-line">Delivery: <span data-label-field="delivery" @if ($loop->first) id="labelDeliveryNumber" @endif>{{ $invoiceNumber }}</span></div>
-                            </td>
-                        </tr>
-                    </table>
-                </article>
+            <div class="receipt-container" data-package-label="true" data-shipment-document>
+                <table class="receipt-header">
+                    <tr>
+                        <td class="header-left">
+                            <img src="{{ asset('kay-paolo/assets/logo/kay-paolo.svg') }}" alt="Kay Paolo Shipping" width="130" height="65">
+                        </td>
+                        <td class="header-right">
+                            <div class="barcode-wrap">
+                                <svg
+                                    class="jsbarcode-awb"
+                                    data-barcode-role="awb"
+                                    data-barcode-value="{{ $barcodeValue }}"
+                                    @if ($loop->first) id="receiptA4Barcode" @endif
+                                ></svg>
+                                <div class="awb-no-text">AWB No. <span data-label-field="trackingLabel" @if ($loop->first) id="receiptA4TrackingNumber" @endif>{{ $labelNumber }}</span></div>
+                            </div>
+                        </td>
+                    </tr>
+                </table>
+
+                <div class="dashed-line"></div>
+
+                <table class="details-table">
+                    <tr>
+                        <th class="table-title-due" data-label-field="due" @if ($loop->first) id="labelDueType" @endif>DUE</th>
+                        <th class="table-title-port" data-label-field="destination" @if ($loop->first) id="labelDestination" @endif>Destination</th>
+                    </tr>
+                    <tr>
+                        <td>
+                            <div class="sender-box">
+                                <div>
+                                    <div class="section-label">Sender</div>
+                                    <div class="address-text" data-label-field="shipper" @if ($loop->first) id="receiptA4Shipper" @endif>Kay Paolo Shipping</div>
+                                </div>
+                                <div class="address-text weight-dim" data-label-field="weightDim" @if ($loop->first) id="labelWeightDim" @endif>1 lb</div>
+                            </div>
+                        </td>
+                        <td>
+                            <div class="section-label">Receiver</div>
+                            <div class="address-text" data-label-field="receiver" @if ($loop->first) id="receiptA4Receiver" @endif>Destination customer</div>
+                        </td>
+                    </tr>
+                </table>
+
+                <div class="huge-awb" data-label-field="tracking" @if ($loop->first) id="receiptA4LargeNumber" @endif>{{ $labelNumber }}</div>
+
+                <div class="dashed-line"></div>
+
+                <div class="lower-barcode-container">
+                    <svg
+                        class="jsbarcode-delivery"
+                        data-barcode-role="delivery"
+                        data-barcode-value="{{ $deliveryNumber }}"
+                        @if ($loop->first) id="labelDeliveryBarcode" @endif
+                    ></svg>
+                    <div class="delivery-no-text">Delivery No. <span data-label-field="delivery" @if ($loop->first) id="labelDeliveryNumber" @endif>{{ $deliveryNumber }}</span></div>
+                </div>
+
+                <div class="package-info-box">
+                    <div class="package-info-title">Package Contents:</div>
+                    <div class="package-info-content" data-label-field="package" @if ($loop->first) id="receiptA4Package" @endif>Package (1 pcs)</div>
+                </div>
             </div>
         @endforeach
     </div>
@@ -268,6 +312,32 @@
             }
         };
     </script>
+    <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js" defer></script>
     <script src="{{ asset('kay-paolo/assets/app.js') }}?v={{ filemtime(public_path('kay-paolo/assets/app.js')) }}" defer></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            function paintBarcodes(root) {
+                if (typeof JsBarcode !== 'function') return;
+                (root || document).querySelectorAll('svg[data-barcode-value]').forEach(function (svg) {
+                    var value = String(svg.getAttribute('data-barcode-value') || '').trim();
+                    if (!value || value === 'Pending') return;
+                    try {
+                        JsBarcode(svg, value, {
+                            format: 'CODE128',
+                            displayValue: false,
+                            margin: 0,
+                            height: svg.classList.contains('jsbarcode-delivery') ? 48 : 56,
+                            width: 2,
+                            background: '#ffffff',
+                            lineColor: '#000000'
+                        });
+                    } catch (error) {}
+                });
+            }
+
+            paintBarcodes(document);
+            window.kayPaoloPaintLabelBarcodes = paintBarcodes;
+        });
+    </script>
 </body>
 </html>

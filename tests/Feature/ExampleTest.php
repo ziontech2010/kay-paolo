@@ -312,6 +312,7 @@ class ExampleTest extends TestCase
         $this->assertStringContainsString('renderPackageLabels', $script);
         $this->assertStringContainsString('splitLabelNumbers', $script);
         $this->assertStringContainsString('formatShipmentNumberDisplay', $script);
+        $this->assertStringContainsString('labelBarcodeValue', $script);
         $this->assertStringNotContainsString("params.set('access_token', storedToken())", $script);
         $this->assertStringContainsString('isAdminRole', $script);
         $this->assertStringNotContainsString('Door to Door', $script);
@@ -353,9 +354,12 @@ class ExampleTest extends TestCase
 
         $labelResponse = $this->get('/shipment-label?shipment_id=24755&invoice=373988&id=HTS373988-1%2F2%2C+HTS373988-2%2F2')
             ->assertOk()
-            ->assertSee('A4 Shipping Label', false)
+            ->assertSee('Shipping Label', false)
             ->assertSee('Kay Paolo Shipping', false)
             ->assertSee('data-shipment-document', false)
+            ->assertSee('Print / Save PDF', false)
+            ->assertSee('jsbarcode', false)
+            ->assertSee('CODE128', false)
             ->assertSee('HTS373988-1/2', false)
             ->assertSee('HTS373988-2/2', false)
             ->assertDontSee('HTS373988-1/2, HTS373988-2/2', false)
@@ -374,6 +378,24 @@ class ExampleTest extends TestCase
             ->assertDontSee('Zion Shipping', false);
 
         Http::assertNothingSent();
+    }
+
+    public function test_shipment_label_streams_zion_pdf_when_authenticated(): void
+    {
+        Http::fake([
+            '*/api/kay-paolo/shipment-label*' => Http::response('%PDF-1.4 fake-label', 200, [
+                'Content-Type' => 'application/pdf',
+                'Content-Disposition' => 'inline; filename="label_373988.pdf"',
+            ]),
+        ]);
+
+        $this->withSession([
+            'zion.access_token' => 'session-token',
+            'zion.user' => ['name' => 'Test User'],
+        ])->get('/shipment-label?shipment_id=24755&invoice=373988&id=HTS373988-1%2F2')
+            ->assertOk()
+            ->assertHeader('content-type', 'application/pdf')
+            ->assertSee('%PDF', false);
     }
 
     public function test_quote_proxy_falls_back_when_api_endpoint_requires_session_store(): void
