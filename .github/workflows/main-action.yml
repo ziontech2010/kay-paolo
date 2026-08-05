@@ -1,0 +1,29 @@
+name: Deploy to Production
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Deploy over SSH
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.HOST }}
+          username: ${{ secrets.USER }}
+          password: ${{ secrets.PASS }}
+          port: ${{ secrets.PORT }}
+          script_stop: true    # stop and fail the job if any command below errors
+          script: |
+            set -e
+            cd /var/www/production
+            git fetch origin
+            git checkout main
+            git pull --ff-only origin main
+            sudo chown -R www-data:www-data /var/www/production
+            sudo -u www-data COMPOSER_HOME=/var/www/production/.composer-cache composer install --no-dev --optimize-autoloader
+            sudo -u www-data php artisan optimize:clear

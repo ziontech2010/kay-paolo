@@ -34,8 +34,6 @@ class ExampleTest extends TestCase
             '/invoice',
             '/receipt',
             '/receipt-a4',
-            '/shipment-label',
-            '/shipment-receipt',
             '/about',
             '/services',
             '/contact',
@@ -309,6 +307,11 @@ class ExampleTest extends TestCase
         $this->assertStringContainsString('Zion Shipping logo', $script);
         $this->assertStringContainsString('labelDestination', $script);
         $this->assertStringContainsString('receiptPackageCount', $script);
+        $this->assertStringContainsString('renderPackageLabels', $script);
+        $this->assertStringContainsString('splitLabelNumbers', $script);
+        $this->assertStringContainsString('formatShipmentNumberDisplay', $script);
+        $this->assertStringContainsString('dollarText', $script);
+        $this->assertStringContainsString('documentServiceSummary', $script);
         $this->assertStringNotContainsString("params.set('access_token', storedToken())", $script);
         $this->assertStringContainsString('isAdminRole', $script);
         $this->assertStringNotContainsString('Door to Door', $script);
@@ -348,25 +351,79 @@ class ExampleTest extends TestCase
     {
         Http::fake();
 
+        @unlink(storage_path('app/public/label/label_373988.pdf'));
+        @unlink(storage_path('app/public/receipts/receipt_373988.pdf'));
+
         $this->get('/shipment-label?shipment_id=24755&invoice=373988&id=HTS373988-1%2F2%2C+HTS373988-2%2F2')
+            ->assertRedirect('/label/label_373988.pdf');
+
+        $this->assertFileExists(storage_path('app/public/label/label_373988.pdf'));
+        $this->assertStringStartsWith('%PDF', (string) file_get_contents(storage_path('app/public/label/label_373988.pdf')));
+
+        $this->get('/label/label_373988.pdf')
             ->assertOk()
-            ->assertSee('A4 Shipping Label', false)
-            ->assertSee('Kay Paolo Shipping', false)
-            ->assertSee('data-shipment-document', false)
-            ->assertSee('HTS373988-1/2, HTS373988-2/2', false)
-            ->assertDontSee('%PDF', false)
-            ->assertDontSee('Zion Shipping', false);
+            ->assertHeader('content-type', 'application/pdf');
 
         $this->get('/shipment-receipt?shipment_id=24755&invoice=373988&id=HTS373988-1%2F2%2C+HTS373988-2%2F2')
-            ->assertOk()
-            ->assertSee('Shipment Receipt', false)
-            ->assertSee('Print Receipt', false)
-            ->assertSee('Kay Paolo Shipping', false)
-            ->assertSee('373988', false)
-            ->assertDontSee('%PDF', false)
-            ->assertDontSee('Zion Shipping', false);
+            ->assertRedirect('/receipts/receipt_373988.pdf');
 
-        Http::assertNothingSent();
+        $this->assertFileExists(storage_path('app/public/receipts/receipt_373988.pdf'));
+        $this->assertStringStartsWith('%PDF', (string) file_get_contents(storage_path('app/public/receipts/receipt_373988.pdf')));
+
+        $this->get('/receipts/receipt_373988.pdf')
+            ->assertOk()
+            ->assertHeader('content-type', 'application/pdf');
+
+        @unlink(storage_path('app/public/label/label_373988.pdf'));
+        @unlink(storage_path('app/public/receipts/receipt_373988.pdf'));
+    }
+
+    public function test_receipt_pdf_includes_package_details_from_shipment_history(): void
+    {
+        Http::fake([
+            '*/api/kay-paolo/shipping-history-filter' => Http::response([
+                'status' => 'success',
+                'shippings' => [[
+                    'id' => 24755,
+                    'invoice_num' => '479029',
+                    'tracking_number' => 'HTS479029-1/1',
+                    'package_description' => 'Household Goods',
+                    'package_count' => 2,
+                    'packages' => [],
+                    'dimensions' => [
+                        'package_count_ind' => [2],
+                        'weight' => [45],
+                        'length' => [24],
+                        'width' => [18],
+                        'height' => [16],
+                    ],
+                    'shipper_name' => 'Kay Shipper',
+                    'consignee_name' => 'Kay Consignee',
+                    'selected_shipper' => 'Economical Air',
+                    'freight' => 80,
+                    'tax' => 5,
+                    'total' => 85,
+                    'created_at' => '2026-08-01 10:00:00',
+                ]],
+            ]),
+        ]);
+
+        @unlink(storage_path('app/public/receipts/receipt_479029.pdf'));
+
+        $this->withSession(['zion.access_token' => 'test-token'])
+            ->get('/shipment-receipt?invoice=479029&id=HTS479029-1%2F1')
+            ->assertRedirect('/receipts/receipt_479029.pdf');
+
+        $path = storage_path('app/public/receipts/receipt_479029.pdf');
+        $this->assertFileExists($path);
+        $pdf = (string) file_get_contents($path);
+        $this->assertStringStartsWith('%PDF', $pdf);
+        $this->assertTrue(
+            str_contains($pdf, 'Household') || str_contains($pdf, 'Goods') || str_contains($pdf, '45'),
+            'Receipt PDF should embed package description or weight from history.'
+        );
+
+        @unlink($path);
     }
 
     public function test_quote_proxy_falls_back_when_api_endpoint_requires_session_store(): void

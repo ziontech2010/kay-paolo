@@ -45,16 +45,6 @@
                     <label for="password">Password</label>
                     <input type="password" id="password" name="password" placeholder="Enter your password" required autocomplete="current-password">
                 </div>
-                <div class="field">
-                    <label for="role_id">Role Filter Optional</label>
-                    <select id="role_id" name="role_id">
-                        <option value="">Auto detect role</option>
-                        <option value="2" @selected(old('role_id') === '2')>Client</option>
-                        <option value="8" @selected(old('role_id') === '8')>Agent</option>
-                        <option value="1" @selected(old('role_id') === '1')>Admin</option>
-                        <option value="16" @selected(old('role_id') === '16')>Driver</option>
-                    </select>
-                </div>
                 <div class="login-row-between">
                     <label style="display: flex; align-items: center; gap: 8px"><input type="checkbox" style="width: auto"> Remember me</label>
                     <a href="{{ route('contact') }}">Need help?</a>

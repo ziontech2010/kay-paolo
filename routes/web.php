@@ -32,6 +32,12 @@ Route::get('/receipt', fn () => view('pages.receipt'))->name('receipt');
 Route::get('/receipt-a4', fn () => view('pages.receipt-a4'))->name('receipt.a4');
 Route::get('/shipment-label', [ZionApiProxyController::class, 'shipmentLabel'])->name('shipment.label');
 Route::get('/shipment-receipt', [ZionApiProxyController::class, 'shipmentReceipt'])->name('shipment.receipt');
+Route::get('/label/{filename}', [ZionApiProxyController::class, 'storedLabel'])
+    ->where('filename', '.*\.pdf')
+    ->name('shipment.label.file');
+Route::get('/receipts/{filename}', [ZionApiProxyController::class, 'storedReceipt'])
+    ->where('filename', '.*\.pdf')
+    ->name('shipment.receipt.file');
 Route::get('/admin', [KayPaoloAdminController::class, 'edit'])->name('admin');
 Route::post('/admin', [KayPaoloAdminController::class, 'update'])->name('admin.update');
 
@@ -68,6 +74,7 @@ Route::prefix('zion-api')->name('zion-api.')->group(function () {
     Route::post('/save-consignee', [ZionApiProxyController::class, 'saveConsignee'])->name('save-consignee');
     Route::post('/quote', [ZionApiProxyController::class, 'quote'])->name('quote');
     Route::post('/shipping', [ZionApiProxyController::class, 'createShipment'])->name('shipping');
+    Route::post('/store-shipment-document-context', [ZionApiProxyController::class, 'storeShipmentDocumentContext'])->name('store-shipment-document-context');
     Route::post('/shipping-history', [ZionApiProxyController::class, 'shippingHistory'])->name('shipping-history');
     Route::post('/tracking', [ZionApiProxyController::class, 'tracking'])->name('tracking');
     Route::post('/email-shipment', [ZionApiProxyController::class, 'emailShipment'])->name('email-shipment');
