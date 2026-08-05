@@ -1284,6 +1284,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (data.shipmentId) params.set('shipment_id', data.shipmentId);
     if (data.documentNumber && data.documentNumber !== 'Pending') params.set('invoice', data.documentNumber);
     if (shipmentNo && shipmentNo !== 'Pending') params.set('id', shipmentNo);
+    if (storedToken()) params.set('access_token', storedToken());
     link.href = params.toString() ? `${baseUrl}?${params}` : baseUrl;
   }
 
