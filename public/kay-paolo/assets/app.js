@@ -2457,9 +2457,10 @@ document.addEventListener('DOMContentLoaded', () => {
       || card.image_url
       || card.icon
       || '';
+    const zionLogo = config.assets?.zionCarrierLogo || '/kay-paolo/assets/images/zion-carrier-logo.png';
 
     if (partner === 'ZION') {
-      return `<img src="${escapeHtml(config.assets?.fullIntegrationLogo || config.assets?.kayPaoloLogo || '/kay-paolo/assets/logo/kay-paolo.svg')}" alt="Full integration logo" width="100" height="50">`;
+      return `<img src="${escapeHtml(zionLogo)}" alt="Zion Shipping logo" width="100" height="50">`;
     }
 
     if (logo) {
@@ -2467,7 +2468,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     if (normalizePartner(carrier) === 'ZION') {
-      return `<img src="${escapeHtml(config.assets?.fullIntegrationLogo || config.assets?.kayPaoloLogo || '/kay-paolo/assets/logo/kay-paolo.svg')}" alt="Full integration logo" width="100" height="50">`;
+      return `<img src="${escapeHtml(zionLogo)}" alt="Zion Shipping logo" width="100" height="50">`;
     }
 
     return `<div class="carrier-logo-fallback" aria-label="${escapeHtml(carrier)}">${escapeHtml(carrierInitials(carrier))}</div>`;
