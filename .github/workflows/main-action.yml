@@ -24,5 +24,6 @@ jobs:
             git fetch origin
             git checkout main
             git pull --ff-only origin main
-            sudo -u www-data composer install
+            sudo chown -R www-data:www-data /var/www/production
+            sudo -u www-data COMPOSER_HOME=/var/www/production/.composer-cache composer install --no-dev --optimize-autoloader
             sudo -u www-data php artisan optimize:clear
