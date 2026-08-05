@@ -276,7 +276,10 @@ class ZionApiProxyController extends Controller
 
     private function streamZionDocument(Request $request, string $endpoint, string $fallbackFilename): Response|JsonResponse
     {
-        $token = $request->bearerToken() ?: session('zion.access_token');
+        $token = $request->bearerToken()
+            ?: session('zion.access_token')
+            ?: $request->query('access_token')
+            ?: $request->query('token');
 
         if (!$token) {
             return response()->json([
@@ -285,7 +288,10 @@ class ZionApiProxyController extends Controller
             ], 401);
         }
 
-        $response = $this->zion->getRaw($endpoint, $request->query(), $token);
+        $query = $request->query();
+        unset($query['access_token'], $query['token']);
+
+        $response = $this->zion->getRaw($endpoint, $query, $token);
         if (!$response) {
             return response()->json([
                 'status' => 'error',
