@@ -19,7 +19,6 @@ class ZionSessionController extends Controller
         $credentials = $request->validate([
             'email' => ['required', 'string'],
             'password' => ['required', 'string'],
-            'role_id' => ['nullable', 'integer'],
         ]);
 
         $payload = array_filter($credentials, static function ($value) {
@@ -40,7 +39,7 @@ class ZionSessionController extends Controller
             }
 
             return back()
-                ->withInput($request->only('email', 'role_id'))
+                ->withInput($request->only('email'))
                 ->withErrors(['email' => $message]);
         }
 

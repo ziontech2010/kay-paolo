@@ -471,8 +471,7 @@ document.addEventListener('DOMContentLoaded', () => {
       try {
         const payload = {
           email: loginForm.querySelector('[name="email"]')?.value.trim(),
-          password: loginForm.querySelector('[name="password"]')?.value,
-          role_id: loginForm.querySelector('[name="role_id"]')?.value || undefined
+          password: loginForm.querySelector('[name="password"]')?.value
         };
         const response = await postJson(loginForm.dataset.apiEndpoint || route('login', '/api/kay-paolo/login'), payload, { token: '' });
 
