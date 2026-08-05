@@ -419,6 +419,11 @@ document.addEventListener('DOMContentLoaded', () => {
         return;
       }
 
+      const placeholder = document.createElement('option');
+      placeholder.value = '';
+      placeholder.textContent = '-- Select Payment Type --';
+      select.appendChild(placeholder);
+
       options.forEach((option) => {
         const optionElement = document.createElement('option');
         optionElement.value = option.value;
@@ -426,9 +431,7 @@ document.addEventListener('DOMContentLoaded', () => {
         select.appendChild(optionElement);
       });
 
-      const nextValue = options.some((option) => option.value === previous)
-        ? previous
-        : options[0].value;
+      const nextValue = options.some((option) => option.value === previous) ? previous : '';
       setSelectValue(select.id, nextValue);
       select.dataset.kayPaymentsLoaded = '1';
     });
@@ -1133,7 +1136,7 @@ document.addEventListener('DOMContentLoaded', () => {
         ...quotePayload,
         quote_id: quoteId,
         partner: quoteCardPartner(card),
-        payment_type: 'PAID AT AGENT',
+        payment_type: '',
         deliveryEstimatePrice: quoteCardTotal(card) || undefined,
         deliveryEstimateDate: quoteCardEta(card) || undefined,
         delivery_option: quoteCardService(card) || undefined,
@@ -1348,17 +1351,54 @@ document.addEventListener('DOMContentLoaded', () => {
       labels.forEach(() => stack.appendChild(source.cloneNode(true)));
     }
 
+    const barcodeValue = labelBarcodeValue(data);
+      const shipperText = [data.shipperName, data.shipperContact, data.shipperAddress].filter(Boolean).join('\n\n');
+    const receiverText = [data.consigneeName, data.consigneeAddress, data.consigneeContact].filter(Boolean).join('\n\n');
+    const weightDim = labelWeightDimText(data);
+    const packageText = `${data.description || 'Package'} (${data.packageCount} pcs)`;
+
     Array.from(stack.querySelectorAll('[data-package-label="true"]')).forEach((page, index) => {
       const labelNumber = labels[index] || data.tracking || 'Pending';
-      setScopedLabelText(page, 'shipper', `${data.shipperName}\n${data.shipperAddress}\n${data.shipperContact}`);
-      setScopedLabelText(page, 'package', `${data.description || 'Package'} (${data.packageCount} pcs) / ${data.totalWeight} lb`);
-      setScopedLabelText(page, 'receiver', `${data.consigneeName}\n${data.consigneeAddress}\n${data.consigneeContact}`);
+      setScopedLabelText(page, 'shipper', shipperText);
+      setScopedLabelText(page, 'package', packageText);
+      setScopedLabelText(page, 'receiver', receiverText);
       setScopedLabelText(page, 'tracking', labelNumber);
       setScopedLabelText(page, 'due', data.chargeStatus);
       setScopedLabelText(page, 'destination', data.destinationLabel);
-      setScopedLabelText(page, 'barcode', `*${labelNumber}*`);
       setScopedLabelText(page, 'trackingLabel', labelNumber);
       setScopedLabelText(page, 'delivery', data.deliveryNumber);
+      setScopedLabelText(page, 'weightDim', weightDim);
+      setLabelBarcodeValue(page, 'awb', barcodeValue);
+      setLabelBarcodeValue(page, 'delivery', data.deliveryNumber);
+    });
+
+    if (typeof window.kayPaoloPaintLabelBarcodes === 'function') {
+      window.kayPaoloPaintLabelBarcodes(stack);
+    }
+  }
+
+  function labelBarcodeValue(data) {
+    const invoice = String(data.documentNumber || '').trim();
+    if (invoice && invoice !== 'Pending') {
+      return invoice.replace(/[^\w\-]/g, '');
+    }
+
+    const firstLabel = String(data.labelNumbers?.[0] || data.tracking || '').trim();
+    return firstLabel.replace(/[^\w\-]/g, '') || 'Pending';
+  }
+
+  function labelWeightDimText(data) {
+    const item = Array.isArray(data.items) && data.items.length ? data.items[0] : null;
+    const weight = numberValue(item?.weight, data.totalWeight || 1);
+    const dims = item?.dimensions ? String(item.dimensions).toUpperCase() : '1 X 1 X 1';
+    return `${weight} lbs, DIM: (${dims})`;
+  }
+
+  function setLabelBarcodeValue(root, role, nextValue) {
+    const value = String(nextValue || '').trim();
+    root.querySelectorAll(`svg[data-barcode-role="${role}"]`).forEach((svg) => {
+      svg.setAttribute('data-barcode-value', value);
+      while (svg.firstChild) svg.removeChild(svg.firstChild);
     });
   }
 
@@ -1426,7 +1466,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const toCity = payload.to_city || shipping.consignee_city || shipping.to_city || '';
     const toState = payload.to_state || shipping.consignee_state || shipping.to_state || '';
     const toCountry = payload.to_country_name || shipping.consignee_country || shipping.to_country || '';
-    const destinationLabel = [toCity, toState || toCountry].filter(Boolean).join(' - ') || 'Destination';
+    const destinationCity = toCity || toCountry || 'Destination';
+    const destinationLabel = toCity
+      ? `${String(toCity).charAt(0).toUpperCase()} - ${toCity}`
+      : destinationCity;
     const deliveryNumber = response.delivery_number
       || responseData.delivery_number
       || shipping.delivery_number
@@ -2079,7 +2122,7 @@ document.addEventListener('DOMContentLoaded', () => {
       delivery_location: normalizeDeliveryLocation(value('shipmentDeliveryLocation') || basePayload.delivery_location),
       package_description: value('shipmentPackageDescription') || basePayload.package_description || '',
       fragile_shipment: document.getElementById('shipmentFragile')?.checked ? 1 : basePayload.fragile_shipment,
-      payment_type: value('shipmentPaymentType') || basePayload.payment_type || 'PAID AT AGENT'
+      payment_type: value('shipmentPaymentType') || basePayload.payment_type || ''
     };
   }
 
@@ -2266,7 +2309,7 @@ document.addEventListener('DOMContentLoaded', () => {
       delivery_location: deliveryLocation,
       deliveryLocation: deliveryLocation,
       delivery_description: payload.delivery_description || '',
-      payment_type: payload.payment_type || 'PAID AT AGENT',
+      payment_type: payload.payment_type || '',
       deliveryEstimatePrice: payload.deliveryEstimatePrice || undefined,
       deliveryEstimateDate: payload.deliveryEstimateDate || undefined,
       promo: payload.promo || payload.coupon_code || '',
@@ -2375,7 +2418,7 @@ document.addEventListener('DOMContentLoaded', () => {
     setValue('shipmentToState', payload.to_state);
     setSelectValue('shipmentDeliveryLocation', normalizeDeliveryLocation(payload.delivery_location));
     setValue('shipmentPackageDescription', payload.package_description);
-    setSelectValue('shipmentPaymentType', payload.payment_type || 'PAID AT AGENT');
+    setSelectValue('shipmentPaymentType', payload.payment_type || '');
 
     const fragileInput = document.getElementById('shipmentFragile');
     if (fragileInput) {

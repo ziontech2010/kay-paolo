@@ -208,6 +208,24 @@ class ZionApiProxyController extends Controller
 
     public function shipmentLabel(Request $request): Response|JsonResponse
     {
+        $token = $request->bearerToken()
+            ?: session('zion.access_token')
+            ?: $request->query('access_token')
+            ?: $request->query('token');
+
+        $hasShipmentRef = $request->filled('shipment_id')
+            || $request->filled('shipping_id')
+            || $request->filled('invoice');
+
+        if ($token && $hasShipmentRef) {
+            $pdfResponse = $this->streamZionDocument($request, 'kay-paolo/shipment-label', 'shipment-label.pdf');
+            $contentType = strtolower((string) $pdfResponse->headers->get('Content-Type', ''));
+
+            if (str_contains($contentType, 'application/pdf') || str_starts_with(ltrim((string) $pdfResponse->getContent()), '%PDF')) {
+                return $pdfResponse;
+            }
+        }
+
         return response()->view('documents.label', [
             'documentQuery' => $request->query(),
         ]);
