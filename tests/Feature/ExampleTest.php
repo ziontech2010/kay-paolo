@@ -309,6 +309,8 @@ class ExampleTest extends TestCase
         $this->assertStringContainsString('Zion Shipping logo', $script);
         $this->assertStringContainsString('labelDestination', $script);
         $this->assertStringContainsString('receiptPackageCount', $script);
+        $this->assertStringContainsString('renderPackageLabels', $script);
+        $this->assertStringContainsString('splitLabelNumbers', $script);
         $this->assertStringNotContainsString("params.set('access_token', storedToken())", $script);
         $this->assertStringContainsString('isAdminRole', $script);
         $this->assertStringNotContainsString('Door to Door', $script);
@@ -348,14 +350,18 @@ class ExampleTest extends TestCase
     {
         Http::fake();
 
-        $this->get('/shipment-label?shipment_id=24755&invoice=373988&id=HTS373988-1%2F2%2C+HTS373988-2%2F2')
+        $labelResponse = $this->get('/shipment-label?shipment_id=24755&invoice=373988&id=HTS373988-1%2F2%2C+HTS373988-2%2F2')
             ->assertOk()
             ->assertSee('A4 Shipping Label', false)
             ->assertSee('Kay Paolo Shipping', false)
             ->assertSee('data-shipment-document', false)
-            ->assertSee('HTS373988-1/2, HTS373988-2/2', false)
+            ->assertSee('HTS373988-1/2', false)
+            ->assertSee('HTS373988-2/2', false)
+            ->assertDontSee('HTS373988-1/2, HTS373988-2/2', false)
             ->assertDontSee('%PDF', false)
             ->assertDontSee('Zion Shipping', false);
+
+        $this->assertSame(2, substr_count($labelResponse->getContent(), 'data-package-label="true"'));
 
         $this->get('/shipment-receipt?shipment_id=24755&invoice=373988&id=HTS373988-1%2F2%2C+HTS373988-2%2F2')
             ->assertOk()

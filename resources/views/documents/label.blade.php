@@ -8,6 +8,20 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&family=Libre+Barcode+39&display=swap" rel="stylesheet">
+    @php
+        $rawLabelNumbers = $documentQuery['id'] ?? $documentQuery['tracking'] ?? $documentQuery['tracking_number'] ?? '';
+        $labelNumbers = collect(explode(',', (string) $rawLabelNumbers))
+            ->map(fn ($label) => trim($label))
+            ->filter()
+            ->values()
+            ->all();
+
+        if (empty($labelNumbers)) {
+            $labelNumbers = ['Pending'];
+        }
+
+        $invoiceNumber = $documentQuery['invoice'] ?? $documentQuery['invoice_num'] ?? 'Pending';
+    @endphp
     <style>
         @page { size: A4 portrait; margin: 0; }
         * { box-sizing: border-box; }
@@ -16,7 +30,9 @@
             background: #f3f4f6;
             color: #000;
             display: flex;
+            flex-direction: column;
             font-family: "Inter", Arial, sans-serif;
+            gap: 24px;
             justify-content: center;
             margin: 0;
             min-height: 100vh;
@@ -51,6 +67,9 @@
             overflow: hidden;
             position: relative;
             width: 210mm;
+        }
+        .page-wrapper + .page-wrapper {
+            margin-top: 24px;
         }
         .label-container {
             background: #fff;
@@ -165,10 +184,14 @@
             }
             .no-print { display: none !important; }
             .page-wrapper {
+                break-after: page;
                 box-shadow: none;
                 height: 297mm;
                 margin: 0;
                 width: 210mm;
+            }
+            .page-wrapper:last-child {
+                break-after: auto;
             }
         }
     </style>
@@ -178,56 +201,60 @@
         <button class="btn-print" onclick="window.print()" type="button">Print Label</button>
     </div>
 
-    <div class="page-wrapper">
-        <article class="label-container awb-sheet" data-shipment-document>
-            <table class="label-table">
-                <tr>
-                    <td class="header-logo-cell">
-                        <img src="{{ asset('kay-paolo/assets/logo/kay-paolo.svg') }}" alt="Kay Paolo Shipping">
-                    </td>
-                    <td class="header-from-cell">
-                        <table class="inline-table">
-                            <tr>
-                                <td class="inline-label">From:</td>
-                                <td><strong>KAY PAOLO SHIPPING</strong></td>
-                            </tr>
-                            <tr>
-                                <td></td>
-                                <td id="receiptA4Shipper">Kay Paolo Shipping</td>
-                            </tr>
-                            <tr>
-                                <td></td>
-                                <td id="receiptA4Package">1 package</td>
-                            </tr>
-                        </table>
-                    </td>
-                </tr>
-                <tr>
-                    <td colspan="2" class="receiver-cell">
-                        <table class="inline-table">
-                            <tr>
-                                <td class="inline-label">To:</td>
-                                <td><strong id="receiptA4Receiver">Destination customer</strong></td>
-                            </tr>
-                        </table>
-                    </td>
-                </tr>
-                <tr>
-                    <td colspan="2" class="huge-awb-cell" id="receiptA4LargeNumber">{{ $documentQuery['id'] ?? 'Pending' }}</td>
-                </tr>
-                <tr>
-                    <td class="due-cell" id="labelDueType">DUE</td>
-                    <td class="dest-cell" id="labelDestination">Destination</td>
-                </tr>
-                <tr>
-                    <td colspan="2" class="barcode-cell">
-                        <div class="barcode-text" id="receiptA4Barcode">*{{ $documentQuery['id'] ?? 'PENDING' }}*</div>
-                        <div class="barcode-label" id="receiptA4TrackingNumber">{{ $documentQuery['id'] ?? 'Pending' }}</div>
-                        <div class="package-line">Delivery: <span id="labelDeliveryNumber">{{ $documentQuery['invoice'] ?? 'Pending' }}</span></div>
-                    </td>
-                </tr>
-            </table>
-        </article>
+    <div data-package-label-stack>
+        @foreach ($labelNumbers as $labelNumber)
+            <div class="page-wrapper" data-package-label="true">
+                <article class="label-container awb-sheet" data-shipment-document>
+                    <table class="label-table">
+                        <tr>
+                            <td class="header-logo-cell">
+                                <img src="{{ asset('kay-paolo/assets/logo/kay-paolo.svg') }}" alt="Kay Paolo Shipping">
+                            </td>
+                            <td class="header-from-cell">
+                                <table class="inline-table">
+                                    <tr>
+                                        <td class="inline-label">From:</td>
+                                        <td><strong>KAY PAOLO SHIPPING</strong></td>
+                                    </tr>
+                                    <tr>
+                                        <td></td>
+                                        <td data-label-field="shipper" @if ($loop->first) id="receiptA4Shipper" @endif>Kay Paolo Shipping</td>
+                                    </tr>
+                                    <tr>
+                                        <td></td>
+                                        <td data-label-field="package" @if ($loop->first) id="receiptA4Package" @endif>1 package</td>
+                                    </tr>
+                                </table>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td colspan="2" class="receiver-cell">
+                                <table class="inline-table">
+                                    <tr>
+                                        <td class="inline-label">To:</td>
+                                        <td><strong data-label-field="receiver" @if ($loop->first) id="receiptA4Receiver" @endif>Destination customer</strong></td>
+                                    </tr>
+                                </table>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td colspan="2" class="huge-awb-cell" data-label-field="tracking" @if ($loop->first) id="receiptA4LargeNumber" @endif>{{ $labelNumber }}</td>
+                        </tr>
+                        <tr>
+                            <td class="due-cell" data-label-field="due" @if ($loop->first) id="labelDueType" @endif>DUE</td>
+                            <td class="dest-cell" data-label-field="destination" @if ($loop->first) id="labelDestination" @endif>Destination</td>
+                        </tr>
+                        <tr>
+                            <td colspan="2" class="barcode-cell">
+                                <div class="barcode-text" data-label-field="barcode" @if ($loop->first) id="receiptA4Barcode" @endif>*{{ $labelNumber }}*</div>
+                                <div class="barcode-label" data-label-field="trackingLabel" @if ($loop->first) id="receiptA4TrackingNumber" @endif>{{ $labelNumber }}</div>
+                                <div class="package-line">Delivery: <span data-label-field="delivery" @if ($loop->first) id="labelDeliveryNumber" @endif>{{ $invoiceNumber }}</span></div>
+                            </td>
+                        </tr>
+                    </table>
+                </article>
+            </div>
+        @endforeach
     </div>
 
     <script>

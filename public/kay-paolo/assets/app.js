@@ -1330,6 +1330,55 @@ document.addEventListener('DOMContentLoaded', () => {
     setText('labelDeliveryNumber', data.deliveryNumber);
     setText('receiptPackageCount', data.packageCount);
     setText('receiptTotalWeight', `${data.totalWeight} lb`);
+    renderPackageLabels(data);
+  }
+
+  function renderPackageLabels(data) {
+    const stack = document.querySelector('[data-package-label-stack]');
+    if (!stack) return;
+
+    const labels = data.labelNumbers?.length ? data.labelNumbers : splitLabelNumbers(data.tracking);
+    const currentPages = Array.from(stack.querySelectorAll('[data-package-label="true"]'));
+    if (!currentPages.length) return;
+
+    if (currentPages.length !== labels.length) {
+      const source = currentPages[0].cloneNode(true);
+      source.querySelectorAll('[id]').forEach((element) => element.removeAttribute('id'));
+      stack.innerHTML = '';
+      labels.forEach(() => stack.appendChild(source.cloneNode(true)));
+    }
+
+    Array.from(stack.querySelectorAll('[data-package-label="true"]')).forEach((page, index) => {
+      const labelNumber = labels[index] || data.tracking || 'Pending';
+      setScopedLabelText(page, 'shipper', `${data.shipperName}\n${data.shipperAddress}\n${data.shipperContact}`);
+      setScopedLabelText(page, 'package', `${data.description || 'Package'} (${data.packageCount} pcs) / ${data.totalWeight} lb`);
+      setScopedLabelText(page, 'receiver', `${data.consigneeName}\n${data.consigneeAddress}\n${data.consigneeContact}`);
+      setScopedLabelText(page, 'tracking', labelNumber);
+      setScopedLabelText(page, 'due', data.chargeStatus);
+      setScopedLabelText(page, 'destination', data.destinationLabel);
+      setScopedLabelText(page, 'barcode', `*${labelNumber}*`);
+      setScopedLabelText(page, 'trackingLabel', labelNumber);
+      setScopedLabelText(page, 'delivery', data.deliveryNumber);
+    });
+  }
+
+  function setScopedLabelText(root, field, nextValue) {
+    root.querySelectorAll(`[data-label-field="${field}"]`).forEach((element) => {
+      element.textContent = String(nextValue ?? '-');
+    });
+  }
+
+  function splitLabelNumbers(raw) {
+    if (Array.isArray(raw)) {
+      return raw.flatMap((item) => splitLabelNumbers(item));
+    }
+
+    const labels = String(raw || '')
+      .split(',')
+      .map((item) => item.trim())
+      .filter(Boolean);
+
+    return labels.length ? labels : ['Pending'];
   }
 
   function buildShipmentDocumentData(response, payload, selected) {
@@ -1364,6 +1413,11 @@ document.addEventListener('DOMContentLoaded', () => {
       || responseData.delivery_number
       || shipping.delivery_number
       || (documentNumber && documentNumber !== 'Pending' ? `DLV${String(documentNumber).replace(/\D/g, '').slice(-6) || documentNumber}` : 'Pending');
+    const labelNumbers = splitLabelNumbers(queryTracking
+      || response.tracking_numbers
+      || responseData.tracking_numbers
+      || shipping.tracking_numbers
+      || tracking);
 
     return {
       shipmentId: response.shipment_id
@@ -1383,6 +1437,7 @@ document.addEventListener('DOMContentLoaded', () => {
       chargeStatus: String(paymentType).toUpperCase().includes('PAID') ? 'PAID' : 'DUE',
       destinationLabel,
       deliveryNumber,
+      labelNumbers,
       shipperName: payload.from_name || shipping.shipper_name || storedUser().name || 'Kay Paolo Customer',
       shipperAddress: [payload.from_address, payload.from_city, payload.from_state, payload.from_zip, payload.from_country_name].filter(Boolean).join(', ') || '414 Main St, Asbury Park, NJ 07712',
       shipperContact: [payload.from_phone, payload.from_email || storedUser().email].filter(Boolean).join(' / ') || 'info@kaypaoloshipping.com',
