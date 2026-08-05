@@ -922,14 +922,22 @@ header.site.scrolled .burger {
   line-height: 1.65;
 }
 
+.process-step:first-child::before,
 .process-step::after {
   content: "";
   position: absolute;
   top: 8px;
-  right: -14px;
   width: 28px;
   height: 1px;
   background: repeating-linear-gradient(90deg, var(--gold-500) 0 6px, transparent 6px 10px);
+}
+
+.process-step:first-child::before {
+  left: -14px;
+}
+
+.process-step::after {
+  right: -14px;
 }
 
 .process-step:last-child::after {
@@ -1259,6 +1267,7 @@ footer ul li a:hover {
     gap: 36px;
   }
 
+  .process-step:first-child::before,
   .process-step::after {
     display: none;
   }
