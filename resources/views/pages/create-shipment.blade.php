@@ -197,9 +197,9 @@
                                 </select>
                             </div>
                             <div class="field">
-                                <label>Payment Type</label>
-                                <select id="shipmentPaymentType" data-payment-options>
-                                    <option value="">Loading payment options...</option>
+                                <label>Payment Type *</label>
+                                <select id="shipmentPaymentType" data-payment-options required>
+                                    <option value="">-- Select Payment Type --</option>
                                 </select>
                             </div>
                         </div>
