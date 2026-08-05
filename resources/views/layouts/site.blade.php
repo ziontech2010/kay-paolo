@@ -205,6 +205,8 @@
         assets: {
             generatingQuote: @json(asset('kay-paolo/assets/generating-quote.gif')),
             processingShipping: @json(asset('kay-paolo/assets/processing-shipping.gif')),
+            fullIntegrationLogo: @json(asset('kay-paolo/assets/logo/kay-paolo.svg')),
+            kayPaoloLogo: @json(asset('kay-paolo/assets/logo/kay-paolo.svg')),
             zionCarrierLogo: @json(asset('kay-paolo/assets/images/zion-carrier-logo.png'))
         }
     };

@@ -28,6 +28,22 @@ class ZionShippingApi
         return $this->request('get', $endpoint, $query, $token, true);
     }
 
+    public function getRaw(string $endpoint, array $query = [], ?string $token = null, bool $webPath = false): ?Response
+    {
+        $client = Http::baseUrl($this->baseUrl())
+            ->timeout((int) config('services.zion_shipping.timeout', 45));
+
+        if ($token) {
+            $client = $client->withToken($token);
+        }
+
+        try {
+            return $client->get($this->endpointPath($endpoint, $webPath), $query);
+        } catch (ConnectionException $exception) {
+            return null;
+        }
+    }
+
     public function webUrl(string $path, array $query = []): string
     {
         $url = rtrim((string) config('services.zion_shipping.web_url'), '/').'/'.ltrim($path, '/');

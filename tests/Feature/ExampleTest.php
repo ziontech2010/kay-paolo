@@ -283,8 +283,10 @@ class ExampleTest extends TestCase
         $this->assertStringContainsString('Object.entries(rawCountries)', $script);
         $this->assertStringContainsString('Object.entries(rawOptions)', $script);
         $this->assertStringContainsString('response?.data?.flat_rates', $script);
+        $this->assertStringContainsString('response?.data?.all_options', $script);
+        $this->assertStringContainsString('historyDateRangeValue', $script);
         $this->assertStringContainsString("const countryCacheKey = 'kayPaoloCountries:v3'", $script);
-        $this->assertStringContainsString("const paymentOptionsCacheKey = 'kayPaoloPaymentOptions:v3'", $script);
+        $this->assertStringContainsString('kayPaoloPaymentOptions:v4', $script);
     }
 
     public function test_delivery_location_runtime_guard_limits_options(): void
@@ -299,6 +301,9 @@ class ExampleTest extends TestCase
         $this->assertStringContainsString('Home Delivery', $script);
         $this->assertStringContainsString('include_in_receipt', $script);
         $this->assertStringContainsString("raw.includes('full integration')", $script);
+        $this->assertStringContainsString('filterQuoteCardsForPayload', $script);
+        $this->assertStringContainsString('totalPackageWeight(payload) !== 0', $script);
+        $this->assertStringContainsString('fullIntegrationLogo', $script);
         $this->assertStringContainsString('isAdminRole', $script);
         $this->assertStringNotContainsString('Door to Door', $script);
         $this->assertStringNotContainsString('Port to Port', $script);
@@ -314,11 +319,9 @@ class ExampleTest extends TestCase
                     'US' => 'United States',
                 ],
             ]),
-            '*/api/kay-paolo/payment-options' => Http::response(['options' => []]),
-            '*/api/payment-options' => Http::response([
-                'payment_options' => [
-                    'PAID AT AGENT' => 'Paid at Store',
-                    'COLLECT' => 'Collect',
+            '*/api/kay-paolo/payment-options*' => Http::response([
+                'options' => [
+                    ['value' => 'COLLECT', 'label' => 'Collect'],
                 ],
             ]),
         ]);
@@ -329,19 +332,36 @@ class ExampleTest extends TestCase
             ->assertJsonPath('countries.1.code', 'US');
 
         $this->withHeader('Authorization', 'Bearer fake-token')
-            ->getJson('/api/kay-paolo/payment-options')
+            ->getJson('/api/kay-paolo/payment-options?quote_user_id=7020')
             ->assertOk()
-            ->assertJsonPath('options.0.value', 'PAID AT AGENT')
-            ->assertJsonPath('options.1.value', 'COLLECT');
+            ->assertJsonCount(1, 'options')
+            ->assertJsonPath('options.0.value', 'COLLECT');
     }
 
-    public function test_shipment_document_routes_redirect_to_pdf_generators(): void
+    public function test_shipment_document_routes_stream_pdf_from_shipping_api(): void
     {
-        $this->get('/shipment-label?shipment_id=24745')
-            ->assertRedirect('https://dev.zionshipping.com/get_shipping_label/24745');
+        Http::fake([
+            '*/api/kay-paolo/shipment-label*' => Http::response('%PDF-label', 200, [
+                'Content-Type' => 'application/pdf',
+                'Content-Disposition' => 'inline; filename="label_24745.pdf"',
+            ]),
+            '*/api/kay-paolo/shipment-receipt*' => Http::response('%PDF-receipt', 200, [
+                'Content-Type' => 'application/pdf',
+                'Content-Disposition' => 'inline; filename="receipt_24745.pdf"',
+            ]),
+        ]);
 
-        $this->get('/shipment-receipt?invoice=HTE59174')
-            ->assertRedirect('https://dev.zionshipping.com/receipt/receipt_HTE59174.pdf');
+        $this->withSession(['zion.access_token' => 'session-token'])
+            ->get('/shipment-label?shipment_id=24745')
+            ->assertOk()
+            ->assertHeader('Content-Type', 'application/pdf')
+            ->assertSee('%PDF-label', false);
+
+        $this->withSession(['zion.access_token' => 'session-token'])
+            ->get('/shipment-receipt?invoice=HTE59174')
+            ->assertOk()
+            ->assertHeader('Content-Type', 'application/pdf')
+            ->assertSee('%PDF-receipt', false);
     }
 
     public function test_quote_proxy_falls_back_when_api_endpoint_requires_session_store(): void
@@ -465,7 +485,7 @@ class ExampleTest extends TestCase
             return str_contains($request->url(), '/api/kay-paolo/update-shipping')
                 && ! array_key_exists('account_number', $data)
                 && ! array_key_exists('phone_or_account', $data)
-                && $data['package_count'] === 1
+                && $data['package_count'] === 3
                 && $data['partner'] === 'ZION'
                 && $data['dimensions']['package_count_ind'] === [3.0]
                 && count($data['packages']) === 3

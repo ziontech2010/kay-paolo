@@ -187,7 +187,7 @@
         </div>
         <div class="process-grid">
             <div class="process-step">
-                <span class="step-num">01 <span class="step-dash">---</span></span>
+                <span class="step-num">01</span>
                 <h3>{{ $content['process_step_1_title'] }}</h3>
                 <p>{{ $content['process_step_1_body'] }}</p>
             </div>
