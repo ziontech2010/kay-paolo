@@ -312,7 +312,8 @@ class ExampleTest extends TestCase
         $this->assertStringContainsString('renderPackageLabels', $script);
         $this->assertStringContainsString('splitLabelNumbers', $script);
         $this->assertStringContainsString('formatShipmentNumberDisplay', $script);
-        $this->assertStringContainsString('labelBarcodeValue', $script);
+        $this->assertStringContainsString('dollarText', $script);
+        $this->assertStringContainsString('documentServiceSummary', $script);
         $this->assertStringNotContainsString("params.set('access_token', storedToken())", $script);
         $this->assertStringContainsString('isAdminRole', $script);
         $this->assertStringNotContainsString('Door to Door', $script);
@@ -371,8 +372,10 @@ class ExampleTest extends TestCase
         $this->get('/shipment-receipt?shipment_id=24755&invoice=373988&id=HTS373988-1%2F2%2C+HTS373988-2%2F2')
             ->assertOk()
             ->assertSee('Shipment Receipt', false)
-            ->assertSee('Print Receipt', false)
+            ->assertSee('Invoice', false)
+            ->assertSee('Print / Save PDF', false)
             ->assertSee('Kay Paolo Shipping', false)
+            ->assertSee('Task Description', false)
             ->assertSee('373988', false)
             ->assertDontSee('%PDF', false)
             ->assertDontSee('Zion Shipping', false);
@@ -393,24 +396,6 @@ class ExampleTest extends TestCase
             'zion.access_token' => 'session-token',
             'zion.user' => ['name' => 'Test User'],
         ])->get('/shipment-label?shipment_id=24755&invoice=373988&id=HTS373988-1%2F2')
-            ->assertOk()
-            ->assertHeader('content-type', 'application/pdf')
-            ->assertSee('%PDF', false);
-    }
-
-    public function test_shipment_receipt_streams_zion_pdf_when_authenticated(): void
-    {
-        Http::fake([
-            '*/api/kay-paolo/shipment-receipt*' => Http::response('%PDF-1.4 fake-receipt', 200, [
-                'Content-Type' => 'application/pdf',
-                'Content-Disposition' => 'inline; filename="receipt_373988.pdf"',
-            ]),
-        ]);
-
-        $this->withSession([
-            'zion.access_token' => 'session-token',
-            'zion.user' => ['name' => 'Test User'],
-        ])->get('/shipment-receipt?shipment_id=24755&invoice=373988&id=HTS373988-1%2F2')
             ->assertOk()
             ->assertHeader('content-type', 'application/pdf')
             ->assertSee('%PDF', false);

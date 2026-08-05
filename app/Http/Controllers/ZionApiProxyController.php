@@ -213,7 +213,9 @@ class ZionApiProxyController extends Controller
 
     public function shipmentReceipt(Request $request): Response|JsonResponse
     {
-        return $this->shipmentDocumentResponse($request, 'kay-paolo/shipment-receipt', 'shipment-receipt.pdf', 'documents.receipt');
+        return response()->view('documents.receipt', [
+            'documentQuery' => $request->query(),
+        ]);
     }
 
     private function shipmentDocumentResponse(
