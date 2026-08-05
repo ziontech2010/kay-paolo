@@ -68,24 +68,27 @@ class ShipmentDocumentPdfService
             ->values()
             ->all();
 
-        return $labels ?: ['Pending'];
+        if ($labels) {
+            return $labels;
+        }
+
+        $invoice = $this->resolveInvoice($query);
+        if ($invoice !== '') {
+            return ['HTS'.$invoice.'-1/1'];
+        }
+
+        return ['Pending'];
     }
 
     public function ensureLabelPdf(array $query, array $shipment = []): string
     {
         $invoice = $this->resolveInvoice($query) ?: 'pending';
         $path = $this->labelPath($invoice);
-        $force = !empty($query['regen'])
-            || $this->shipmentHasPackageDetails($shipment)
-            || $this->templateIsNewer('documents/pdf/label.blade.php', $path);
-
-        if (is_file($path) && filesize($path) > 4 && !$force) {
-            return $path;
-        }
-
+        // Always rebuild labels so layout/template updates are never stuck behind a stale file.
         $payload = $this->documentPayload($query, $shipment);
         $pdf = Pdf::loadView('documents.pdf.label', $payload)->setPaper('a4', 'portrait');
         $this->write($path, $pdf->output());
+        $this->mirrorPublicCopy($path, 'label');
 
         return $path;
     }
@@ -105,6 +108,7 @@ class ShipmentDocumentPdfService
         $payload = $this->documentPayload($query, $shipment);
         $pdf = Pdf::loadView('documents.pdf.receipt', $payload)->setPaper('a4', 'portrait');
         $this->write($path, $pdf->output());
+        $this->mirrorPublicCopy($path, 'receipts');
 
         return $path;
     }
@@ -152,8 +156,20 @@ class ShipmentDocumentPdfService
             ?? $responseData['shipping']
             ?? [];
 
-        $labels = $this->labelNumbers($query);
         $invoice = $this->resolveInvoice($query);
+        $labels = $this->labelNumbers($query);
+        if ($labels === ['Pending'] || $labels === []) {
+            $trackingFallback = (string) ($payload['tracking_number']
+                ?? $shipping['tracking_number']
+                ?? $response['tracking_number']
+                ?? $responseData['tracking_number']
+                ?? '');
+            if ($trackingFallback !== '') {
+                $labels = $this->labelNumbers(['id' => $trackingFallback]);
+            } elseif ($invoice !== '') {
+                $labels = ['HTS'.$invoice.'-1/1'];
+            }
+        }
         $trackingDisplay = $this->formatShipmentNumber(implode(',', $labels));
         $barcodeValue = $invoice !== '' ? $invoice : preg_replace('/[^A-Za-z0-9\-]/', '', (string) ($labels[0] ?? 'Pending'));
         $deliveryNumber = $invoice !== ''
@@ -480,6 +496,19 @@ class ShipmentDocumentPdfService
         }
 
         File::put($path, $binary);
+    }
+
+    private function mirrorPublicCopy(string $storagePath, string $directory): void
+    {
+        try {
+            $publicDir = public_path($directory);
+            if (!is_dir($publicDir)) {
+                File::makeDirectory($publicDir, 0775, true);
+            }
+            File::copy($storagePath, $publicDir.DIRECTORY_SEPARATOR.basename($storagePath));
+        } catch (\Throwable $exception) {
+            report($exception);
+        }
     }
 
     private function safe(string $value): string
