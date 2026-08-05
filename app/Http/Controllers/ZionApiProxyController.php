@@ -326,11 +326,11 @@ class ZionApiProxyController extends Controller
                 $shipment = $this->resolveShipmentContext(request(), $query);
                 if ($this->documents->shipmentHasPackageDetails($shipment)) {
                     $query['regen'] = '1';
-                    if ($directory === 'label') {
-                        $this->documents->ensureLabelPdf($query, $shipment);
-                    } else {
-                        $this->documents->ensureReceiptPdf($query, $shipment);
-                    }
+                }
+                if ($directory === 'label') {
+                    $this->documents->ensureLabelPdf($query, $shipment);
+                } else {
+                    $this->documents->ensureReceiptPdf($query, $shipment);
                 }
             } catch (\Throwable $exception) {
                 report($exception);

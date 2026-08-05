@@ -75,7 +75,9 @@ class ShipmentDocumentPdfService
     {
         $invoice = $this->resolveInvoice($query) ?: 'pending';
         $path = $this->labelPath($invoice);
-        $force = !empty($query['regen']) || $this->shipmentHasPackageDetails($shipment);
+        $force = !empty($query['regen'])
+            || $this->shipmentHasPackageDetails($shipment)
+            || $this->templateIsNewer('documents/pdf/label.blade.php', $path);
 
         if (is_file($path) && filesize($path) > 4 && !$force) {
             return $path;
@@ -92,7 +94,9 @@ class ShipmentDocumentPdfService
     {
         $invoice = $this->resolveInvoice($query) ?: 'pending';
         $path = $this->receiptPath($invoice);
-        $force = !empty($query['regen']) || $this->shipmentHasPackageDetails($shipment);
+        $force = !empty($query['regen'])
+            || $this->shipmentHasPackageDetails($shipment)
+            || $this->templateIsNewer('documents/pdf/receipt.blade.php', $path);
 
         if (is_file($path) && filesize($path) > 4 && !$force) {
             return $path;
@@ -265,9 +269,10 @@ class ShipmentDocumentPdfService
             'labels' => $labels,
             'trackingDisplay' => $trackingDisplay,
             'barcodeValue' => $barcodeValue ?: 'Pending',
-            'barcodeUri' => $this->barcodeDataUri($barcodeValue ?: '0'),
+            'barcodeUri' => $this->barcodeDataUri($barcodeValue ?: '0', 56),
+            'scanBarcodeUri' => $this->barcodeDataUri($barcodeValue ?: '0', 130),
             'deliveryNumber' => $deliveryNumber,
-            'deliveryBarcodeUri' => $this->barcodeDataUri($deliveryNumber),
+            'deliveryBarcodeUri' => $this->barcodeDataUri($deliveryNumber, 48),
             'chargeStatus' => $chargeStatus,
             'destination' => $destination,
             'shipperName' => $shipperName,
@@ -451,6 +456,20 @@ class ShipmentDocumentPdfService
         } catch (\Throwable) {
             return (string) $value;
         }
+    }
+
+    private function templateIsNewer(string $relativeView, string $pdfPath): bool
+    {
+        if (!is_file($pdfPath)) {
+            return true;
+        }
+
+        $template = resource_path('views/'.$relativeView);
+        if (!is_file($template)) {
+            return false;
+        }
+
+        return filemtime($template) > filemtime($pdfPath);
     }
 
     private function write(string $path, string $binary): void
