@@ -168,6 +168,157 @@
     max-width: 620px;
 }
 
+.pkg-flat-rate-field {
+    background: #f8fafc;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 12px;
+}
+
+.pkg-flat-rate-note {
+    margin-bottom: 0;
+}
+
+.package-block input.is-readonly {
+    background: #eef2f7;
+    color: var(--ink-600);
+}
+
+.page-back-actions {
+    display: flex;
+    justify-content: flex-start;
+    margin: 0 0 18px;
+}
+
+.btn-back {
+    min-height: 42px;
+}
+
+.quote-party-card {
+    grid-column: 1 / -1;
+}
+
+.inline-checkbox-row {
+    align-items: end;
+}
+
+.inline-checkbox-row .checkbox-field {
+    margin-bottom: 12px;
+    margin-top: 0;
+}
+
+.about-photo-stack {
+    min-height: 360px;
+    overflow: visible;
+}
+
+.about-photo-stack::before,
+.about-photo-stack::after {
+    display: none;
+}
+
+.about-photo-stack img {
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    box-shadow: var(--shadow);
+    display: block;
+    object-fit: cover;
+    position: absolute;
+}
+
+.about-photo-primary {
+    height: 78%;
+    inset: 0 auto auto 0;
+    width: 72%;
+}
+
+.about-photo-secondary {
+    bottom: 0;
+    height: 58%;
+    right: 0;
+    width: 48%;
+}
+
+.about-photo-stack .badge-years {
+    z-index: 3;
+}
+
+.kay-process-overlay[hidden] {
+    display: none !important;
+}
+
+body.kay-process-open {
+    overflow: hidden;
+}
+
+.kay-process-overlay {
+    align-items: center;
+    background: rgba(15, 23, 42, 0.66);
+    backdrop-filter: blur(4px);
+    display: flex;
+    inset: 0;
+    justify-content: center;
+    padding: 24px;
+    position: fixed;
+    z-index: 9999;
+}
+
+.kay-process-card {
+    background: #fff;
+    border: 1px solid rgba(148, 163, 184, 0.38);
+    border-radius: 8px;
+    box-shadow: 0 24px 70px rgba(15, 23, 42, 0.26);
+    max-width: 760px;
+    overflow: hidden;
+    width: min(760px, 100%);
+}
+
+.kay-process-card img {
+    display: block;
+    height: auto;
+    width: 100%;
+}
+
+.kay-process-copy {
+    padding: 18px 22px 22px;
+    text-align: center;
+}
+
+.kay-process-copy h3 {
+    color: var(--navy-950);
+    font-family: "Inter", sans-serif;
+    font-size: 20px;
+    font-weight: 800;
+    margin: 0 0 6px;
+}
+
+.kay-process-copy p {
+    color: var(--ink-600);
+    font-size: 14px;
+    margin: 0;
+}
+
+.carrier-logo-fallback {
+    align-items: center;
+    background: #f8fafc;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    color: var(--navy-900);
+    display: flex;
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 14px;
+    font-weight: 800;
+    height: 44px;
+    justify-content: center;
+    min-width: 88px;
+    padding: 0 12px;
+    text-transform: uppercase;
+}
+
+.carrier-unavailable-card .carrier-logo-fallback {
+    color: var(--ink-400);
+}
+
 .readable {
     max-width: 780px;
 }
@@ -189,8 +340,622 @@
     margin-top: 22px;
 }
 
+.shipment-doc-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    justify-content: flex-end;
+    margin-bottom: 18px;
+}
+
+.shipment-confirmation-page {
+    max-width: 1040px;
+}
+
+.shipment-confirmation-banner {
+    margin-bottom: 18px;
+}
+
+.shipment-confirmation-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    justify-content: flex-end;
+    margin-bottom: 18px;
+}
+
+.shipment-confirmation-card {
+    background: #fff;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    box-shadow: var(--shadow);
+    color: var(--ink-900);
+    padding: 34px;
+}
+
+.shipment-confirmation-header {
+    align-items: flex-start;
+    border-bottom: 1px solid var(--line);
+    display: flex;
+    gap: 24px;
+    justify-content: space-between;
+    padding-bottom: 22px;
+}
+
+.shipment-confirmation-header span,
+.shipment-confirmation-grid span,
+.shipment-confirmation-parties h3,
+.shipment-confirmation-package span {
+    color: var(--ink-400);
+    display: block;
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0;
+    text-transform: uppercase;
+}
+
+.shipment-confirmation-header h2 {
+    color: var(--navy-950);
+    font-family: "Fraunces", serif;
+    font-size: 42px;
+    margin: 4px 0 8px;
+}
+
+.shipment-confirmation-header p {
+    color: var(--teal-600);
+    font-size: 14px;
+    font-weight: 800;
+    margin: 0;
+    text-transform: uppercase;
+}
+
+.shipment-confirmation-grid {
+    display: grid;
+    gap: 14px;
+    grid-template-columns: repeat(4, 1fr);
+    margin: 24px 0;
+}
+
+.shipment-confirmation-grid div {
+    background: #f8fafc;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 14px;
+}
+
+.shipment-confirmation-grid strong,
+.shipment-confirmation-package strong {
+    display: block;
+    font-size: 14px;
+    margin-top: 5px;
+}
+
+.shipment-confirmation-parties {
+    display: grid;
+    gap: 18px;
+    grid-template-columns: 1fr 1fr;
+    margin-bottom: 24px;
+}
+
+.shipment-confirmation-parties > div,
+.shipment-confirmation-package {
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 18px;
+}
+
+.shipment-confirmation-parties strong {
+    display: block;
+    font-size: 16px;
+    margin: 8px 0;
+}
+
+.shipment-confirmation-parties p,
+.shipment-confirmation-package p {
+    color: var(--ink-600);
+    font-size: 14px;
+    line-height: 1.65;
+    margin: 0;
+}
+
+.shipment-confirmation-package {
+    align-items: flex-start;
+    display: grid;
+    gap: 18px;
+    grid-template-columns: 1.2fr 0.8fr;
+}
+
+.shipment-confirmation-wrap {
+    margin: 0 auto;
+    max-width: 1120px;
+}
+
+.shipment-success-alert {
+    align-items: center;
+    background-color: #fef9e7;
+    border-left: 4px solid var(--gold-500);
+    border-radius: 4px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.02);
+    display: flex;
+    gap: 12px;
+    margin-bottom: 28px;
+    padding: 16px 22px;
+}
+
+.shipment-success-alert span {
+    color: var(--ink-900);
+    font-size: 15px;
+    font-weight: 500;
+    line-height: 1.4;
+}
+
+.shipment-confirm-hero-card {
+    background: #111827;
+    border-radius: 4px;
+    border-top: 4px solid var(--gold-500);
+    box-shadow: 0 24px 48px -12px rgba(15, 23, 42, 0.35);
+    color: var(--sand-50);
+    overflow: hidden;
+    padding: 44px 48px 48px;
+    position: relative;
+}
+
+.shipment-confirm-hero-card h2 {
+    color: #ffffff;
+    font-family: "Inter", sans-serif;
+    font-size: clamp(20px, 2.5vw, 25px);
+    font-weight: 800;
+    letter-spacing: 0.03em;
+    line-height: 1.25;
+    margin: 0 0 14px;
+    text-transform: uppercase;
+}
+
+.shipment-confirm-hero-card p.confirm-desc {
+    color: #94a3b8;
+    font-size: 14.5px;
+    font-weight: 400;
+    line-height: 1.65;
+    margin: 0 0 34px;
+    max-width: 760px;
+}
+
+.confirm-details-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 20px;
+    margin-bottom: 34px;
+}
+
+.confirm-detail-box {
+    background: #1e293b;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 14px;
+    flex: 0 1 auto;
+    min-width: 220px;
+    padding: 20px 28px;
+    transition: border-color 0.2s ease, transform 0.2s ease;
+}
+
+.confirm-detail-box:hover {
+    border-color: rgba(181, 138, 61, 0.4);
+    transform: translateY(-2px);
+}
+
+.confirm-detail-label {
+    color: var(--gold-500);
+    display: block;
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 11.5px;
+    font-weight: 700;
+    letter-spacing: 0.09em;
+    margin-bottom: 8px;
+    text-transform: uppercase;
+}
+
+.confirm-detail-value {
+    color: #ffffff;
+    font-family: "Inter", sans-serif;
+    font-size: 24px;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+}
+
+.confirm-detail-box-wide {
+    min-width: min(480px, 100%);
+}
+
+.confirm-detail-subvalue {
+    color: #cbd5e1;
+    display: block;
+    font-size: 15px;
+    font-weight: 700;
+    margin-top: 8px;
+}
+
+.confirm-actions-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+}
+
+.return-home-container {
+    margin-top: 24px;
+}
+
+@media (max-width: 768px) {
+    .shipment-confirm-hero-card {
+        padding: 28px 22px 32px;
+    }
+
+    .confirm-detail-box {
+        min-width: 100%;
+        width: 100%;
+    }
+
+    .shipment-confirm-hero-card h2 {
+        font-size: 19px;
+    }
+
+    .confirm-actions-row {
+        width: 100%;
+    }
+
+    .confirm-actions-row .btn {
+        flex: 1;
+        justify-content: center;
+    }
+}
+
+.shipment-doc,
+.awb-sheet {
+    background: #fff;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    box-shadow: var(--shadow);
+    color: var(--ink-900);
+    padding: 34px;
+}
+
+.shipment-doc-header,
+.awb-header {
+    align-items: flex-start;
+    border-bottom: 1px solid var(--line);
+    display: flex;
+    gap: 24px;
+    justify-content: space-between;
+    padding-bottom: 22px;
+}
+
+.shipment-doc-header p,
+.awb-header p {
+    color: var(--ink-600);
+    font-size: 13px;
+    line-height: 1.55;
+    margin: 8px 0 0;
+}
+
+.shipment-doc-title {
+    text-align: right;
+}
+
+.shipment-doc-title span,
+.shipment-doc-meta span,
+.shipment-doc-addresses h3,
+.shipment-doc-note h3,
+.shipment-doc-summary dt,
+.awb-grid h3 {
+    color: var(--ink-400);
+    display: block;
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0;
+    text-transform: uppercase;
+}
+
+.shipment-doc-title h2 {
+    color: var(--navy-950);
+    font-family: "Fraunces", serif;
+    font-size: 42px;
+    margin: 4px 0 8px;
+}
+
+.shipment-doc-title strong,
+.awb-code strong {
+    color: var(--gold-500);
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 15px;
+}
+
+.shipment-doc-meta {
+    display: grid;
+    gap: 14px;
+    grid-template-columns: repeat(4, 1fr);
+    margin: 24px 0;
+}
+
+.shipment-doc-meta div {
+    background: #f8fafc;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 14px;
+}
+
+.shipment-doc-meta strong {
+    display: block;
+    font-size: 14px;
+    margin-top: 5px;
+}
+
+.shipment-doc-addresses,
+.awb-grid {
+    display: grid;
+    gap: 18px;
+    grid-template-columns: 1fr 1fr;
+    margin-bottom: 24px;
+}
+
+.shipment-doc-addresses > div,
+.awb-grid > div {
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 18px;
+}
+
+.shipment-doc-addresses strong {
+    display: block;
+    font-size: 16px;
+    margin: 8px 0;
+}
+
+.shipment-doc-addresses p,
+.shipment-doc-note p,
+.awb-grid p {
+    color: var(--ink-600);
+    font-size: 14px;
+    line-height: 1.65;
+    margin: 0;
+}
+
+.awb-grid p {
+    white-space: pre-line;
+}
+
+.shipment-doc-table-wrap {
+    margin: 26px 0;
+    overflow-x: auto;
+}
+
+.shipment-doc-table {
+    border-collapse: collapse;
+    width: 100%;
+}
+
+.shipment-doc-table th,
+.shipment-doc-table td {
+    border: 1px solid var(--line);
+    padding: 13px 12px;
+    text-align: left;
+    vertical-align: top;
+}
+
+.shipment-doc-table th {
+    background: #f8fafc;
+    color: var(--ink-500);
+    font-size: 11px;
+    font-weight: 800;
+    text-transform: uppercase;
+}
+
+.shipment-doc-table td {
+    font-size: 14px;
+}
+
+.shipment-doc-summary {
+    align-items: flex-start;
+    display: grid;
+    gap: 26px;
+    grid-template-columns: 1.1fr 0.9fr;
+}
+
+.shipment-doc-summary dl {
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    margin: 0;
+    overflow: hidden;
+}
+
+.shipment-doc-summary dl div {
+    align-items: center;
+    display: flex;
+    justify-content: space-between;
+    padding: 12px 16px;
+}
+
+.shipment-doc-summary dl div + div {
+    border-top: 1px solid var(--line);
+}
+
+.shipment-doc-summary dd {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 14px;
+    font-weight: 700;
+    margin: 0;
+}
+
+.shipment-doc-summary .total {
+    background: var(--navy-950);
+    color: #fff;
+}
+
+.shipment-doc-summary .total dt,
+.shipment-doc-summary .total dd {
+    color: #fff;
+    font-size: 16px;
+}
+
+.a4-receipt-card {
+    display: grid;
+    gap: 18px;
+}
+
+.awb-sheet {
+    border: 2px solid #111827;
+}
+
+.awb-code {
+    text-align: right;
+}
+
+.barcode-text {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 28px;
+    font-weight: 800;
+}
+
+.awb-number {
+    border-bottom: 2px dashed #cbd5e1;
+    border-top: 2px dashed #cbd5e1;
+    color: #111827;
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 46px;
+    font-weight: 800;
+    margin: 22px 0;
+    padding: 22px 0;
+    text-align: center;
+}
+
+.admin-page-wrap {
+    max-width: 1120px;
+}
+
+.admin-content-form {
+    padding: 0;
+}
+
+.admin-edit-grid {
+    display: grid;
+    gap: 22px;
+    margin-bottom: 24px;
+}
+
+.admin-edit-panel {
+    border-bottom: 1px solid var(--line);
+    padding: 28px;
+}
+
+.admin-edit-panel h2 {
+    color: var(--navy-950);
+    font-family: "Inter", sans-serif;
+    font-size: 20px;
+    font-weight: 800;
+    margin: 0 0 18px;
+}
+
+.admin-image-row {
+    display: grid;
+    gap: 20px;
+    grid-template-columns: repeat(2, 1fr);
+}
+
+.admin-preview-label {
+    color: var(--ink-400);
+    display: block;
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0;
+    margin-bottom: 8px;
+    text-transform: uppercase;
+}
+
+.admin-image-preview {
+    aspect-ratio: 16 / 10;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    display: block;
+    margin-bottom: 16px;
+    object-fit: cover;
+    width: 100%;
+}
+
+@media print {
+    .topbar,
+    header.site,
+    footer.site,
+    .page-banner,
+    .whatsapp-fab,
+    .no-print {
+        display: none !important;
+    }
+
+    .page-follows-banner {
+        margin: 0;
+        padding: 0;
+    }
+
+    .shipment-doc,
+    .awb-sheet {
+        border-radius: 0;
+        box-shadow: none;
+    }
+}
+
 @media (max-width: 860px) {
     .dashboard-grid {
         grid-template-columns: 1fr;
+    }
+
+    .shipment-doc-header,
+    .awb-header,
+    .shipment-doc-summary {
+        grid-template-columns: 1fr;
+    }
+
+    .shipment-doc-header,
+    .awb-header {
+        display: grid;
+    }
+
+    .shipment-doc-title,
+    .awb-code {
+        text-align: left;
+    }
+
+    .shipment-doc-meta,
+    .shipment-doc-addresses,
+    .awb-grid,
+    .shipment-confirmation-grid,
+    .shipment-confirmation-parties,
+    .shipment-confirmation-package {
+        grid-template-columns: 1fr;
+    }
+
+    .shipment-confirmation-actions {
+        justify-content: stretch;
+    }
+
+    .shipment-confirmation-actions .btn {
+        width: 100%;
+    }
+
+    .inline-checkbox-row,
+    .admin-image-row {
+        grid-template-columns: 1fr;
+    }
+
+    .shipment-confirmation-card {
+        padding: 22px;
+    }
+
+    .shipment-confirmation-header {
+        display: grid;
+    }
+
+    .kay-process-overlay {
+        padding: 14px;
+    }
+
+    .kay-process-copy {
+        padding: 14px 16px 18px;
     }
 }

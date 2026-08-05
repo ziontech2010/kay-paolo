@@ -3,23 +3,71 @@
 @section('title', 'Services | Kay Paolo Shipping')
 
 @section('banner')
-<div class="page-banner"><div class="wrap"><h1>Services</h1><div class="breadcrumb"><a href="{{ route('home') }}">Home</a><span class="sep">/</span><span>Services</span></div></div></div>
+<div class="page-banner">
+    <div class="wrap">
+        <h1>Our Services</h1>
+        <div class="breadcrumb"><a href="{{ route('home') }}">Home</a><span class="sep">/</span><span>Services</span></div>
+    </div>
+</div>
 @endsection
 
 @section('content')
-<section>
+<section class="page-follows-banner">
     <div class="wrap">
-        <div class="section-head center">
-            <div class="eyebrow" style="justify-content:center;">Services</div>
-            <h2>Shipping tools connected to dev Zion</h2>
-            <p>Every action stays inside Kay Paolo's Blade interface while operational data is requested from Zion's API.</p>
+        <div class="service-zig" id="ocean">
+            <div class="sz-art">
+                <img src="https://images.unsplash.com/photo-1494412574643-ff11b0a5c1c3?auto=format&fit=crop&w=800&q=80" alt="Ocean freight transport">
+            </div>
+            <div class="sz-text">
+                <span class="idx">SERVICE 01</span>
+                <h2>Ocean Transport</h2>
+                <p>Cost-effective solutions for large and heavy shipments with complete port-to-port visibility.</p>
+                <p class="callout">We manage each step with clean documents, route clarity, and steady communication.</p>
+            </div>
         </div>
-        <div class="services-grid">
-            <div class="service-card" id="ocean"><span class="num">01</span><h3>Ocean Freight</h3><p>International and Caribbean shipment workflows through Zion carrier products.</p></div>
-            <div class="service-card" id="air"><span class="num">02</span><h3>Air Freight</h3><p>Fast rate cards and delivery estimates for supported destinations.</p></div>
-            <div class="service-card" id="land"><span class="num">03</span><h3>Land Freight</h3><p>Domestic pickup, delivery, and customer shipment history support.</p></div>
-            <div class="service-card" id="rail"><span class="num">04</span><h3>Documents</h3><p>Labels, receipts, and commercial invoice metadata returned after shipment creation.</p></div>
+
+        <div class="service-zig rev" id="air">
+            <div class="sz-art">
+                <img src="https://images.unsplash.com/photo-1436491865332-7a61a109cc05?auto=format&fit=crop&w=800&q=80" alt="Air freight transport">
+            </div>
+            <div class="sz-text">
+                <span class="idx">SERVICE 02</span>
+                <h2>Air Freight Transport</h2>
+                <p>Fast, dependable options for international destinations when speed matters most.</p>
+                <p class="callout">Kay Paolo sends quote requests through the live shipping bridge and presents returned rate cards here.</p>
+            </div>
+        </div>
+
+        <div class="service-zig" id="land">
+            <div class="sz-art">
+                <img src="https://images.unsplash.com/photo-1601584115197-04ecc0da31d7?auto=format&fit=crop&w=800&q=80" alt="Road freight transport">
+            </div>
+            <div class="sz-text">
+                <span class="idx">SERVICE 03</span>
+                <h2>Road Transport</h2>
+                <p>Flexible local and regional transport for timely, secure deliveries.</p>
+                <p class="callout">Live tracking uses the Kay Paolo API namespace.</p>
+            </div>
+        </div>
+
+        <div class="service-zig rev" id="rail">
+            <div class="sz-art">
+                <img src="https://images.unsplash.com/photo-1474487548417-781cb71495f3?auto=format&fit=crop&w=800&q=80" alt="Rail freight transport">
+            </div>
+            <div class="sz-text">
+                <span class="idx">SERVICE 04</span>
+                <h2>Shipment Documents</h2>
+                <p>Labels, receipts, and shipment response payloads are available after shipment creation.</p>
+                <p class="callout">Kay Paolo keeps shipment documents and customer-facing workflows in one place.</p>
+            </div>
         </div>
     </div>
 </section>
+
+<div class="cta-strip">
+    <div class="wrap">
+        <h3>Tell us what's moving - we'll match the mode.</h3>
+        <a href="{{ route('quote') }}" class="btn btn-navy">Get A Quote</a>
+    </div>
+</div>
 @endsection

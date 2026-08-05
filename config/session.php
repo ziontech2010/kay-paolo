@@ -18,9 +18,9 @@ return [
     |
     */
 
-    'driver' => env('SESSION_DRIVER', 'file') === 'database'
-        ? 'file'
-        : env('SESSION_DRIVER', 'file'),
+    'driver' => in_array(env('SESSION_DRIVER', 'cookie'), ['array', 'cookie'], true)
+        ? env('SESSION_DRIVER', 'cookie')
+        : 'cookie',
 
     /*
     |--------------------------------------------------------------------------

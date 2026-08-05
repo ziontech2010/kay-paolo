@@ -22,43 +22,57 @@ class ZionSessionController extends Controller
             'role_id' => ['nullable', 'integer'],
         ]);
 
-        $response = $zion->post('kay-paolo/login', array_filter($credentials, static function ($value) {
+        $payload = array_filter($credentials, static function ($value) {
             return $value !== null && $value !== '';
-        }));
+        });
 
-        $payload = $response['data'];
-        $failed = !$response['ok'] || (($payload['error'] ?? 'false') === 'true');
+        $response = $zion->post('kay-paolo/login', $payload);
+        $data = $response['data'] ?? [];
+        $failed = !$response['ok']
+            || (($data['error'] ?? 'false') === 'true')
+            || empty($data['access_token']);
 
         if ($failed) {
+            $message = $data['message'] ?? 'Unable to log in to Kay Paolo.';
+
+            if (!$request->hasSession()) {
+                return redirect()->route('login', ['login_error' => $message]);
+            }
+
             return back()
                 ->withInput($request->only('email', 'role_id'))
-                ->withErrors(['email' => $payload['message'] ?? 'Unable to log in with Zion Shipping.']);
+                ->withErrors(['email' => $message]);
         }
 
-        session([
-            'zion.access_token' => $payload['access_token'] ?? null,
-            'zion.token_type' => $payload['token_type'] ?? 'Bearer',
-            'zion.user' => $payload['user'] ?? [],
-            'zion.session_id' => $payload['session_id'] ?? null,
-            'zion.csrf_token' => $payload['csrf_token'] ?? null,
-        ]);
+        if ($request->hasSession()) {
+            $request->session()->regenerate();
+            $request->session()->put([
+                'zion.access_token' => $data['access_token'],
+                'zion.token_type' => $data['token_type'] ?? 'Bearer',
+                'zion.user' => $data['user'] ?? [],
+            ]);
+        }
 
-        return redirect()->intended(route('dashboard'));
-    }
+        $redirectTo = $request->input('redirect');
 
-    public function logout(Request $request): RedirectResponse
-    {
-        $request->session()->forget('zion');
+        if (is_string($redirectTo) && str_starts_with($redirectTo, '/') && !str_starts_with($redirectTo, '//')) {
+            return redirect()->to($redirectTo);
+        }
 
         return redirect()->route('home');
     }
 
-    public function dashboard(): View|RedirectResponse
+    public function logout(Request $request): RedirectResponse
     {
-        if (!session('zion.access_token')) {
-            return redirect()->route('login');
+        if ($request->hasSession()) {
+            $request->session()->forget('zion');
         }
 
+        return redirect()->route('home');
+    }
+
+    public function dashboard(): View
+    {
         return view('pages.dashboard', [
             'zionUser' => session('zion.user', []),
         ]);
