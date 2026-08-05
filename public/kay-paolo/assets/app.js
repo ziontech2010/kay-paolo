@@ -1634,7 +1634,8 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     container.innerHTML = rows.map((row) => {
-      const tracking = historyField(row, ['tracking_number', 'trackingNumber', 'tracking', 'invoice_num', 'invoice', 'invoice_number', 'awb', 'id'], '-');
+      const tracking = historyField(row, ['tracking_number', 'trackingNumber', 'tracking', 'tracking_numbers', 'invoice_num', 'invoice', 'invoice_number', 'awb', 'id'], '-');
+      const trackingDisplay = formatShipmentNumberDisplay(tracking);
       const status = historyStatus(row);
       const createdBy = historyField(row, ['created_by', 'shipper_name', 'from_name'], 'Kay Paolo Shipping');
       const date = readableDate(historyField(row, ['created_at', 'shipment_date', 'date'], ''));
@@ -1654,14 +1655,14 @@ document.addEventListener('DOMContentLoaded', () => {
       const packageCount = historyPackageCount(row);
       const agentId = historyField(row, ['agent_id', 'assigned_agent_id', 'created_by_id', 'created_by'], '-');
       const pickupDate = readableDate(historyField(row, ['scheduled_pickup', 'pickup_date', 'plannedShippingDateAndTime'], ''));
-      const searchPool = [tracking, status, createdBy, fromName, toName, option, description, fromAddress, toAddress].join(' ');
+      const searchPool = [tracking, trackingDisplay, status, createdBy, fromName, toName, option, description, fromAddress, toAddress].join(' ');
       const cardStyle = status === 'Delivered' ? 'margin-bottom: 0; border-top-color: #059669' : 'margin-bottom: 0';
 
       return `
         <div class="shipment-card" data-status="${escapeHtml(status)}" data-category="${escapeHtml(category)}" data-tracking="${escapeHtml(tracking)}" data-search-pool="${escapeHtml(searchPool)}" style="${cardStyle}">
           <div class="history-card-main">
             <div class="history-card-col">
-              <h4 style="color: var(--navy-800)">${escapeHtml(tracking)}</h4>
+              <h4 style="color: var(--navy-800)">${escapeHtml(trackingDisplay)}</h4>
               <span class="status-lbl">${escapeHtml(status)}</span>
               <span class="meta-label">Created By</span>
               <span class="meta-val">${escapeHtml(createdBy)}</span>
