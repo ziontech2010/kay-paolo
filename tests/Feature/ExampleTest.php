@@ -303,7 +303,8 @@ class ExampleTest extends TestCase
         $this->assertStringContainsString("raw.includes('full integration')", $script);
         $this->assertStringContainsString('filterQuoteCardsForPayload', $script);
         $this->assertStringContainsString('totalPackageWeight(payload) !== 0', $script);
-        $this->assertStringContainsString('fullIntegrationLogo', $script);
+        $this->assertStringContainsString('zionCarrierLogo', $script);
+        $this->assertStringContainsString('Zion Shipping logo', $script);
         $this->assertStringContainsString('isAdminRole', $script);
         $this->assertStringNotContainsString('Door to Door', $script);
         $this->assertStringNotContainsString('Port to Port', $script);
