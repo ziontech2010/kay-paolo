@@ -2,16 +2,20 @@
 
 namespace App\Http\Controllers;
 
+use App\Services\ShipmentDocumentStore;
 use App\Services\ZionShippingApi;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class ZionApiProxyController extends Controller
 {
-    public function __construct(private readonly ZionShippingApi $zion)
-    {
+    public function __construct(
+        private readonly ZionShippingApi $zion,
+        private readonly ShipmentDocumentStore $documents
+    ) {
     }
 
     public function login(Request $request): JsonResponse|RedirectResponse|Response
@@ -154,10 +158,16 @@ class ZionApiProxyController extends Controller
             $retryResponse = $this->zion->postWeb('web-api/update-shipping-bocicot', $payload, $token);
 
             if (!$this->isRecoverableZionAccountNumberSchemaError($retryResponse)) {
+                $this->persistShipmentDocumentsFromResponse($retryResponse['data'] ?? [], $token, $request);
+
                 return $this->jsonResponse($retryResponse);
             }
 
             $response = $retryResponse;
+        }
+
+        if ($response['ok'] ?? false) {
+            $this->persistShipmentDocumentsFromResponse($response['data'] ?? [], $token, $request);
         }
 
         return $this->jsonResponse($response);
@@ -206,22 +216,45 @@ class ZionApiProxyController extends Controller
         return $this->jsonResponse($response);
     }
 
-    public function shipmentLabel(Request $request): Response|JsonResponse
+    public function shipmentLabel(Request $request): Response|JsonResponse|RedirectResponse
     {
-        return $this->shipmentDocumentResponse($request, 'kay-paolo/shipment-label', 'shipment-label.pdf', 'documents.label');
+        return $this->serveSavedOrFetchDocument($request, 'label');
     }
 
-    public function shipmentReceipt(Request $request): Response|JsonResponse
+    public function shipmentReceipt(Request $request): Response|JsonResponse|RedirectResponse
     {
-        return $this->shipmentDocumentResponse($request, 'kay-paolo/shipment-receipt', 'shipment-receipt.pdf', 'documents.receipt');
+        return $this->serveSavedOrFetchDocument($request, 'receipt');
     }
 
-    private function shipmentDocumentResponse(
-        Request $request,
-        string $endpoint,
-        string $fallbackFilename,
-        string $fallbackView
-    ): Response|JsonResponse {
+    public function storedLabel(string $filename): BinaryFileResponse|JsonResponse
+    {
+        return $this->serveStoredPdf('label', $filename);
+    }
+
+    public function storedReceipt(string $filename): BinaryFileResponse|JsonResponse
+    {
+        return $this->serveStoredPdf('receipts', $filename);
+    }
+
+    private function serveSavedOrFetchDocument(Request $request, string $type): Response|JsonResponse|RedirectResponse
+    {
+        $invoice = $this->documents->resolveInvoice($request->query());
+        $wantsDownload = $request->boolean('download');
+
+        if ($invoice !== '') {
+            $exists = $type === 'label'
+                ? $this->documents->hasLabel($invoice)
+                : $this->documents->hasReceipt($invoice);
+
+            if ($exists) {
+                return redirect()->to(
+                    $type === 'label'
+                        ? $this->documents->labelUrl($invoice)
+                        : $this->documents->receiptUrl($invoice)
+                );
+            }
+        }
+
         $token = $request->bearerToken()
             ?: session('zion.access_token')
             ?: $request->query('access_token')
@@ -229,20 +262,163 @@ class ZionApiProxyController extends Controller
 
         $hasShipmentRef = $request->filled('shipment_id')
             || $request->filled('shipping_id')
-            || $request->filled('invoice');
+            || $request->filled('invoice')
+            || $invoice !== '';
 
-        if ($token && $hasShipmentRef) {
-            $pdfResponse = $this->streamZionDocument($request, $endpoint, $fallbackFilename);
-            $contentType = strtolower((string) $pdfResponse->headers->get('Content-Type', ''));
+        if (!$token || !$hasShipmentRef) {
+            return response()->json([
+                'status' => 'error',
+                'message' => $token
+                    ? 'Shipment reference is required to generate the PDF.'
+                    : 'Please login to Kay Paolo first.',
+            ], $token ? 422 : 401);
+        }
 
-            if (str_contains($contentType, 'application/pdf') || str_starts_with(ltrim((string) $pdfResponse->getContent()), '%PDF')) {
-                return $pdfResponse;
+        $endpoint = $type === 'label' ? 'kay-paolo/shipment-label' : 'kay-paolo/shipment-receipt';
+        $fallbackName = $type === 'label' ? 'shipment-label.pdf' : 'shipment-receipt.pdf';
+        $pdfResponse = $this->streamZionDocument($request, $endpoint, $fallbackName);
+        $contentType = strtolower((string) $pdfResponse->headers->get('Content-Type', ''));
+        $body = (string) $pdfResponse->getContent();
+
+        if (!str_contains($contentType, 'application/pdf') && !str_starts_with(ltrim($body), '%PDF')) {
+            return $pdfResponse;
+        }
+
+        if ($invoice === '') {
+            $invoice = $this->documents->resolveInvoice([
+                'invoice' => $request->query('invoice'),
+                'id' => $request->query('id'),
+            ]) ?: ('doc'.time());
+        }
+
+        if ($type === 'label') {
+            $path = $this->documents->saveLabel($invoice, $body);
+            $url = $this->documents->labelUrl($invoice);
+        } else {
+            $path = $this->documents->saveReceipt($invoice, $body);
+            $url = $this->documents->receiptUrl($invoice);
+        }
+
+        if ($wantsDownload) {
+            return response()->download($path, basename($path), [
+                'Content-Type' => 'application/pdf',
+            ]);
+        }
+
+        return redirect()->to($url);
+    }
+
+    private function serveStoredPdf(string $directory, string $filename): BinaryFileResponse|JsonResponse
+    {
+        $safeName = basename($filename);
+        if (!preg_match('/^[A-Za-z0-9_-]+\.pdf$/', $safeName)) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Invalid document filename.',
+            ], 404);
+        }
+
+        $path = public_path($directory.'/'.$safeName);
+        if (!is_file($path)) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'PDF document not found.',
+            ], 404);
+        }
+
+        return response()->file($path, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => 'inline; filename="'.$safeName.'"',
+            'Cache-Control' => 'private, max-age=86400',
+        ]);
+    }
+
+    private function persistShipmentDocumentsFromResponse(array $data, string $token, Request $request): void
+    {
+        try {
+            $shipmentId = $data['shipment_id']
+                ?? $data['shipping_id']
+                ?? $data['id']
+                ?? data_get($data, 'shipping.id')
+                ?? data_get($data, 'data.shipment_id')
+                ?? data_get($data, 'data.id');
+
+            $invoice = trim((string) (
+                $data['invoice_num']
+                ?? $data['invoice']
+                ?? data_get($data, 'shipping.invoice_num')
+                ?? data_get($data, 'data.invoice_num')
+                ?? ''
+            ));
+
+            $tracking = trim((string) (
+                $data['tracking_number']
+                ?? data_get($data, 'shipping.tracking_number')
+                ?? data_get($data, 'data.tracking_number')
+                ?? ''
+            ));
+
+            if ($invoice === '' && $tracking !== '') {
+                $invoice = $this->documents->resolveInvoice(['id' => $tracking]);
+            }
+
+            if ($invoice === '' && !$shipmentId) {
+                return;
+            }
+
+            $query = array_filter([
+                'shipment_id' => $shipmentId,
+                'invoice' => $invoice !== '' ? $invoice : null,
+                'id' => $tracking !== '' ? $tracking : null,
+            ], static fn ($value) => $value !== null && $value !== '');
+
+            $this->fetchAndStoreDocument('kay-paolo/shipment-label', $query, $token, 'label', $invoice);
+            $this->fetchAndStoreDocument('kay-paolo/shipment-receipt', $query, $token, 'receipt', $invoice);
+        } catch (\Throwable) {
+            // Document persistence must never break shipment creation.
+        }
+    }
+
+    private function fetchAndStoreDocument(
+        string $endpoint,
+        array $query,
+        string $token,
+        string $type,
+        string $invoice
+    ): void {
+        if ($invoice !== '') {
+            $exists = $type === 'label'
+                ? $this->documents->hasLabel($invoice)
+                : $this->documents->hasReceipt($invoice);
+            if ($exists) {
+                return;
             }
         }
 
-        return response()->view($fallbackView, [
-            'documentQuery' => $request->query(),
-        ]);
+        $response = $this->zion->getRaw($endpoint, $query, $token);
+        if (!$response || !$response->successful()) {
+            return;
+        }
+
+        $contentType = strtolower((string) $response->header('Content-Type', ''));
+        $body = (string) $response->body();
+        if (str_contains($contentType, 'application/json') || !str_starts_with(ltrim($body), '%PDF')) {
+            return;
+        }
+
+        $resolvedInvoice = $invoice !== ''
+            ? $invoice
+            : $this->documents->resolveInvoice($query);
+
+        if ($resolvedInvoice === '') {
+            return;
+        }
+
+        if ($type === 'label') {
+            $this->documents->saveLabel($resolvedInvoice, $body);
+        } else {
+            $this->documents->saveReceipt($resolvedInvoice, $body);
+        }
     }
 
     private function forwardAuthenticated(string $endpoint, Request $request, ?array $payload = null): JsonResponse

@@ -34,14 +34,15 @@ class ExampleTest extends TestCase
             '/invoice',
             '/receipt',
             '/receipt-a4',
-            '/shipment-label',
-            '/shipment-receipt',
             '/about',
             '/services',
             '/contact',
         ] as $path) {
             $this->get($path)->assertStatus(200);
         }
+
+        $this->get('/shipment-label')->assertStatus(401);
+        $this->get('/shipment-receipt')->assertStatus(401);
     }
 
     public function test_dashboard_renders_without_a_server_side_zion_session(): void
@@ -312,7 +313,8 @@ class ExampleTest extends TestCase
         $this->assertStringContainsString('renderPackageLabels', $script);
         $this->assertStringContainsString('splitLabelNumbers', $script);
         $this->assertStringContainsString('formatShipmentNumberDisplay', $script);
-        $this->assertStringContainsString('labelBarcodeValue', $script);
+        $this->assertStringContainsString('dollarText', $script);
+        $this->assertStringContainsString('documentServiceSummary', $script);
         $this->assertStringNotContainsString("params.set('access_token', storedToken())", $script);
         $this->assertStringContainsString('isAdminRole', $script);
         $this->assertStringNotContainsString('Door to Door', $script);
@@ -348,72 +350,73 @@ class ExampleTest extends TestCase
             ->assertJsonPath('options.0.value', 'COLLECT');
     }
 
-    public function test_shipment_document_routes_render_kay_branded_document_ui(): void
+    public function test_shipment_document_routes_require_login_without_saved_pdf(): void
     {
+        @unlink(public_path('label/label_373988.pdf'));
+        @unlink(public_path('receipts/receipt_373988.pdf'));
+
         Http::fake();
 
-        $labelResponse = $this->get('/shipment-label?shipment_id=24755&invoice=373988&id=HTS373988-1%2F2%2C+HTS373988-2%2F2')
-            ->assertOk()
-            ->assertSee('Shipping Label', false)
-            ->assertSee('Kay Paolo Shipping', false)
-            ->assertSee('data-shipment-document', false)
-            ->assertSee('Print / Save PDF', false)
-            ->assertSee('jsbarcode', false)
-            ->assertSee('CODE128', false)
-            ->assertSee('HTS373988-1/2', false)
-            ->assertSee('HTS373988-2/2', false)
-            ->assertDontSee('HTS373988-1/2, HTS373988-2/2', false)
-            ->assertDontSee('%PDF', false)
-            ->assertDontSee('Zion Shipping', false);
+        $this->get('/shipment-label?shipment_id=24755&invoice=373988&id=HTS373988-1%2F2')
+            ->assertStatus(401)
+            ->assertJsonPath('message', 'Please login to Kay Paolo first.');
 
-        $this->assertSame(2, substr_count($labelResponse->getContent(), 'data-package-label="true"'));
-
-        $this->get('/shipment-receipt?shipment_id=24755&invoice=373988&id=HTS373988-1%2F2%2C+HTS373988-2%2F2')
-            ->assertOk()
-            ->assertSee('Shipment Receipt', false)
-            ->assertSee('Print Receipt', false)
-            ->assertSee('Kay Paolo Shipping', false)
-            ->assertSee('373988', false)
-            ->assertDontSee('%PDF', false)
-            ->assertDontSee('Zion Shipping', false);
+        $this->get('/shipment-receipt?shipment_id=24755&invoice=373988&id=HTS373988-1%2F2')
+            ->assertStatus(401)
+            ->assertJsonPath('message', 'Please login to Kay Paolo first.');
 
         Http::assertNothingSent();
     }
 
-    public function test_shipment_label_streams_zion_pdf_when_authenticated(): void
+    public function test_shipment_label_and_receipt_are_saved_as_local_pdf_files(): void
     {
+        @unlink(public_path('label/label_373988.pdf'));
+        @unlink(public_path('receipts/receipt_373988.pdf'));
+
         Http::fake([
             '*/api/kay-paolo/shipment-label*' => Http::response('%PDF-1.4 fake-label', 200, [
                 'Content-Type' => 'application/pdf',
                 'Content-Disposition' => 'inline; filename="label_373988.pdf"',
             ]),
-        ]);
-
-        $this->withSession([
-            'zion.access_token' => 'session-token',
-            'zion.user' => ['name' => 'Test User'],
-        ])->get('/shipment-label?shipment_id=24755&invoice=373988&id=HTS373988-1%2F2')
-            ->assertOk()
-            ->assertHeader('content-type', 'application/pdf')
-            ->assertSee('%PDF', false);
-    }
-
-    public function test_shipment_receipt_streams_zion_pdf_when_authenticated(): void
-    {
-        Http::fake([
             '*/api/kay-paolo/shipment-receipt*' => Http::response('%PDF-1.4 fake-receipt', 200, [
                 'Content-Type' => 'application/pdf',
                 'Content-Disposition' => 'inline; filename="receipt_373988.pdf"',
             ]),
         ]);
 
-        $this->withSession([
+        $session = [
             'zion.access_token' => 'session-token',
             'zion.user' => ['name' => 'Test User'],
-        ])->get('/shipment-receipt?shipment_id=24755&invoice=373988&id=HTS373988-1%2F2')
+        ];
+
+        $this->withSession($session)
+            ->get('/shipment-label?shipment_id=24755&invoice=373988&id=HTS373988-1%2F2')
+            ->assertRedirect('/label/label_373988.pdf');
+
+        $this->assertFileExists(public_path('label/label_373988.pdf'));
+        $this->assertStringStartsWith('%PDF', (string) file_get_contents(public_path('label/label_373988.pdf')));
+
+        $this->get('/label/label_373988.pdf')
             ->assertOk()
-            ->assertHeader('content-type', 'application/pdf')
-            ->assertSee('%PDF', false);
+            ->assertHeader('content-type', 'application/pdf');
+
+        $this->withSession($session)
+            ->get('/shipment-receipt?shipment_id=24755&invoice=373988&id=HTS373988-1%2F2')
+            ->assertRedirect('/receipts/receipt_373988.pdf');
+
+        $this->assertFileExists(public_path('receipts/receipt_373988.pdf'));
+        $this->assertStringStartsWith('%PDF', (string) file_get_contents(public_path('receipts/receipt_373988.pdf')));
+
+        $this->get('/receipts/receipt_373988.pdf')
+            ->assertOk()
+            ->assertHeader('content-type', 'application/pdf');
+
+        // Saved PDFs remain available without login, like Zion static label URLs.
+        $this->get('/shipment-label?invoice=373988')
+            ->assertRedirect('/label/label_373988.pdf');
+
+        @unlink(public_path('label/label_373988.pdf'));
+        @unlink(public_path('receipts/receipt_373988.pdf'));
     }
 
     public function test_quote_proxy_falls_back_when_api_endpoint_requires_session_store(): void

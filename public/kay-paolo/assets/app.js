@@ -1305,19 +1305,24 @@ document.addEventListener('DOMContentLoaded', () => {
     setText('documentDate', data.date);
     setText('documentStatus', data.status);
     setText('documentPaymentType', data.paymentType);
-    setText('documentTracking', data.tracking);
+    setText('documentPaymentStatus', data.paymentStatus);
+    setText('documentTracking', formatShipmentNumberDisplay(data.tracking));
+    setText('documentAccountNumber', data.accountNumber);
+    setText('documentServiceSummary', data.serviceSummary);
+    setText('documentDeliveryDate', data.deliveryDate);
     setText('documentShipperName', data.shipperName);
     setText('documentShipperAddress', data.shipperAddress);
-    setText('documentShipperContact', data.shipperContact);
+    setText('documentShipperContact', data.shipperPhone || data.shipperContact);
     setText('documentConsigneeName', data.consigneeName);
     setText('documentConsigneeAddress', data.consigneeAddress);
-    setText('documentConsigneeContact', data.consigneeContact);
+    setText('documentConsigneeContact', data.consigneePhone || data.consigneeContact);
     setText('documentNotes', data.notes);
-    setText('documentFreight', moneyText(data.freight));
-    setText('documentInsurance', moneyText(data.insurance));
-    setText('documentHomeDelivery', moneyText(data.homeDelivery));
-    setText('documentTax', moneyText(data.tax));
-    setText('documentTotal', moneyText(data.total));
+    setText('documentFreight', dollarText(data.freight));
+    setText('documentInsurance', dollarText(data.insurance));
+    setText('documentHomeDelivery', dollarText(data.homeDelivery));
+    setText('documentTax', dollarText(data.tax));
+    setText('documentTotal', dollarText(data.total));
+    setText('documentDeclaredValue', dollarText(data.declaredValue));
     renderDocumentItems(data.items);
 
     setText('receiptA4TrackingNumber', data.tracking);
@@ -1327,12 +1332,12 @@ document.addEventListener('DOMContentLoaded', () => {
     setText('receiptA4Receiver', `${data.consigneeName}\n${data.consigneeAddress}\n${data.consigneeContact}`);
     setText('receiptA4Package', `${data.description || 'Package'} (${data.packageCount} pcs) / ${data.totalWeight} lb`);
     setText('receiptA4PaymentType', data.paymentType);
-    setText('receiptA4Total', moneyText(data.total));
+    setText('receiptA4Total', dollarText(data.total));
     setText('labelDueType', data.chargeStatus);
     setText('labelDestination', data.destinationLabel);
     setText('labelDeliveryNumber', data.deliveryNumber);
     setText('receiptPackageCount', data.packageCount);
-    setText('receiptTotalWeight', `${data.totalWeight} lb`);
+    setText('receiptTotalWeight', `${data.totalWeight} lbs`);
     renderPackageLabels(data);
   }
 
@@ -1470,6 +1475,50 @@ document.addEventListener('DOMContentLoaded', () => {
     const destinationLabel = toCity
       ? `${String(toCity).charAt(0).toUpperCase()} - ${toCity}`
       : destinationCity;
+    const deliveryLocation = normalizeDeliveryLocation(payload.delivery_location || shipping.delivery_location || '');
+    const deliveryOption = payload.delivery_option
+      || payload.selected_shipper
+      || selected.service
+      || selected.carrier
+      || shipping.selected_shipper
+      || 'Shipping Service';
+    const serviceSummary = [deliveryOption, deliveryLocation].filter(Boolean).join(' | ') || 'Shipping Service';
+    const deliveryDateRaw = payload.deliveryEstimateDate
+      || selected.eta
+      || selected.delivery_date
+      || response.delivery_date
+      || responseData.delivery_date
+      || shipping.delivery_date
+      || '';
+    const deliveryDate = deliveryDateRaw
+      ? `by ${readableDate(deliveryDateRaw)}`
+      : 'Pending';
+    const paymentStatus = String(paymentType).toUpperCase().includes('COLLECT') || String(paymentType).toUpperCase().includes('DUE')
+      ? 'Payment is Due'
+      : String(paymentType).toUpperCase().includes('PAID')
+        ? 'Paid'
+        : String(paymentType || 'Payment is Due');
+    const shipperPhone = payload.from_phone || shipping.shipper_phone || '';
+    const consigneePhone = payload.to_phone_1 || payload.consignee_phone || shipping.consignee_phone || '';
+    const shipperAddress = [
+      [payload.from_address, payload.from_apt].filter(Boolean).join(' '),
+      [payload.from_city, payload.from_state, payload.from_zip].filter(Boolean).join(' '),
+      payload.from_country_name || payload.from_country || shipping.shipper_country || ''
+    ].filter(Boolean).join('\n')
+      || shipping.shipper_address
+      || '414 Main St, Asbury Park, NJ 07712';
+    const consigneeAddress = [
+      [payload.to_address, payload.to_apt].filter(Boolean).join(' '),
+      [payload.to_city, payload.to_state, payload.to_zip].filter(Boolean).join(' '),
+      payload.to_country_name || payload.to_country || shipping.consignee_country || ''
+    ].filter(Boolean).join('\n')
+      || shipping.consignee_address
+      || 'Destination address pending';
+    const declaredValue = payload.total_value
+      || payload.package_value
+      || shipping.total_value
+      || items.reduce((sum, item) => sum + numberValue(item.value, 0), 0)
+      || 0;
     const deliveryNumber = response.delivery_number
       || responseData.delivery_number
       || shipping.delivery_number
@@ -1492,29 +1541,36 @@ document.addEventListener('DOMContentLoaded', () => {
         || '',
       documentNumber,
       tracking,
+      accountNumber: storedUser().account_number || shipping.account_number || payload.account_number || '-',
+      serviceSummary,
+      deliveryDate,
       date: readableDate(response.created_at || responseData.created_at || shipping.created_at || new Date()),
       status: response.status_name || response.status || response.message || responseData.status || shipping.status || 'Booked',
       paymentType,
+      paymentStatus,
       chargeStatus: String(paymentType).toUpperCase().includes('PAID') ? 'PAID' : 'DUE',
       destinationLabel,
       deliveryNumber,
       labelNumbers,
       shipperName: payload.from_name || shipping.shipper_name || storedUser().name || 'Kay Paolo Customer',
-      shipperAddress: [payload.from_address, payload.from_city, payload.from_state, payload.from_zip, payload.from_country_name].filter(Boolean).join(', ') || '414 Main St, Asbury Park, NJ 07712',
-      shipperContact: [payload.from_phone, payload.from_email || storedUser().email].filter(Boolean).join(' / ') || 'info@kaypaoloshipping.com',
+      shipperAddress,
+      shipperPhone: shipperPhone || 'info@kaypaoloshipping.com',
+      shipperContact: [shipperPhone, payload.from_email || storedUser().email].filter(Boolean).join(' / ') || 'info@kaypaoloshipping.com',
       consigneeName: payload.to_name || payload.consignee_name || shipping.consignee_name || 'Destination Customer',
-      consigneeAddress: [payload.to_address, payload.to_apt, payload.to_city, payload.to_state, payload.to_zip, payload.to_country_name].filter(Boolean).join(', ') || 'Destination address pending',
-      consigneeContact: [payload.to_phone_1 || payload.consignee_phone, payload.to_phone_2].filter(Boolean).join(' / ') || 'Phone pending',
+      consigneeAddress,
+      consigneePhone: consigneePhone || 'Phone pending',
+      consigneeContact: [consigneePhone, payload.to_phone_2].filter(Boolean).join(' / ') || 'Phone pending',
       description,
       items,
       packageCount: packagePieceCount(payload) || items.reduce((sum, item) => sum + numberValue(item.count, 0), 0) || 1,
       totalWeight,
-      freight: selected.freight || response.freight || responseData.freight || shipping.freight || 0,
+      declaredValue,
+      freight: selected.freight || response.freight || responseData.freight || shipping.freight || selected.total || selected.price || 0,
       insurance: selected.insurance || response.insurance || responseData.insurance || shipping.insurance || 0,
       homeDelivery: selected.home_delivery || selected.delivery || response.home_delivery || responseData.home_delivery || shipping.home_delivery || 0,
       tax: selected.tax || response.tax || responseData.tax || shipping.tax || 0,
       total: selected.total || selected.price || selected.amount || payload.deliveryEstimatePrice || response.total || responseData.total || shipping.total || 0,
-      notes: response.message || responseData.message || 'Thank you for shipping with Kay Paolo Shipping.'
+      notes: 'Special Notice: Due to current situational instabilities and territorial security issues in Haiti, we cannot guarantee any delivery date. The provided date is only an estimated timeframe.'
     };
   }
 
@@ -1541,15 +1597,44 @@ document.addEventListener('DOMContentLoaded', () => {
     const tbody = document.getElementById('documentItems');
     if (!tbody) return;
 
-    tbody.innerHTML = items.map((item) => `
+    const rows = Array.isArray(items) && items.length ? items : [{
+      description: 'Package',
+      count: 1,
+      weight: 1,
+      dimensions: '1 x 1 x 1',
+      volume: '1.00',
+      value: 0
+    }];
+
+    const itemRows = rows.map((item, index) => {
+      const pieces = String(numberValue(item.count, 1)).padStart(2, '0');
+      const volume = item.volume ?? packageVolumeFromDimensions(item.dimensions);
+      return `
       <tr>
-        <td>${escapeHtml(item.description)}</td>
-        <td>${escapeHtml(item.count)}</td>
-        <td>${escapeHtml(item.weight)} lb</td>
-        <td>${escapeHtml(item.dimensions)}</td>
-        <td>${escapeHtml(moneyText(item.value))}</td>
-      </tr>
-    `).join('');
+        <td>${escapeHtml(pieces)}</td>
+        <td>${escapeHtml(item.description || 'Package')}</td>
+        <td style="text-align: right">${escapeHtml(numberValue(item.weight, 1))} lbs</td>
+        <td style="text-align: right">${escapeHtml(volume)}</td>
+        <td style="text-align: right">${escapeHtml(item.dimensions || '1 x 1 x 1')}</td>
+      </tr>`;
+    }).join('');
+
+    const legalRow = tbody.querySelector('tr:last-child');
+    const legalHtml = legalRow && legalRow.querySelector('.legal-text')
+      ? legalRow.outerHTML
+      : '';
+
+    tbody.innerHTML = itemRows + legalHtml;
+  }
+
+  function packageVolumeFromDimensions(raw) {
+    const parts = String(raw || '')
+      .toLowerCase()
+      .split(/x|\*/i)
+      .map((part) => Number(String(part).replace(/[^\d.]/g, '')) || 0);
+    if (parts.length < 3) return '1.00';
+    const cubicInches = parts[0] * parts[1] * parts[2];
+    return (cubicInches / 1728 * 100 || 0).toFixed(2);
   }
 
   function moneyText(amount) {
@@ -1558,6 +1643,13 @@ document.addEventListener('DOMContentLoaded', () => {
     if (/^usd\s/i.test(raw)) return raw;
     if (raw.startsWith('$')) return `USD ${raw.slice(1)}`;
     return `USD ${raw}`;
+  }
+
+  function dollarText(amount) {
+    const raw = moneyText(amount).replace(/^USD\s*/i, '').replace(/^\$/, '').trim();
+    const numeric = Number(String(raw).replace(/,/g, ''));
+    if (Number.isFinite(numeric)) return `$${numeric.toFixed(2)}`;
+    return `$${raw || '0.00'}`;
   }
 
   function readableDate(dateValue) {
