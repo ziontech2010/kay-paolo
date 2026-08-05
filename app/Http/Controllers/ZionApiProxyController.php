@@ -208,12 +208,16 @@ class ZionApiProxyController extends Controller
 
     public function shipmentLabel(Request $request): Response|JsonResponse
     {
-        return $this->streamZionDocument($request, 'kay-paolo/shipment-label', 'kay-paolo-label.pdf');
+        return response()->view('documents.label', [
+            'documentQuery' => $request->query(),
+        ]);
     }
 
     public function shipmentReceipt(Request $request): Response|JsonResponse
     {
-        return $this->streamZionDocument($request, 'kay-paolo/shipment-receipt', 'kay-paolo-receipt.pdf');
+        return response()->view('documents.receipt', [
+            'documentQuery' => $request->query(),
+        ]);
     }
 
     private function forwardAuthenticated(string $endpoint, Request $request, ?array $payload = null): JsonResponse

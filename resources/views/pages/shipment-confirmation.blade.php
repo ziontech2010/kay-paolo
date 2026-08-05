@@ -67,8 +67,8 @@
             </div>
 
             <div class="confirm-actions-row">
-                <a href="{{ route('shipment.label') }}" target="_blank" class="btn btn-gold" id="openLabelBtn">Open Label PDF</a>
-                <a href="{{ route('shipment.receipt') }}" target="_blank" class="btn btn-gold" id="openReceiptBtn">Open Receipt PDF</a>
+                <a href="{{ route('shipment.label') }}" target="_blank" class="btn btn-gold" id="openLabelBtn">Open Label</a>
+                <a href="{{ route('shipment.receipt') }}" target="_blank" class="btn btn-gold" id="openReceiptBtn">Open Receipt</a>
             </div>
         </div>
 
