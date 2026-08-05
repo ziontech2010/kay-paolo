@@ -311,6 +311,7 @@ class ExampleTest extends TestCase
         $this->assertStringContainsString('receiptPackageCount', $script);
         $this->assertStringContainsString('renderPackageLabels', $script);
         $this->assertStringContainsString('splitLabelNumbers', $script);
+        $this->assertStringContainsString('formatShipmentNumberDisplay', $script);
         $this->assertStringNotContainsString("params.set('access_token', storedToken())", $script);
         $this->assertStringContainsString('isAdminRole', $script);
         $this->assertStringNotContainsString('Door to Door', $script);

@@ -1270,7 +1270,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const params = new URLSearchParams(window.location.search);
     const shipmentNo = params.get('id') || data.tracking || data.documentNumber || 'Pending';
 
-    setText('shipmentNoDisplay', shipmentNo);
+    setText('shipmentNoDisplay', formatShipmentNumberDisplay(shipmentNo));
     setText('packageAmountDisplay', `${data.packageCount} package${Number(data.packageCount) === 1 ? '' : 's'}`);
     setDocumentHref('openLabelBtn', route('shipmentLabel', '/shipment-label'), data, shipmentNo);
     setDocumentHref('openReceiptBtn', route('shipmentReceipt', '/shipment-receipt'), data, shipmentNo);
@@ -1379,6 +1379,24 @@ document.addEventListener('DOMContentLoaded', () => {
       .filter(Boolean);
 
     return labels.length ? labels : ['Pending'];
+  }
+
+  function formatShipmentNumberDisplay(raw) {
+    const labels = splitLabelNumbers(raw);
+    const first = labels[0] || String(raw || '').trim();
+    if (!first || first === 'Pending') return first || 'Pending';
+
+    const pieceMatch = first.match(/^(.+)-(\d+)\/(\d+)$/);
+    if (pieceMatch) {
+      return `${pieceMatch[1]}-${pieceMatch[3]}`;
+    }
+
+    if (labels.length > 1) {
+      const baseMatch = first.match(/^(.+)-\d+/);
+      if (baseMatch) return `${baseMatch[1]}-${labels.length}`;
+    }
+
+    return first;
   }
 
   function buildShipmentDocumentData(response, payload, selected) {
