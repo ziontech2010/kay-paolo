@@ -7,7 +7,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const shipmentResponseKey = 'kayPaoloShipmentResponse';
   const trackingResponseKey = 'kayPaoloTrackingResponse';
   const countryCacheKey = 'kayPaoloCountries:v3';
-  const paymentOptionsCacheKey = 'kayPaoloPaymentOptions:v3';
+  const paymentOptionsCacheKey = () => `kayPaoloPaymentOptions:v4:${storedUser().id || storedUser().account_number || 'guest'}`;
   const flatRateCache = new Map();
 
   const route = (name, fallback) => config.routes?.[name] || fallback;
@@ -57,8 +57,14 @@ document.addEventListener('DOMContentLoaded', () => {
   const firstElement = (...ids) => ids.map((id) => document.getElementById(id)).find(Boolean) || null;
   const queryParam = (name) => new URLSearchParams(window.location.search).get(name) || '';
   const numberValue = (raw, fallback) => {
-    const parsed = Number(String(raw ?? '').replace(/[^0-9.-]/g, ''));
-    return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+    const text = String(raw ?? '').trim();
+    if (!text) return fallback;
+
+    const cleaned = text.replace(/[^0-9.-]/g, '');
+    if (!cleaned || cleaned === '-' || cleaned === '.') return fallback;
+
+    const parsed = Number(cleaned);
+    return Number.isFinite(parsed) && parsed >= 0 ? parsed : fallback;
   };
   const currentPath = () => window.location.pathname + window.location.search;
   const adminRoleIds = [1, 12, 13, 14, 15];
@@ -344,23 +350,29 @@ document.addEventListener('DOMContentLoaded', () => {
     const selects = Array.from(document.querySelectorAll('[data-payment-options], #shipmentPaymentType'));
     if (!selects.length) return;
 
-    const cached = normalizePaymentOptions(storedJson(paymentOptionsCacheKey, []));
+    const cacheKey = paymentOptionsCacheKey();
+    const pending = storedJson(pendingShipmentKey, { payload: {} });
+    const cached = normalizePaymentOptions(storedJson(cacheKey, []));
     if (cached.length) {
       populatePaymentOptions(selects, cached);
     }
 
-    getJson(route('paymentOptions', '/api/kay-paolo/payment-options'), {}, { token: storedToken() })
+    getJson(route('paymentOptions', '/api/kay-paolo/payment-options'), {
+      user_id: pending.payload?.user_id || pending.payload?.quote_user_id || undefined,
+      quote_user_id: pending.payload?.quote_user_id || pending.payload?.user_id || undefined
+    }, { token: storedToken() })
       .then((response) => {
         const options = normalizePaymentOptions(response.options || response.payment_options || response.data?.options || response.data || []);
-        if (!options.length) return;
+        if (!options.length) {
+          populatePaymentOptions(selects, []);
+          return;
+        }
 
-        window.localStorage.setItem(paymentOptionsCacheKey, JSON.stringify(options));
+        window.localStorage.setItem(cacheKey, JSON.stringify(options));
         populatePaymentOptions(selects, options);
       })
       .catch(() => {
-        if (!cached.length) {
-          populatePaymentOptions(selects, [{ value: 'PAID AT AGENT', label: 'Paid at Store' }]);
-        }
+        if (!cached.length) populatePaymentOptions(selects, []);
       });
   }
 
@@ -398,6 +410,15 @@ document.addEventListener('DOMContentLoaded', () => {
       const previous = select.value || pending.payload?.payment_type || '';
       select.innerHTML = '';
 
+      if (!options.length) {
+        const optionElement = document.createElement('option');
+        optionElement.value = '';
+        optionElement.textContent = 'No payment options available';
+        select.appendChild(optionElement);
+        select.dataset.kayPaymentsLoaded = '0';
+        return;
+      }
+
       options.forEach((option) => {
         const optionElement = document.createElement('option');
         optionElement.value = option.value;
@@ -405,7 +426,10 @@ document.addEventListener('DOMContentLoaded', () => {
         select.appendChild(optionElement);
       });
 
-      setSelectValue(select.id, previous || 'PAID AT AGENT');
+      const nextValue = options.some((option) => option.value === previous)
+        ? previous
+        : options[0].value;
+      setSelectValue(select.id, nextValue);
       select.dataset.kayPaymentsLoaded = '1';
     });
   }
@@ -887,7 +911,13 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function normalizeFlatRateOptions(response) {
-    const options = [
+    const candidates = [
+      response?.all_options,
+      response?.data?.all_options,
+      response?.all_groups,
+      response?.data?.all_groups,
+      response?.groups,
+      response?.data?.groups,
       response?.options,
       response?.data?.options,
       response?.flat_rates,
@@ -902,22 +932,51 @@ document.addEventListener('DOMContentLoaded', () => {
       response?.data?.rates,
       response?.items,
       response?.data?.items,
-      response?.all_options,
-      response?.data?.all_options,
       response?.data?.data,
       response?.data
-    ].find((candidate) => {
-      if (Array.isArray(candidate)) return candidate.length > 0;
-      return candidate && typeof candidate === 'object' && Object.keys(candidate).length > 0;
-    }) || [];
+    ];
 
-    const rows = Array.isArray(options)
-      ? options.map((option) => ['', option])
-      : Object.entries(options);
-
-    return rows
+    const seen = new Set();
+    return candidates
+      .flatMap((candidate) => flatRateRows(candidate))
       .map(([key, option]) => normalizeFlatRateOption(option, key))
-      .filter((option) => option.slug && !option.restricted);
+      .filter((option) => {
+        if (!option.slug || option.restricted || seen.has(option.slug)) return false;
+        seen.add(option.slug);
+        return true;
+      });
+  }
+
+  function flatRateRows(candidate) {
+    if (!candidate) return [];
+
+    if (Array.isArray(candidate)) {
+      return candidate.flatMap((item) => {
+        if (item && typeof item === 'object' && Array.isArray(item.options)) {
+          return item.options.map((option) => [option.slug || option.value || option.code || '', {
+            ...option,
+            group: option.group || item.label || item.group || item.name
+          }]);
+        }
+
+        return [['', item]];
+      });
+    }
+
+    if (typeof candidate === 'object') {
+      return Object.entries(candidate).flatMap(([key, item]) => {
+        if (item && typeof item === 'object' && Array.isArray(item.options)) {
+          return item.options.map((option) => [option.slug || option.value || option.code || key, {
+            ...option,
+            group: option.group || item.label || item.group || item.name || key
+          }]);
+        }
+
+        return [[key, item]];
+      });
+    }
+
+    return [];
   }
 
   function normalizeFlatRateOption(option, key = '') {
@@ -1402,6 +1461,7 @@ document.addEventListener('DOMContentLoaded', () => {
       try {
         const response = await postJson(route('shippingHistory', '/api/kay-paolo/shipping-history'), {
           limit: firstValue('entriesSelect') || 100,
+          date_range: historyDateRangeValue(firstValue('timeSelect')),
           created_in: firstValue('timeSelect'),
           search: firstValue('searchInput'),
           user_id: storedUser().id || storedUser().account_number || undefined
@@ -1578,6 +1638,14 @@ document.addEventListener('DOMContentLoaded', () => {
     }).join('');
 
     updateHistoryBadgesFromRows(rows);
+  }
+
+  function historyDateRangeValue(label) {
+    const value = String(label || '').toLowerCase();
+    if (value.includes('90')) return '90 Days';
+    if (value.includes('year')) return '365 Days';
+    if (value.includes('all')) return '';
+    return '30 Days';
   }
 
   function historyField(row, keys, fallback = '') {
@@ -1834,7 +1902,7 @@ document.addEventListener('DOMContentLoaded', () => {
       to_phone_1: firstValue('toPhone', 'to_phone_1'),
       to_phone_2: firstValue('toHomePhone', 'to_phone_2'),
       consignee_phone: firstValue('toPhone', 'to_phone_1'),
-      package_count: dimensionRowCountFromDimensions(dimensions),
+      package_count: dimensionPieceCountFromDimensions(dimensions),
       total_value: numberValue(firstValue('totalValue', 'package_value'), 10),
       package_value: numberValue(firstValue('totalValue', 'package_value'), 10),
       dimensions,
@@ -1938,6 +2006,13 @@ document.addEventListener('DOMContentLoaded', () => {
     const lengths = ['package_count_ind', 'weight', 'length', 'width', 'height']
       .map((key) => Array.isArray(source[key]) ? source[key].length : 0);
     return Math.max(...lengths, 1);
+  }
+
+  function dimensionPieceCountFromDimensions(dimensions) {
+    const counts = arrayValue(dimensions?.package_count_ind);
+    if (!counts.length) return 1;
+
+    return counts.reduce((sum, item) => sum + numberValue(item, 1), 0) || 1;
   }
 
   function normalizeShipmentDimensions(payload) {
@@ -2076,7 +2151,7 @@ document.addEventListener('DOMContentLoaded', () => {
       to_zip: payload.to_zip || undefined,
       to_city: payload.to_city || undefined,
       to_state: payload.to_state || undefined,
-      package_count: rowCount,
+      package_count: dimensionPieceCountFromDimensions(dimensions),
       package_description: payload.package_description ?? '',
       total_value: declaredValue,
       package_value: declaredValue,
@@ -2146,6 +2221,7 @@ document.addEventListener('DOMContentLoaded', () => {
   async function queueShipmentEmailNotifications(response, payload) {
     const data = buildShipmentDocumentData(response || {}, payload || {}, {});
     const emails = Array.from(new Set([
+      'info@kaypaoloshipping.com',
       payload?.from_email,
       storedUser().email
     ].filter(Boolean)));
@@ -2222,7 +2298,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const container = document.getElementById('quoteResult');
     if (!container) return;
 
-    const cards = normalizeQuoteCards(response);
+    const cards = filterQuoteCardsForPayload(normalizeQuoteCards(response), originalPayload || {});
     const quoteId = response.quote_id || response.quoteId || response.id || '';
 
     if (!cards.length) {
@@ -2301,6 +2377,24 @@ document.addEventListener('DOMContentLoaded', () => {
       || '';
   }
 
+  function filterQuoteCardsForPayload(cards, payload) {
+    if (totalPackageWeight(payload) !== 0) return cards;
+
+    return cards.filter((card) => {
+      if (card.type === 'message' || card.message_only) return true;
+
+      const service = quoteCardService(card).toLowerCase();
+      return service.includes('regular boat') || service.includes('express container');
+    });
+  }
+
+  function totalPackageWeight(payload) {
+    const weights = arrayValue(payload?.dimensions?.weight);
+    if (!weights.length) return null;
+
+    return weights.reduce((sum, item) => sum + numberValue(item, 0), 0);
+  }
+
   function quoteCardPartner(card) {
     return normalizePartner(card.carrier || card.partner || card.carrier_key || card.carrier_name || card.integration || card.full_integration);
   }
@@ -2365,7 +2459,7 @@ document.addEventListener('DOMContentLoaded', () => {
       || '';
 
     if (partner === 'ZION') {
-      return `<img src="${escapeHtml(config.assets?.zionCarrierLogo || '/kay-paolo/assets/images/zion-carrier-logo.png')}" alt="Full integration logo" width="100" height="50">`;
+      return `<img src="${escapeHtml(config.assets?.fullIntegrationLogo || config.assets?.kayPaoloLogo || '/kay-paolo/assets/logo/kay-paolo.svg')}" alt="Full integration logo" width="100" height="50">`;
     }
 
     if (logo) {
@@ -2373,7 +2467,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     if (normalizePartner(carrier) === 'ZION') {
-      return `<img src="${escapeHtml(config.assets?.zionCarrierLogo || '/kay-paolo/assets/images/zion-carrier-logo.png')}" alt="Full integration logo" width="100" height="50">`;
+      return `<img src="${escapeHtml(config.assets?.fullIntegrationLogo || config.assets?.kayPaoloLogo || '/kay-paolo/assets/logo/kay-paolo.svg')}" alt="Full integration logo" width="100" height="50">`;
     }
 
     return `<div class="carrier-logo-fallback" aria-label="${escapeHtml(carrier)}">${escapeHtml(carrierInitials(carrier))}</div>`;

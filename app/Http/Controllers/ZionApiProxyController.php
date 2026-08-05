@@ -90,26 +90,24 @@ class ZionApiProxyController extends Controller
     public function paymentOptions(Request $request): JsonResponse
     {
         $token = $request->bearerToken();
-        $response = $this->zion->get('kay-paolo/payment-options', [], $token);
+        $response = $this->zion->get('kay-paolo/payment-options', $request->query(), $token);
         $options = $response['ok']
             ? $this->normalizePaymentOptions($response['data'])
             : [];
 
-        if (!$response['ok'] || empty($options)) {
-            $response = $this->zion->get('payment-options', [], $token);
-            $options = $response['ok']
-                ? $this->normalizePaymentOptions($response['data'])
-                : [];
-        }
-
-        if (empty($options)) {
-            $options = $this->defaultPaymentOptions();
+        if (!$response['ok']) {
+            return response()->json([
+                'status' => 'error',
+                'message' => $response['data']['message'] ?? 'Unable to load payment options from the shipping API.',
+                'options' => [],
+                'source' => 'api',
+            ], $response['status'] > 0 ? $response['status'] : 502);
         }
 
         return response()->json([
             'status' => 'success',
             'options' => $options,
-            'source' => $response['ok'] ? 'api' : 'fallback',
+            'source' => 'api',
         ]);
     }
 
@@ -208,14 +206,14 @@ class ZionApiProxyController extends Controller
         return $this->jsonResponse($response);
     }
 
-    public function shipmentLabel(Request $request): RedirectResponse
+    public function shipmentLabel(Request $request): Response|JsonResponse
     {
-        return redirect()->away($this->documentUrl($request, 'label'));
+        return $this->streamZionDocument($request, 'kay-paolo/shipment-label', 'kay-paolo-label.pdf');
     }
 
-    public function shipmentReceipt(Request $request): RedirectResponse
+    public function shipmentReceipt(Request $request): Response|JsonResponse
     {
-        return redirect()->away($this->documentUrl($request, 'receipt'));
+        return $this->streamZionDocument($request, 'kay-paolo/shipment-receipt', 'kay-paolo-receipt.pdf');
     }
 
     private function forwardAuthenticated(string $endpoint, Request $request, ?array $payload = null): JsonResponse
@@ -276,6 +274,52 @@ class ZionApiProxyController extends Controller
         ]);
     }
 
+    private function streamZionDocument(Request $request, string $endpoint, string $fallbackFilename): Response|JsonResponse
+    {
+        $token = $request->bearerToken() ?: session('zion.access_token');
+
+        if (!$token) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Please login to Kay Paolo first.',
+            ], 401);
+        }
+
+        $response = $this->zion->getRaw($endpoint, $request->query(), $token);
+        if (!$response) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Unable to reach the shipping API.',
+            ], 502);
+        }
+
+        $contentType = strtolower((string) $response->header('Content-Type', ''));
+        if (!$response->successful() || str_contains($contentType, 'application/json')) {
+            $data = $response->json();
+
+            return response()->json(is_array($data) ? $data : [
+                'status' => 'error',
+                'message' => trim($response->body()) ?: 'Unable to load shipment document.',
+            ], $response->status());
+        }
+
+        $filename = $this->documentFilename($response->header('Content-Disposition'), $fallbackFilename);
+
+        return response($response->body(), 200, [
+            'Content-Type' => $response->header('Content-Type', 'application/pdf'),
+            'Content-Disposition' => 'inline; filename="'.$filename.'"',
+        ]);
+    }
+
+    private function documentFilename(?string $contentDisposition, string $fallback): string
+    {
+        if ($contentDisposition && preg_match('/filename="?([^";]+)"?/i', $contentDisposition, $matches)) {
+            return basename($matches[1]);
+        }
+
+        return $fallback;
+    }
+
     private function sanitizeShipmentPayload(array $payload): array
     {
         $dimensions = $this->normalizeShipmentDimensions($payload);
@@ -319,7 +363,7 @@ class ZionApiProxyController extends Controller
             'to_zip' => $payload['to_zip'] ?? null,
             'to_city' => $payload['to_city'] ?? null,
             'to_state' => $payload['to_state'] ?? null,
-            'package_count' => $rowCount,
+            'package_count' => $this->dimensionPieceCount($dimensions),
             'package_description' => $payload['package_description'] ?? '',
             'total_value' => $declaredValue,
             'package_value' => $declaredValue,
@@ -366,10 +410,10 @@ class ZionApiProxyController extends Controller
 
         return [
             'package_count_ind' => array_map(fn ($value) => $this->positiveNumber($value, 1), $this->padArray($counts, $rowCount, 1)),
-            'weight' => array_map(fn ($value) => $this->positiveNumber($value, 1), $this->padArray($weights, $rowCount, 1)),
-            'length' => array_map(fn ($value) => $this->positiveNumber($value, 1), $this->padArray($lengths, $rowCount, 1)),
-            'width' => array_map(fn ($value) => $this->positiveNumber($value, 1), $this->padArray($widths, $rowCount, 1)),
-            'height' => array_map(fn ($value) => $this->positiveNumber($value, 1), $this->padArray($heights, $rowCount, 1)),
+            'weight' => array_map(fn ($value) => $this->nonNegativeNumber($value, 1), $this->padArray($weights, $rowCount, 1)),
+            'length' => array_map(fn ($value) => $this->nonNegativeNumber($value, 1), $this->padArray($lengths, $rowCount, 1)),
+            'width' => array_map(fn ($value) => $this->nonNegativeNumber($value, 1), $this->padArray($widths, $rowCount, 1)),
+            'height' => array_map(fn ($value) => $this->nonNegativeNumber($value, 1), $this->padArray($heights, $rowCount, 1)),
         ];
     }
 
@@ -417,6 +461,17 @@ class ZionApiProxyController extends Controller
         );
     }
 
+    private function dimensionPieceCount(array $dimensions): int
+    {
+        $total = 0;
+
+        foreach ($dimensions['package_count_ind'] ?? [] as $count) {
+            $total += (int) $this->positiveNumber($count, 1);
+        }
+
+        return max($total, 1);
+    }
+
     private function arrayValue(mixed $value): array
     {
         if (is_array($value)) {
@@ -448,6 +503,20 @@ class ZionApiProxyController extends Controller
             : (float) preg_replace('/[^0-9.-]/', '', (string) $value);
 
         return $number > 0 ? $number : $fallback;
+    }
+
+    private function nonNegativeNumber(mixed $value, float|int $fallback): float|int
+    {
+        $raw = trim((string) $value);
+        if ($raw === '') {
+            return $fallback;
+        }
+
+        $number = is_numeric($value)
+            ? (float) $value
+            : (float) preg_replace('/[^0-9.-]/', '', $raw);
+
+        return $number >= 0 ? $number : $fallback;
     }
 
     private function normalizeDeliveryLocation(mixed $value): string
@@ -655,16 +724,6 @@ class ZionApiProxyController extends Controller
             ->all();
     }
 
-    private function defaultPaymentOptions(): array
-    {
-        return collect(['PAID AT AGENT', 'COLLECT', 'CREDIT OR DEBIT CARD', 'PAYPAL', 'SQUARE', 'SPLIT', 'PARTIAL PAYMENT'])
-            ->map(fn ($value) => [
-                'value' => $value,
-                'label' => $this->paymentLabel($value),
-            ])
-            ->all();
-    }
-
     private function paymentLabel(string $value): string
     {
         return match ($value) {
@@ -677,27 +736,6 @@ class ZionApiProxyController extends Controller
             'PARTIAL PAYMENT' => 'Partial Payment',
             default => ucwords(strtolower(str_replace(['_', '-'], ' ', $value))),
         };
-    }
-
-    private function documentUrl(Request $request, string $type): string
-    {
-        $shipmentId = trim((string) $request->query('shipment_id', $request->query('shipping_id', '')));
-        $invoice = trim((string) $request->query('invoice', $request->query('id', '')));
-
-        if ($shipmentId !== '' && ctype_digit($shipmentId)) {
-            return $this->zion->webUrl($type === 'label'
-                ? 'get_shipping_label/'.$shipmentId
-                : 'get_shipping_receipt/'.$shipmentId);
-        }
-
-        $cleanInvoice = preg_replace('/[^A-Za-z0-9_-]/', '', $invoice);
-        if ($cleanInvoice !== '') {
-            return $this->zion->webUrl($type === 'label'
-                ? 'label/label_'.$cleanInvoice.'.pdf'
-                : 'receipt/receipt_'.$cleanInvoice.'.pdf');
-        }
-
-        return $this->zion->webUrl('/');
     }
 
     private function jsonResponse(array $response): JsonResponse
