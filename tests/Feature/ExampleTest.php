@@ -378,6 +378,54 @@ class ExampleTest extends TestCase
         @unlink(storage_path('app/public/receipts/receipt_373988.pdf'));
     }
 
+    public function test_receipt_pdf_includes_package_details_from_shipment_history(): void
+    {
+        Http::fake([
+            '*/api/kay-paolo/shipping-history-filter' => Http::response([
+                'status' => 'success',
+                'shippings' => [[
+                    'id' => 24755,
+                    'invoice_num' => '479029',
+                    'tracking_number' => 'HTS479029-1/1',
+                    'package_description' => 'Household Goods',
+                    'package_count' => 2,
+                    'packages' => [],
+                    'dimensions' => [
+                        'package_count_ind' => [2],
+                        'weight' => [45],
+                        'length' => [24],
+                        'width' => [18],
+                        'height' => [16],
+                    ],
+                    'shipper_name' => 'Kay Shipper',
+                    'consignee_name' => 'Kay Consignee',
+                    'selected_shipper' => 'Economical Air',
+                    'freight' => 80,
+                    'tax' => 5,
+                    'total' => 85,
+                    'created_at' => '2026-08-01 10:00:00',
+                ]],
+            ]),
+        ]);
+
+        @unlink(storage_path('app/public/receipts/receipt_479029.pdf'));
+
+        $this->withSession(['zion.access_token' => 'test-token'])
+            ->get('/shipment-receipt?invoice=479029&id=HTS479029-1%2F1')
+            ->assertRedirect('/receipts/receipt_479029.pdf');
+
+        $path = storage_path('app/public/receipts/receipt_479029.pdf');
+        $this->assertFileExists($path);
+        $pdf = (string) file_get_contents($path);
+        $this->assertStringStartsWith('%PDF', $pdf);
+        $this->assertTrue(
+            str_contains($pdf, 'Household') || str_contains($pdf, 'Goods') || str_contains($pdf, '45'),
+            'Receipt PDF should embed package description or weight from history.'
+        );
+
+        @unlink($path);
+    }
+
     public function test_quote_proxy_falls_back_when_api_endpoint_requires_session_store(): void
     {
         Http::fake([

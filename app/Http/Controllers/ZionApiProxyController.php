@@ -272,9 +272,10 @@ class ZionApiProxyController extends Controller
     {
         $query = $request->query();
         $invoice = $this->documents->resolveInvoice($query);
+        $query['regen'] = '1';
 
         try {
-            $shipment = (array) session('kay_paolo.last_shipment', []);
+            $shipment = $this->resolveShipmentContext($request, $query);
             $path = $type === 'label'
                 ? $this->documents->ensureLabelPdf($query, $shipment)
                 : $this->documents->ensureReceiptPdf($query, $shipment);
@@ -317,6 +318,25 @@ class ZionApiProxyController extends Controller
             ], 404);
         }
 
+        $prefix = $directory === 'label' ? 'label' : 'receipt';
+        $invoice = $this->documents->invoiceFromFilename($safeName, $prefix);
+        if ($invoice !== '') {
+            try {
+                $query = ['invoice' => $invoice];
+                $shipment = $this->resolveShipmentContext(request(), $query);
+                if ($this->documents->shipmentHasPackageDetails($shipment)) {
+                    $query['regen'] = '1';
+                    if ($directory === 'label') {
+                        $this->documents->ensureLabelPdf($query, $shipment);
+                    } else {
+                        $this->documents->ensureReceiptPdf($query, $shipment);
+                    }
+                }
+            } catch (\Throwable $exception) {
+                report($exception);
+            }
+        }
+
         $path = storage_path('app/public/'.$directory.'/'.$safeName);
         if (!is_file($path)) {
             return response()->json([
@@ -328,8 +348,121 @@ class ZionApiProxyController extends Controller
         return response()->file($path, [
             'Content-Type' => 'application/pdf',
             'Content-Disposition' => 'inline; filename="'.$safeName.'"',
-            'Cache-Control' => 'private, max-age=86400',
+            'Cache-Control' => 'private, max-age=0, must-revalidate',
         ]);
+    }
+
+    private function resolveShipmentContext(Request $request, array $query): array
+    {
+        $sessionShipment = (array) session('kay_paolo.last_shipment', []);
+        $remote = $this->fetchShipmentRecord($request, $query);
+
+        if (!$remote) {
+            return $sessionShipment;
+        }
+
+        $sessionPayload = is_array($sessionShipment['payload'] ?? null) ? $sessionShipment['payload'] : [];
+        $sessionSelected = is_array($sessionShipment['selected'] ?? null) ? $sessionShipment['selected'] : [];
+
+        $remotePackages = $remote['packages'] ?? $remote['package'] ?? null;
+        if (is_string($remotePackages)) {
+            $decodedPackages = json_decode($remotePackages, true);
+            $remotePackages = is_array($decodedPackages) ? $decodedPackages : null;
+        }
+        $remoteDimensions = $remote['dimensions'] ?? null;
+        if (is_string($remoteDimensions)) {
+            $decodedDimensions = json_decode($remoteDimensions, true);
+            $remoteDimensions = is_array($decodedDimensions) ? $decodedDimensions : null;
+        }
+
+        return [
+            'response' => $remote,
+            'payload' => array_merge($sessionPayload, $remote, array_filter([
+                'package_description' => $remote['package_description'] ?? null,
+                'package_count' => $remote['package_count'] ?? null,
+                'dimensions' => is_array($remoteDimensions) && $remoteDimensions !== [] ? $remoteDimensions : null,
+                'packages' => is_array($remotePackages) && $remotePackages !== [] ? $remotePackages : null,
+                'delivery_option' => $remote['delivery_option'] ?? $remote['selected_shipper'] ?? null,
+                'selected_shipper' => $remote['selected_shipper'] ?? null,
+                'from_name' => $remote['from_name'] ?? $remote['shipper_name'] ?? null,
+                'from_address' => $remote['shipper_address'] ?? null,
+                'from_city' => $remote['shipper_city'] ?? null,
+                'from_state' => $remote['shipper_state'] ?? null,
+                'from_zip' => $remote['shipper_zip'] ?? null,
+                'from_country_name' => $remote['shipper_country'] ?? null,
+                'to_name' => $remote['to_name'] ?? $remote['consignee_name'] ?? null,
+                'to_address' => $remote['consignee_address'] ?? null,
+                'to_city' => $remote['consignee_city'] ?? null,
+                'to_state' => $remote['consignee_state'] ?? null,
+                'to_zip' => $remote['consignee_zip'] ?? null,
+                'to_country_name' => $remote['consignee_country'] ?? null,
+            ], static fn ($value) => $value !== null && $value !== '' && $value !== [])),
+            'selected' => array_merge($sessionSelected, array_filter([
+                'freight' => $remote['freight'] ?? null,
+                'tax' => $remote['tax'] ?? null,
+                'total' => $remote['total'] ?? null,
+                'insurance' => $remote['insurance'] ?? null,
+                'service' => $remote['selected_shipper'] ?? $remote['delivery_option'] ?? null,
+            ], static fn ($value) => $value !== null && $value !== '')),
+        ];
+    }
+
+    private function fetchShipmentRecord(Request $request, array $query): ?array
+    {
+        $token = $request->bearerToken()
+            ?: session('zion.access_token')
+            ?: $request->query('access_token')
+            ?: $request->query('token');
+
+        if (!$token) {
+            return null;
+        }
+
+        $invoice = $this->documents->resolveInvoice($query);
+        $shipmentId = $query['shipment_id'] ?? $query['shipping_id'] ?? null;
+        $search = trim((string) ($invoice !== '' ? $invoice : ($query['id'] ?? '')));
+
+        if ($search === '' && !$shipmentId) {
+            return null;
+        }
+
+        $response = $this->zion->post('kay-paolo/shipping-history-filter', array_filter([
+            'search' => $search !== '' ? $search : null,
+            'date_range' => '365 Days',
+            'limit' => 50,
+        ]), $token);
+
+        if (!($response['ok'] ?? false)) {
+            return null;
+        }
+
+        $rows = $response['data']['shippings']
+            ?? $response['data']['shipping_history']
+            ?? $response['data']['data']
+            ?? [];
+
+        if (!is_array($rows)) {
+            return null;
+        }
+
+        foreach ($rows as $row) {
+            if (!is_array($row)) {
+                continue;
+            }
+
+            $rowId = (string) ($row['id'] ?? $row['shipment_id'] ?? $row['shipping_id'] ?? '');
+            $rowInvoice = (string) ($row['invoice_num'] ?? $row['invoice'] ?? '');
+            if ($shipmentId && $rowId === (string) $shipmentId) {
+                return $row;
+            }
+            if ($invoice !== '' && $rowInvoice === $invoice) {
+                return $row;
+            }
+        }
+
+        $first = $rows[0] ?? null;
+
+        return is_array($first) ? $first : null;
     }
 
     private function forwardAuthenticated(string $endpoint, Request $request, ?array $payload = null): JsonResponse
