@@ -34,6 +34,8 @@ class ExampleTest extends TestCase
             '/invoice',
             '/receipt',
             '/receipt-a4',
+            '/shipment-label',
+            '/shipment-receipt',
             '/about',
             '/services',
             '/contact',
@@ -140,8 +142,8 @@ class ExampleTest extends TestCase
             ->assertSee('SHIPMENT NUMBER', false)
             ->assertSee('packageAmountDisplay', false)
             ->assertDontSee('CARRIER DETAILS', false)
-            ->assertSee('Open Label PDF', false)
-            ->assertSee('Open Receipt PDF', false)
+            ->assertSee('Open Label', false)
+            ->assertSee('Open Receipt', false)
             ->assertSee('Return to Home', false)
             ->assertSee('kayPaoloMarkConfirmationSeen', false);
 
@@ -305,7 +307,9 @@ class ExampleTest extends TestCase
         $this->assertStringContainsString('totalPackageWeight(payload) !== 0', $script);
         $this->assertStringContainsString('zionCarrierLogo', $script);
         $this->assertStringContainsString('Zion Shipping logo', $script);
-        $this->assertStringContainsString("params.set('access_token', storedToken())", $script);
+        $this->assertStringContainsString('labelDestination', $script);
+        $this->assertStringContainsString('receiptPackageCount', $script);
+        $this->assertStringNotContainsString("params.set('access_token', storedToken())", $script);
         $this->assertStringContainsString('isAdminRole', $script);
         $this->assertStringNotContainsString('Door to Door', $script);
         $this->assertStringNotContainsString('Port to Port', $script);
@@ -340,41 +344,29 @@ class ExampleTest extends TestCase
             ->assertJsonPath('options.0.value', 'COLLECT');
     }
 
-    public function test_shipment_document_routes_stream_pdf_from_shipping_api(): void
+    public function test_shipment_document_routes_render_kay_branded_document_ui(): void
     {
-        Http::fake([
-            '*/api/kay-paolo/shipment-label*' => Http::response('%PDF-label', 200, [
-                'Content-Type' => 'application/pdf',
-                'Content-Disposition' => 'inline; filename="label_24745.pdf"',
-            ]),
-            '*/api/kay-paolo/shipment-receipt*' => Http::response('%PDF-receipt', 200, [
-                'Content-Type' => 'application/pdf',
-                'Content-Disposition' => 'inline; filename="receipt_24745.pdf"',
-            ]),
-        ]);
+        Http::fake();
 
-        $this->withSession(['zion.access_token' => 'session-token'])
-            ->get('/shipment-label?shipment_id=24745')
+        $this->get('/shipment-label?shipment_id=24755&invoice=373988&id=HTS373988-1%2F2%2C+HTS373988-2%2F2')
             ->assertOk()
-            ->assertHeader('Content-Type', 'application/pdf')
-            ->assertSee('%PDF-label', false);
+            ->assertSee('A4 Shipping Label', false)
+            ->assertSee('Kay Paolo Shipping', false)
+            ->assertSee('data-shipment-document', false)
+            ->assertSee('HTS373988-1/2, HTS373988-2/2', false)
+            ->assertDontSee('%PDF', false)
+            ->assertDontSee('Zion Shipping', false);
 
-        $this->withSession(['zion.access_token' => 'session-token'])
-            ->get('/shipment-receipt?invoice=HTE59174')
+        $this->get('/shipment-receipt?shipment_id=24755&invoice=373988&id=HTS373988-1%2F2%2C+HTS373988-2%2F2')
             ->assertOk()
-            ->assertHeader('Content-Type', 'application/pdf')
-            ->assertSee('%PDF-receipt', false);
+            ->assertSee('Shipment Receipt', false)
+            ->assertSee('Print Receipt', false)
+            ->assertSee('Kay Paolo Shipping', false)
+            ->assertSee('373988', false)
+            ->assertDontSee('%PDF', false)
+            ->assertDontSee('Zion Shipping', false);
 
-        $this->get('/shipment-label?shipment_id=24755&invoice=373988&id=HTS373988-1%2F2%2C+HTS373988-2%2F2&access_token=query-token')
-            ->assertOk()
-            ->assertHeader('Content-Type', 'application/pdf')
-            ->assertSee('%PDF-label', false);
-
-        Http::assertSent(function ($request) {
-            return str_contains((string) $request->url(), '/api/kay-paolo/shipment-label')
-                && !str_contains((string) $request->url(), 'access_token=')
-                && $request->hasHeader('Authorization');
-        });
+        Http::assertNothingSent();
     }
 
     public function test_quote_proxy_falls_back_when_api_endpoint_requires_session_store(): void
