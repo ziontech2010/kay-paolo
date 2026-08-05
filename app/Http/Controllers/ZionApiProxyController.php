@@ -208,6 +208,20 @@ class ZionApiProxyController extends Controller
 
     public function shipmentLabel(Request $request): Response|JsonResponse
     {
+        return $this->shipmentDocumentResponse($request, 'kay-paolo/shipment-label', 'shipment-label.pdf', 'documents.label');
+    }
+
+    public function shipmentReceipt(Request $request): Response|JsonResponse
+    {
+        return $this->shipmentDocumentResponse($request, 'kay-paolo/shipment-receipt', 'shipment-receipt.pdf', 'documents.receipt');
+    }
+
+    private function shipmentDocumentResponse(
+        Request $request,
+        string $endpoint,
+        string $fallbackFilename,
+        string $fallbackView
+    ): Response|JsonResponse {
         $token = $request->bearerToken()
             ?: session('zion.access_token')
             ?: $request->query('access_token')
@@ -218,7 +232,7 @@ class ZionApiProxyController extends Controller
             || $request->filled('invoice');
 
         if ($token && $hasShipmentRef) {
-            $pdfResponse = $this->streamZionDocument($request, 'kay-paolo/shipment-label', 'shipment-label.pdf');
+            $pdfResponse = $this->streamZionDocument($request, $endpoint, $fallbackFilename);
             $contentType = strtolower((string) $pdfResponse->headers->get('Content-Type', ''));
 
             if (str_contains($contentType, 'application/pdf') || str_starts_with(ltrim((string) $pdfResponse->getContent()), '%PDF')) {
@@ -226,14 +240,7 @@ class ZionApiProxyController extends Controller
             }
         }
 
-        return response()->view('documents.label', [
-            'documentQuery' => $request->query(),
-        ]);
-    }
-
-    public function shipmentReceipt(Request $request): Response|JsonResponse
-    {
-        return response()->view('documents.receipt', [
+        return response()->view($fallbackView, [
             'documentQuery' => $request->query(),
         ]);
     }
