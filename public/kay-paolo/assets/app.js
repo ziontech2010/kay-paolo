@@ -1277,6 +1277,17 @@ document.addEventListener('DOMContentLoaded', () => {
     setText('packageAmountDisplay', `${data.packageCount} package${Number(data.packageCount) === 1 ? '' : 's'}`);
     setDocumentHref('openLabelBtn', route('shipmentLabel', '/shipment-label'), data, shipmentNo);
     setDocumentHref('openReceiptBtn', route('shipmentReceipt', '/shipment-receipt'), data, shipmentNo);
+    syncShipmentDocumentContext(shipment);
+  }
+
+  async function syncShipmentDocumentContext(shipment) {
+    try {
+      await postJson(route('storeShipmentDocumentContext', '/api/kay-paolo/store-shipment-document-context'), {
+        response: shipment.response || {},
+        payload: shipment.payload || {},
+        selected: shipment.selected || {}
+      }, { token: storedToken() });
+    } catch (error) {}
   }
 
   function setDocumentHref(id, baseUrl, data, shipmentNo) {

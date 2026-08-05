@@ -13,6 +13,7 @@ Route::prefix('kay-paolo')->name('api.kay-paolo.')->group(function () {
     Route::post('/save-consignee', [ZionApiProxyController::class, 'saveConsignee'])->name('save-consignee');
     Route::post('/quote', [ZionApiProxyController::class, 'quote'])->name('quote');
     Route::post('/shipping', [ZionApiProxyController::class, 'createShipment'])->name('shipping');
+    Route::post('/store-shipment-document-context', [ZionApiProxyController::class, 'storeShipmentDocumentContext'])->name('store-shipment-document-context');
     Route::post('/shipping-history', [ZionApiProxyController::class, 'shippingHistory'])->name('shipping-history');
     Route::post('/validate-tracking', [ZionApiProxyController::class, 'tracking'])->name('validate-tracking');
     Route::post('/email-shipment', [ZionApiProxyController::class, 'emailShipment'])->name('email-shipment');

@@ -194,6 +194,7 @@
             paymentOptions: @json(route('api.kay-paolo.payment-options')),
             quote: @json(route('api.kay-paolo.quote')),
             shipping: @json(route('api.kay-paolo.shipping')),
+            storeShipmentDocumentContext: @json(route('api.kay-paolo.store-shipment-document-context')),
             tracking: @json(route('api.kay-paolo.validate-tracking')),
             fetchUserForQuote: @json(route('api.kay-paolo.fetch-user-for-quote')),
             consigneeList: @json(route('api.kay-paolo.consignee-list')),
