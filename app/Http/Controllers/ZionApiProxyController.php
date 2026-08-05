@@ -2,16 +2,20 @@
 
 namespace App\Http\Controllers;
 
+use App\Services\ShipmentDocumentPdfService;
 use App\Services\ZionShippingApi;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class ZionApiProxyController extends Controller
 {
-    public function __construct(private readonly ZionShippingApi $zion)
-    {
+    public function __construct(
+        private readonly ZionShippingApi $zion,
+        private readonly ShipmentDocumentPdfService $documents
+    ) {
     }
 
     public function login(Request $request): JsonResponse|RedirectResponse|Response
@@ -154,13 +158,51 @@ class ZionApiProxyController extends Controller
             $retryResponse = $this->zion->postWeb('web-api/update-shipping-bocicot', $payload, $token);
 
             if (!$this->isRecoverableZionAccountNumberSchemaError($retryResponse)) {
+                $this->rememberShipmentContext($request, $retryResponse['data'] ?? [], $payload);
+
                 return $this->jsonResponse($retryResponse);
             }
 
             $response = $retryResponse;
         }
 
+        if ($response['ok'] ?? false) {
+            $this->rememberShipmentContext($request, $response['data'] ?? [], $payload);
+        }
+
         return $this->jsonResponse($response);
+    }
+
+    public function storeShipmentDocumentContext(Request $request): JsonResponse
+    {
+        $payload = $request->validate([
+            'response' => ['nullable', 'array'],
+            'payload' => ['nullable', 'array'],
+            'selected' => ['nullable', 'array'],
+        ]);
+
+        if ($request->hasSession()) {
+            $request->session()->put('kay_paolo.last_shipment', [
+                'response' => $payload['response'] ?? [],
+                'payload' => $payload['payload'] ?? [],
+                'selected' => $payload['selected'] ?? [],
+            ]);
+        }
+
+        return response()->json(['status' => 'success']);
+    }
+
+    private function rememberShipmentContext(Request $request, array $responseData, array $payload): void
+    {
+        if (!$request->hasSession()) {
+            return;
+        }
+
+        $request->session()->put('kay_paolo.last_shipment', [
+            'response' => $responseData,
+            'payload' => $payload,
+            'selected' => [],
+        ]);
     }
 
     public function shippingHistory(Request $request): JsonResponse
@@ -206,17 +248,87 @@ class ZionApiProxyController extends Controller
         return $this->jsonResponse($response);
     }
 
-    public function shipmentLabel(Request $request): Response
+    public function shipmentLabel(Request $request): BinaryFileResponse|RedirectResponse|JsonResponse|Response
     {
-        return response()->view('documents.label', [
-            'documentQuery' => $request->query(),
+        return $this->serveGeneratedPdf($request, 'label');
+    }
+
+    public function shipmentReceipt(Request $request): BinaryFileResponse|RedirectResponse|JsonResponse|Response
+    {
+        return $this->serveGeneratedPdf($request, 'receipt');
+    }
+
+    public function storedLabel(string $filename): BinaryFileResponse|JsonResponse
+    {
+        return $this->serveStoredPdf('label', $filename);
+    }
+
+    public function storedReceipt(string $filename): BinaryFileResponse|JsonResponse
+    {
+        return $this->serveStoredPdf('receipts', $filename);
+    }
+
+    private function serveGeneratedPdf(Request $request, string $type): BinaryFileResponse|RedirectResponse|JsonResponse|Response
+    {
+        $query = $request->query();
+        $invoice = $this->documents->resolveInvoice($query);
+
+        try {
+            $shipment = (array) session('kay_paolo.last_shipment', []);
+            $path = $type === 'label'
+                ? $this->documents->ensureLabelPdf($query, $shipment)
+                : $this->documents->ensureReceiptPdf($query, $shipment);
+        } catch (\Throwable $exception) {
+            report($exception);
+
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Unable to generate PDF document.',
+            ], 500);
+        }
+
+        if ($request->boolean('download')) {
+            return response()->download($path, basename($path), [
+                'Content-Type' => 'application/pdf',
+            ]);
+        }
+
+        if ($invoice !== '') {
+            $url = $type === 'label'
+                ? $this->documents->labelPublicUrl($invoice)
+                : $this->documents->receiptPublicUrl($invoice);
+
+            return redirect()->to($url);
+        }
+
+        return response()->file($path, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => 'inline; filename="'.basename($path).'"',
         ]);
     }
 
-    public function shipmentReceipt(Request $request): Response
+    private function serveStoredPdf(string $directory, string $filename): BinaryFileResponse|JsonResponse
     {
-        return response()->view('documents.receipt', [
-            'documentQuery' => $request->query(),
+        $safeName = basename($filename);
+        if (!preg_match('/^[A-Za-z0-9_-]+\.pdf$/', $safeName)) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Invalid document filename.',
+            ], 404);
+        }
+
+        $path = storage_path('app/public/'.$directory.'/'.$safeName);
+        if (!is_file($path)) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'PDF document not found.',
+            ], 404);
+        }
+
+        return response()->file($path, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => 'inline; filename="'.$safeName.'"',
+            'Cache-Control' => 'private, max-age=86400',
         ]);
     }
 

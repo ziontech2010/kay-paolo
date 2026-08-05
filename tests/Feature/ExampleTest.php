@@ -34,8 +34,6 @@ class ExampleTest extends TestCase
             '/invoice',
             '/receipt',
             '/receipt-a4',
-            '/shipment-label',
-            '/shipment-receipt',
             '/about',
             '/services',
             '/contact',
@@ -353,34 +351,31 @@ class ExampleTest extends TestCase
     {
         Http::fake();
 
-        $labelResponse = $this->get('/shipment-label?shipment_id=24755&invoice=373988&id=HTS373988-1%2F2%2C+HTS373988-2%2F2')
-            ->assertOk()
-            ->assertSee('Shipping Label', false)
-            ->assertSee('Kay Paolo Shipping', false)
-            ->assertSee('data-shipment-document', false)
-            ->assertSee('Print / Save PDF', false)
-            ->assertSee('Sender', false)
-            ->assertSee('Receiver', false)
-            ->assertSee('HTS373988-1/2', false)
-            ->assertSee('HTS373988-2/2', false)
-            ->assertDontSee('HTS373988-1/2, HTS373988-2/2', false)
-            ->assertDontSee('%PDF', false)
-            ->assertDontSee('Zion Shipping', false);
+        @unlink(storage_path('app/public/label/label_373988.pdf'));
+        @unlink(storage_path('app/public/receipts/receipt_373988.pdf'));
 
-        $this->assertSame(2, substr_count($labelResponse->getContent(), 'data-package-label="true"'));
+        $this->get('/shipment-label?shipment_id=24755&invoice=373988&id=HTS373988-1%2F2%2C+HTS373988-2%2F2')
+            ->assertRedirect('/label/label_373988.pdf');
+
+        $this->assertFileExists(storage_path('app/public/label/label_373988.pdf'));
+        $this->assertStringStartsWith('%PDF', (string) file_get_contents(storage_path('app/public/label/label_373988.pdf')));
+
+        $this->get('/label/label_373988.pdf')
+            ->assertOk()
+            ->assertHeader('content-type', 'application/pdf');
 
         $this->get('/shipment-receipt?shipment_id=24755&invoice=373988&id=HTS373988-1%2F2%2C+HTS373988-2%2F2')
-            ->assertOk()
-            ->assertSee('Shipment Receipt', false)
-            ->assertSee('Invoice', false)
-            ->assertSee('Print / Save PDF', false)
-            ->assertSee('Kay Paolo Shipping', false)
-            ->assertSee('Task Description', false)
-            ->assertSee('373988', false)
-            ->assertDontSee('%PDF', false)
-            ->assertDontSee('Zion Shipping', false);
+            ->assertRedirect('/receipts/receipt_373988.pdf');
 
-        Http::assertNothingSent();
+        $this->assertFileExists(storage_path('app/public/receipts/receipt_373988.pdf'));
+        $this->assertStringStartsWith('%PDF', (string) file_get_contents(storage_path('app/public/receipts/receipt_373988.pdf')));
+
+        $this->get('/receipts/receipt_373988.pdf')
+            ->assertOk()
+            ->assertHeader('content-type', 'application/pdf');
+
+        @unlink(storage_path('app/public/label/label_373988.pdf'));
+        @unlink(storage_path('app/public/receipts/receipt_373988.pdf'));
     }
 
     public function test_quote_proxy_falls_back_when_api_endpoint_requires_session_store(): void
