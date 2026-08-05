@@ -305,6 +305,7 @@ class ExampleTest extends TestCase
         $this->assertStringContainsString('totalPackageWeight(payload) !== 0', $script);
         $this->assertStringContainsString('zionCarrierLogo', $script);
         $this->assertStringContainsString('Zion Shipping logo', $script);
+        $this->assertStringContainsString("params.set('access_token', storedToken())", $script);
         $this->assertStringContainsString('isAdminRole', $script);
         $this->assertStringNotContainsString('Door to Door', $script);
         $this->assertStringNotContainsString('Port to Port', $script);
@@ -363,6 +364,17 @@ class ExampleTest extends TestCase
             ->assertOk()
             ->assertHeader('Content-Type', 'application/pdf')
             ->assertSee('%PDF-receipt', false);
+
+        $this->get('/shipment-label?shipment_id=24755&invoice=373988&id=HTS373988-1%2F2%2C+HTS373988-2%2F2&access_token=query-token')
+            ->assertOk()
+            ->assertHeader('Content-Type', 'application/pdf')
+            ->assertSee('%PDF-label', false);
+
+        Http::assertSent(function ($request) {
+            return str_contains((string) $request->url(), '/api/kay-paolo/shipment-label')
+                && !str_contains((string) $request->url(), 'access_token=')
+                && $request->hasHeader('Authorization');
+        });
     }
 
     public function test_quote_proxy_falls_back_when_api_endpoint_requires_session_store(): void
