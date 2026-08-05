@@ -1284,7 +1284,6 @@ document.addEventListener('DOMContentLoaded', () => {
     if (data.shipmentId) params.set('shipment_id', data.shipmentId);
     if (data.documentNumber && data.documentNumber !== 'Pending') params.set('invoice', data.documentNumber);
     if (shipmentNo && shipmentNo !== 'Pending') params.set('id', shipmentNo);
-    if (storedToken()) params.set('access_token', storedToken());
     link.href = params.toString() ? `${baseUrl}?${params}` : baseUrl;
   }
 
@@ -1323,15 +1322,24 @@ document.addEventListener('DOMContentLoaded', () => {
     setText('receiptA4LargeNumber', data.tracking);
     setText('receiptA4Shipper', `${data.shipperName}\n${data.shipperAddress}\n${data.shipperContact}`);
     setText('receiptA4Receiver', `${data.consigneeName}\n${data.consigneeAddress}\n${data.consigneeContact}`);
-    setText('receiptA4Package', `${data.description} / ${data.packageCount} package(s) / ${data.totalWeight} lb`);
+    setText('receiptA4Package', `${data.description || 'Package'} (${data.packageCount} pcs) / ${data.totalWeight} lb`);
     setText('receiptA4PaymentType', data.paymentType);
     setText('receiptA4Total', moneyText(data.total));
+    setText('labelDueType', data.chargeStatus);
+    setText('labelDestination', data.destinationLabel);
+    setText('labelDeliveryNumber', data.deliveryNumber);
+    setText('receiptPackageCount', data.packageCount);
+    setText('receiptTotalWeight', `${data.totalWeight} lb`);
   }
 
   function buildShipmentDocumentData(response, payload, selected) {
     const responseData = response.data || {};
     const shipping = response.shipping_data || response.shipping || responseData.shipping_data || responseData.shipping || {};
-    const tracking = response.tracking_number
+    const query = new URLSearchParams(window.location.search);
+    const queryTracking = query.get('id') || query.get('tracking_number') || query.get('tracking') || query.get('awb') || '';
+    const queryInvoice = query.get('invoice') || query.get('invoice_num') || '';
+    const tracking = queryTracking
+      || response.tracking_number
       || response.invoice_num
       || response.awb
       || responseData.tracking_number
@@ -1339,13 +1347,23 @@ document.addEventListener('DOMContentLoaded', () => {
       || shipping.invoice_num
       || payload.tracking_number
       || 'Pending';
-    const documentNumber = response.invoice_num
+    const documentNumber = queryInvoice
+      || response.invoice_num
       || responseData.invoice_num
       || shipping.invoice_num
       || tracking;
     const description = payload.package_description || shipping.package_description || '';
     const items = packageRowsFromPayload(payload, description);
     const totalWeight = items.reduce((sum, item) => sum + numberValue(item.weight, 0), 0) || 1;
+    const paymentType = payload.payment_type || shipping.payment_type || 'PAID AT AGENT';
+    const toCity = payload.to_city || shipping.consignee_city || shipping.to_city || '';
+    const toState = payload.to_state || shipping.consignee_state || shipping.to_state || '';
+    const toCountry = payload.to_country_name || shipping.consignee_country || shipping.to_country || '';
+    const destinationLabel = [toCity, toState || toCountry].filter(Boolean).join(' - ') || 'Destination';
+    const deliveryNumber = response.delivery_number
+      || responseData.delivery_number
+      || shipping.delivery_number
+      || (documentNumber && documentNumber !== 'Pending' ? `DLV${String(documentNumber).replace(/\D/g, '').slice(-6) || documentNumber}` : 'Pending');
 
     return {
       shipmentId: response.shipment_id
@@ -1361,7 +1379,10 @@ document.addEventListener('DOMContentLoaded', () => {
       tracking,
       date: readableDate(response.created_at || responseData.created_at || shipping.created_at || new Date()),
       status: response.status_name || response.status || response.message || responseData.status || shipping.status || 'Booked',
-      paymentType: payload.payment_type || shipping.payment_type || 'PAID AT AGENT',
+      paymentType,
+      chargeStatus: String(paymentType).toUpperCase().includes('PAID') ? 'PAID' : 'DUE',
+      destinationLabel,
+      deliveryNumber,
       shipperName: payload.from_name || shipping.shipper_name || storedUser().name || 'Kay Paolo Customer',
       shipperAddress: [payload.from_address, payload.from_city, payload.from_state, payload.from_zip, payload.from_country_name].filter(Boolean).join(', ') || '414 Main St, Asbury Park, NJ 07712',
       shipperContact: [payload.from_phone, payload.from_email || storedUser().email].filter(Boolean).join(' / ') || 'info@kaypaoloshipping.com',
