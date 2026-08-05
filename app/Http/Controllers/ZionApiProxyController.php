@@ -23,7 +23,6 @@ class ZionApiProxyController extends Controller
         $payload = $request->validate([
             'email' => ['required', 'string'],
             'password' => ['required', 'string'],
-            'role_id' => ['nullable', 'integer'],
         ]);
 
         $response = $this->zion->post('kay-paolo/login', array_filter($payload, static function ($value) {

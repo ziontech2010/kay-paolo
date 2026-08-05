@@ -4,147 +4,158 @@
     <meta charset="UTF-8">
     <title>Label {{ $trackingDisplay }}</title>
     <style>
-        @page { margin: 14px 16px 170px 16px; }
-        body { font-family: DejaVu Sans, Arial, sans-serif; color: #000; font-size: 12px; margin: 0; }
-        .page { page-break-after: always; }
+        @page { margin: 10px; }
+        * { box-sizing: border-box; }
+        body {
+            font-family: DejaVu Sans, Arial, sans-serif;
+            color: #000;
+            font-size: 15px;
+            margin: 0;
+            padding: 0;
+        }
+        .page {
+            page-break-after: always;
+            width: 100%;
+            border: 3px solid #000;
+        }
         .page:last-child { page-break-after: auto; }
-        .header { width: 100%; border-collapse: collapse; margin-bottom: 4px; }
-        .header td { vertical-align: middle; border: 0; padding: 0; }
-        .logo { width: 110px; }
-        .header-meta { text-align: right; }
-        .awb-text { font-size: 12px; font-weight: 700; margin-top: 2px; }
-        .dash { border-top: 2px dashed #94a3b8; margin: 8px 0; }
-        .details { width: 100%; border-collapse: collapse; border: 2px solid #000; margin-bottom: 8px; }
-        .details th, .details td { border: 1px solid #000; padding: 8px 10px; vertical-align: top; width: 50%; }
-        .title { font-size: 22px; font-weight: 700; text-align: center; padding: 6px !important; }
-        .label { font-size: 10px; font-weight: 700; text-transform: uppercase; margin-bottom: 4px; }
-        .addr { font-size: 12px; line-height: 1.35; white-space: pre-line; }
-        .weight { font-weight: 700; margin-top: 10px; }
-        .huge { font-size: 30px; font-weight: 700; text-align: center; margin: 8px 0 6px; letter-spacing: 0.5px; }
-        .pkg { border: 2px solid #000; padding: 8px 10px; }
-        .pkg-title { font-weight: 700; margin-bottom: 4px; font-size: 12px; }
-        .scan-zone {
-            position: fixed;
-            left: 16px;
-            right: 16px;
-            bottom: 14px;
-            border: 2px solid #000;
-            padding: 12px 12px 10px;
+        table { width: 100%; border-collapse: collapse; }
+        td, th { vertical-align: top; padding: 8px 10px; }
+        .row-border { border-bottom: 3px solid #000; }
+        .col-border { border-right: 3px solid #000; }
+        .logo { width: 120px; height: auto; }
+        .from-label {
+            font-size: 15px;
+            font-weight: 700;
+            text-transform: uppercase;
+            margin-bottom: 4px;
+        }
+        .from-name { font-size: 15px; font-weight: 700; line-height: 1.25; }
+        .from-meta { font-size: 14px; line-height: 1.3; margin-top: 2px; }
+        .weight { font-size: 15px; font-weight: 700; margin-top: 8px; }
+        .to-label {
+            font-size: 18px;
+            font-weight: 700;
+            text-transform: uppercase;
+            margin-bottom: 4px;
+        }
+        .to-name { font-size: 26px; font-weight: 700; line-height: 1.15; }
+        .to-addr { font-size: 18px; font-weight: 700; line-height: 1.25; margin-top: 4px; white-space: pre-line; }
+        .to-phone { font-size: 18px; font-weight: 700; margin-top: 6px; }
+        .awb {
+            font-size: 48px;
+            font-weight: 700;
             text-align: center;
-            background: #fff;
+            padding: 8px 4px !important;
+            letter-spacing: 0.5px;
+            line-height: 1.05;
+            word-break: break-word;
+        }
+        .status-cell {
+            width: 34%;
+            font-size: 28px;
+            font-weight: 700;
+            text-align: center;
+            vertical-align: middle !important;
+            padding: 10px 6px !important;
+        }
+        .dest-cell {
+            width: 66%;
+            font-size: 26px;
+            font-weight: 700;
+            text-align: center;
+            vertical-align: middle !important;
+            padding: 10px 6px !important;
+            line-height: 1.15;
+        }
+        .scan-wrap {
+            text-align: center;
+            padding: 8px 6px 4px !important;
         }
         .scan-title {
-            font-size: 10px;
-            font-weight: 700;
-            letter-spacing: 2px;
-            text-transform: uppercase;
-            margin-bottom: 8px;
-            color: #111;
-        }
-        .scan-zone img.scan-barcode {
-            height: 88px;
-            max-width: 96%;
-        }
-        .scan-awb {
-            font-size: 13px;
-            font-weight: 700;
-            margin-top: 6px;
-        }
-        .scan-delivery {
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 8px;
-            border-top: 1px dashed #94a3b8;
-        }
-        .scan-delivery td {
-            border: 0;
-            vertical-align: middle;
-            padding-top: 8px;
-        }
-        .scan-delivery img {
-            height: 36px;
-        }
-        .scan-delivery-text {
-            text-align: right;
             font-size: 11px;
             font-weight: 700;
+            letter-spacing: 1.5px;
+            text-transform: uppercase;
+            margin-bottom: 4px;
+        }
+        .scan-barcode {
+            width: 94%;
+            height: 90px;
+            display: block;
+            margin: 0 auto;
+        }
+        .scan-awb {
+            font-size: 15px;
+            font-weight: 700;
+            margin-top: 4px;
+        }
+        .pkg-title { font-size: 14px; font-weight: 700; margin-bottom: 2px; }
+        .pkg-text { font-size: 15px; font-weight: 700; line-height: 1.25; }
+        .footer-meta {
+            font-size: 13px;
+            font-weight: 700;
+            text-align: center;
+            padding: 6px 8px !important;
         }
     </style>
 </head>
 <body>
 @foreach ($labels as $labelNumber)
     <div class="page">
-        <table class="header">
+        <table>
             <tr>
-                <td style="width: 42%">
+                <td class="row-border col-border" style="width: 42%; text-align: center; vertical-align: middle !important; padding: 10px;">
                     @if (is_file($logoPath))
                         <img class="logo" src="{{ $logoPath }}" alt="Kay Paolo Shipping">
                     @else
-                        <strong>KAY PAOLO SHIPPING</strong>
+                        <strong style="font-size: 16px">KAY PAOLO</strong>
                     @endif
                 </td>
-                <td class="header-meta">
-                    <div class="awb-text">AWB No. {{ $labelNumber }}</div>
-                    <div class="awb-text" style="font-weight: 600; margin-top: 2px">Invoice {{ $invoice }}</div>
+                <td class="row-border" style="width: 58%">
+                    <div class="from-label">From</div>
+                    <div class="from-name">{{ $shipperName }}</div>
+                    <div class="from-meta">{{ $shipperPhone }}</div>
+                    <div class="from-meta" style="white-space: pre-line">{{ $shipperAddress }}</div>
+                    <div class="weight">{{ $weightDim }}</div>
+                </td>
+            </tr>
+            <tr>
+                <td class="row-border" colspan="2">
+                    <div class="to-label">To</div>
+                    <div class="to-name">{{ $consigneeName }}</div>
+                    <div class="to-addr">{{ $consigneeAddress }}</div>
+                    <div class="to-phone">{{ $consigneePhone }}</div>
+                </td>
+            </tr>
+            <tr>
+                <td class="row-border awb" colspan="2">{{ $labelNumber }}</td>
+            </tr>
+            <tr>
+                <td class="row-border col-border status-cell">{{ $chargeStatus }}</td>
+                <td class="row-border dest-cell">{{ $destination }}</td>
+            </tr>
+            <tr>
+                <td class="row-border scan-wrap" colspan="2">
+                    <div class="scan-title">Scan Code</div>
+                    @if (($scanBarcodeUri ?? $barcodeUri) !== '')
+                        <img class="scan-barcode" src="{{ $scanBarcodeUri ?? $barcodeUri }}" alt="scan barcode">
+                    @endif
+                    <div class="scan-awb">{{ $barcodeValue }} &nbsp;|&nbsp; {{ $labelNumber }}</div>
+                </td>
+            </tr>
+            <tr>
+                <td colspan="2" style="padding: 8px 10px">
+                    <div class="pkg-title">Package Contents</div>
+                    <div class="pkg-text">{{ $packageText }}</div>
+                </td>
+            </tr>
+            <tr>
+                <td class="footer-meta" colspan="2" style="border-top: 3px solid #000">
+                    Invoice {{ $invoice }} &nbsp;|&nbsp; Delivery {{ $deliveryNumber }}
                 </td>
             </tr>
         </table>
-
-        <div class="dash"></div>
-
-        <table class="details">
-            <tr>
-                <th class="title">{{ $chargeStatus }}</th>
-                <th class="title" style="font-size: 18px">{{ $destination }}</th>
-            </tr>
-            <tr>
-                <td>
-                    <div class="label">Sender</div>
-                    <div class="addr"><strong>{{ $shipperName }}</strong>
-{{ $shipperPhone }}
-
-{{ $shipperAddress }}</div>
-                    <div class="addr weight">{{ $weightDim }}</div>
-                </td>
-                <td>
-                    <div class="label">Receiver</div>
-                    <div class="addr"><strong>{{ $consigneeName }}</strong>
-
-{{ $consigneeAddress }}
-
-{{ $consigneePhone }}</div>
-                </td>
-            </tr>
-        </table>
-
-        <div class="huge">{{ $labelNumber }}</div>
-        <div class="dash"></div>
-
-        <div class="pkg">
-            <div class="pkg-title">Package Contents:</div>
-            <div>{{ $packageText }}</div>
-        </div>
-
-        <div class="scan-zone">
-            <div class="scan-title">Scan Code</div>
-            @if (($scanBarcodeUri ?? $barcodeUri) !== '')
-                <img class="scan-barcode" src="{{ $scanBarcodeUri ?? $barcodeUri }}" alt="scan barcode">
-            @endif
-            <div class="scan-awb">AWB No. {{ $labelNumber }}</div>
-
-            <table class="scan-delivery">
-                <tr>
-                    <td style="width: 58%; text-align: left">
-                        @if ($deliveryBarcodeUri !== '')
-                            <img src="{{ $deliveryBarcodeUri }}" alt="delivery barcode">
-                        @endif
-                    </td>
-                    <td class="scan-delivery-text">
-                        Delivery No. {{ $deliveryNumber }}
-                    </td>
-                </tr>
-            </table>
-        </div>
     </div>
 @endforeach
 </body>

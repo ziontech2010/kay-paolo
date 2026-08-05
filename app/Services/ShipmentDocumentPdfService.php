@@ -86,7 +86,8 @@ class ShipmentDocumentPdfService
         $path = $this->labelPath($invoice);
         // Always rebuild labels so layout/template updates are never stuck behind a stale file.
         $payload = $this->documentPayload($query, $shipment);
-        $pdf = Pdf::loadView('documents.pdf.label', $payload)->setPaper('a4', 'portrait');
+        // Match Zion 4x6 label stock (384x576 DomPDF points).
+        $pdf = Pdf::loadView('documents.pdf.label', $payload)->setPaper([0, 0, 384, 576], 'portrait');
         $this->write($path, $pdf->output());
         $this->mirrorPublicCopy($path, 'label');
 
@@ -123,7 +124,7 @@ class ShipmentDocumentPdfService
         return $matches[1];
     }
 
-    public function barcodeDataUri(string $value, int $height = 50): string
+    public function barcodeDataUri(string $value, int $height = 50, int $widthFactor = 2): string
     {
         $value = trim($value);
         if ($value === '' || strcasecmp($value, 'Pending') === 0) {
@@ -136,7 +137,12 @@ class ShipmentDocumentPdfService
 
         try {
             $generator = new BarcodeGeneratorPNG();
-            $png = $generator->getBarcode($value, $generator::TYPE_CODE_128, 2, $height);
+            $png = $generator->getBarcode(
+                $value,
+                $generator::TYPE_CODE_128,
+                max(1, $widthFactor),
+                max(20, $height)
+            );
 
             return 'data:image/png;base64,'.base64_encode($png);
         } catch (\Throwable) {
@@ -285,10 +291,10 @@ class ShipmentDocumentPdfService
             'labels' => $labels,
             'trackingDisplay' => $trackingDisplay,
             'barcodeValue' => $barcodeValue ?: 'Pending',
-            'barcodeUri' => $this->barcodeDataUri($barcodeValue ?: '0', 56),
-            'scanBarcodeUri' => $this->barcodeDataUri($barcodeValue ?: '0', 130),
+            'barcodeUri' => $this->barcodeDataUri($barcodeValue ?: '0', 70, 3),
+            'scanBarcodeUri' => $this->barcodeDataUri($barcodeValue ?: '0', 110, 3),
             'deliveryNumber' => $deliveryNumber,
-            'deliveryBarcodeUri' => $this->barcodeDataUri($deliveryNumber, 48),
+            'deliveryBarcodeUri' => $this->barcodeDataUri($deliveryNumber, 48, 2),
             'chargeStatus' => $chargeStatus,
             'destination' => $destination,
             'shipperName' => $shipperName,
