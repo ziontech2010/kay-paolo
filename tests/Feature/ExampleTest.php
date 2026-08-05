@@ -398,6 +398,24 @@ class ExampleTest extends TestCase
             ->assertSee('%PDF', false);
     }
 
+    public function test_shipment_receipt_streams_zion_pdf_when_authenticated(): void
+    {
+        Http::fake([
+            '*/api/kay-paolo/shipment-receipt*' => Http::response('%PDF-1.4 fake-receipt', 200, [
+                'Content-Type' => 'application/pdf',
+                'Content-Disposition' => 'inline; filename="receipt_373988.pdf"',
+            ]),
+        ]);
+
+        $this->withSession([
+            'zion.access_token' => 'session-token',
+            'zion.user' => ['name' => 'Test User'],
+        ])->get('/shipment-receipt?shipment_id=24755&invoice=373988&id=HTS373988-1%2F2')
+            ->assertOk()
+            ->assertHeader('content-type', 'application/pdf')
+            ->assertSee('%PDF', false);
+    }
+
     public function test_quote_proxy_falls_back_when_api_endpoint_requires_session_store(): void
     {
         Http::fake([
