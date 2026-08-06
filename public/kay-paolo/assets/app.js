@@ -615,11 +615,33 @@ document.addEventListener('DOMContentLoaded', () => {
     const quoteCustomer = storedJson('kayPaoloQuoteCustomer', {});
     const storedCustomerId = String(quoteCustomer.quote_user_id || quoteCustomer.user_id || quoteCustomer.customer?.id || '');
     const requestedCustomerId = queryParam('customer');
-    if (quoteCustomer?.customer && (!requestedCustomerId || storedCustomerId === requestedCustomerId)) {
-      applyCustomerToQuoteForm(quoteCustomer.customer);
-      if (!value('quoteUserId')) {
-        setValue('quoteUserId', quoteCustomer.quote_user_id || quoteCustomer.user_id || quoteCustomer.customer.id);
+    const lookupValue = queryParam('lookup');
+
+    // Prefer the pulled client's real user id. Agents often land with customer=<account#>
+    // (same as lookup); Bocicot Man resolves that to the client before loading consignees.
+    const resolveQuoteCustomerId = () => {
+      if (storedCustomerId) {
+        if (!requestedCustomerId || storedCustomerId === requestedCustomerId) {
+          return storedCustomerId;
+        }
+        if (lookupValue && requestedCustomerId === lookupValue && storedCustomerId !== requestedCustomerId) {
+          return storedCustomerId;
+        }
       }
+
+      return firstValue('quoteUserId') || requestedCustomerId || '';
+    };
+
+    const resolvedCustomerId = resolveQuoteCustomerId();
+    if (resolvedCustomerId) {
+      setValue('quoteUserId', resolvedCustomerId);
+    }
+    if (quoteCustomer?.customer && (
+      !requestedCustomerId
+      || storedCustomerId === requestedCustomerId
+      || (lookupValue && requestedCustomerId === lookupValue)
+    )) {
+      applyCustomerToQuoteForm(quoteCustomer.customer);
     }
 
     const clearConsigneeFields = () => {
@@ -637,13 +659,13 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     const buildLookupPayload = () => {
-      const customerId = firstValue('quoteUserId') || queryParam('customer');
-      const lookup = queryParam('lookup');
+      const customerId = resolveQuoteCustomerId();
+      const lookup = lookupValue || undefined;
 
       return {
         user_id: customerId || undefined,
         quote_user_id: customerId || undefined,
-        phone_or_account: lookup || undefined
+        phone_or_account: lookup || customerId || undefined
       };
     };
 
@@ -667,6 +689,11 @@ document.addEventListener('DOMContentLoaded', () => {
         const response = await postJson(route('consigneeList', '/api/kay-paolo/consignee-list'), payload);
         const customer = response.customer || response.data?.customer;
         if (customer) applyCustomerToQuoteForm(customer);
+
+        const resolvedId = response.quote_user_id || response.user_id || response.data?.quote_user_id || response.data?.user_id || customer?.id;
+        if (resolvedId) {
+          setValue('quoteUserId', resolvedId);
+        }
 
         const consignees = response.consignees || response.data?.consignees || [];
         consigneesById.clear();
@@ -724,7 +751,7 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     });
 
-    if (firstValue('quoteUserId') || queryParam('customer') || queryParam('lookup')) {
+    if (resolvedCustomerId || queryParam('customer') || queryParam('lookup')) {
       loadConsignees();
     }
   }
@@ -2424,14 +2451,22 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  async function ensureConsigneeForShipment(payload) {
+    async function ensureConsigneeForShipment(payload) {
     if (payload.consignee_id || payload.consignees_id) {
       return payload;
     }
 
+    const quoteCustomer = storedJson('kayPaoloQuoteCustomer', {});
+    const ownerId = payload.user_id
+      || payload.quote_user_id
+      || quoteCustomer.quote_user_id
+      || quoteCustomer.user_id
+      || quoteCustomer.customer?.id
+      || undefined;
+
     const response = await postJson(route('saveConsignee', '/api/kay-paolo/save-consignee'), compactPayload({
-      user_id: payload.user_id || payload.quote_user_id || storedUser().id || undefined,
-      quote_user_id: payload.quote_user_id || payload.user_id || storedUser().id || undefined,
+      user_id: ownerId,
+      quote_user_id: ownerId,
       to_name: payload.to_name || payload.consignee_name,
       to_phone_1: payload.to_phone_1 || payload.consignee_phone,
       to_phone_2: payload.to_phone_2 || payload.consignee_homephone,

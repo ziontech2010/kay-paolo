@@ -64,7 +64,12 @@ class ZionApiProxyController extends Controller
 
     public function consigneeList(Request $request): JsonResponse
     {
-        return $this->forwardAuthenticated('kay-paolo/consignee-list', $request);
+        return $this->forwardAuthenticatedWithFallback([
+            ['endpoint' => 'kay-paolo/consignee-list'],
+            ['endpoint' => 'bocicot/consignee-list'],
+            ['endpoint' => 'web-api/consignee-list-bocicot', 'web' => true],
+            ['endpoint' => 'web-api/fetch-consignee-for-quote-bocicot', 'web' => true],
+        ], $request);
     }
 
     public function countries(Request $request): JsonResponse
