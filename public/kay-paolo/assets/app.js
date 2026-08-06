@@ -2469,13 +2469,50 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (!emails.length) return;
 
-    await Promise.allSettled(emails.map((email) => postJson(route('emailShipment', '/api/kay-paolo/email-shipment'), {
-      email,
+    const shipmentNo = data.tracking || data.documentNumber || data.shipmentId || '';
+    const query = new URLSearchParams();
+    if (data.shipmentId) query.set('shipment_id', data.shipmentId);
+    if (data.documentNumber && data.documentNumber !== 'Pending') query.set('invoice', data.documentNumber);
+    if (shipmentNo && shipmentNo !== 'Pending') query.set('id', shipmentNo);
+    const queryString = query.toString();
+    const labelUrl = `${route('shipmentLabel', '/shipment-label')}${queryString ? `?${queryString}` : ''}`;
+    const receiptUrl = `${route('shipmentReceipt', '/shipment-receipt')}${queryString ? `?${queryString}` : ''}`;
+
+    const mailPayload = {
       shipment_id: data.shipmentId || undefined,
       shipping_id: data.shipmentId || undefined,
       id: data.shipmentId || data.documentNumber || data.tracking || undefined,
-      invoice: data.documentNumber || undefined
+      invoice: data.documentNumber || undefined,
+      shipment_number: shipmentNo || undefined,
+      tracking_number: data.tracking || undefined,
+      package_count: Number(data.packageCount) || 1,
+      service_name: data.serviceSummary || undefined,
+      created_at: data.date || undefined,
+      shipper_name: data.shipperName || undefined,
+      shipper_address: data.shipperAddress || undefined,
+      shipper_contact: data.shipperContact || data.shipperPhone || undefined,
+      consignee_name: data.consigneeName || undefined,
+      consignee_address: data.consigneeAddress || undefined,
+      consignee_contact: data.consigneeContact || data.consigneePhone || undefined,
+      label_url: absoluteUrl(labelUrl),
+      receipt_url: absoluteUrl(receiptUrl)
+    };
+
+    await Promise.allSettled(emails.map((email) => postJson(route('emailShipment', '/api/kay-paolo/email-shipment'), {
+      email,
+      recipient_name: email === payload?.from_email
+        ? (payload?.from_name || data.shipperName || undefined)
+        : (email === storedUser().email ? (storedUser().name || undefined) : undefined),
+      ...mailPayload
     })));
+  }
+
+  function absoluteUrl(path) {
+    try {
+      return new URL(path, window.location.origin).toString();
+    } catch (error) {
+      return path;
+    }
   }
 
   function fillCreateShipmentPage() {
