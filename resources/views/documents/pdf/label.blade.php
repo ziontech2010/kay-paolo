@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <title>Label {{ $trackingDisplay }}</title>
     <style>
-        @page { margin: 6px; }
+        @page { margin: 10px; }
         * { box-sizing: border-box; }
         html, body {
             margin: 0;
@@ -15,18 +15,24 @@
         }
         .page {
             width: 100%;
-            height: 560px;
-            overflow: hidden;
-            border: 3px solid #000;
             page-break-inside: avoid;
             page-break-after: always;
         }
         .page:last-child { page-break-after: auto; }
-        table { width: 100%; border-collapse: collapse; table-layout: fixed; }
-        td { vertical-align: top; padding: 5px 7px; }
-        .row-border { border-bottom: 2px solid #000; }
-        .col-border { border-right: 2px solid #000; }
-        .logo { width: 88px; height: auto; }
+        .frame {
+            width: 100%;
+            border-collapse: collapse;
+            border: 3px solid #000;
+            table-layout: fixed;
+        }
+        .frame td {
+            vertical-align: top;
+            padding: 5px 7px;
+            border: 0;
+        }
+        .row-border { border-bottom: 2px solid #000 !important; }
+        .col-border { border-right: 2px solid #000 !important; }
+        .logo { width: 84px; height: auto; }
         .from-label, .to-label {
             font-size: 12px;
             font-weight: 700;
@@ -40,10 +46,10 @@
         .to-addr { font-size: 14px; font-weight: 700; line-height: 1.15; margin-top: 2px; white-space: pre-line; }
         .to-phone { font-size: 14px; font-weight: 700; margin-top: 3px; }
         .awb {
-            font-size: 34px;
+            font-size: 32px;
             font-weight: 700;
             text-align: center;
-            padding: 5px 3px !important;
+            padding: 6px 3px !important;
             letter-spacing: 0.3px;
             line-height: 1;
             word-break: break-word;
@@ -79,8 +85,8 @@
             margin-bottom: 3px;
         }
         .scan-barcode {
-            width: 94%;
-            height: 68px;
+            width: 92%;
+            height: 64px;
             display: block;
             margin: 0 auto;
         }
@@ -95,7 +101,7 @@
             font-size: 11px;
             font-weight: 700;
             text-align: center;
-            padding: 4px 6px !important;
+            padding: 5px 6px !important;
             vertical-align: middle !important;
         }
     </style>
@@ -103,7 +109,7 @@
 <body>
 @foreach ($labels as $labelNumber)
     <div class="page">
-        <table>
+        <table class="frame">
             <tr>
                 <td class="row-border col-border" style="width: 38%; text-align: center; vertical-align: middle !important; padding: 6px;">
                     @if (is_file($logoPath))
@@ -145,13 +151,13 @@
                 </td>
             </tr>
             <tr>
-                <td colspan="2" style="padding: 5px 7px">
+                <td class="row-border" colspan="2" style="padding: 5px 7px">
                     <div class="pkg-title">Package Contents</div>
                     <div class="pkg-text">{{ \Illuminate\Support\Str::limit($packageText, 80, '') }}</div>
                 </td>
             </tr>
             <tr>
-                <td class="footer-meta" colspan="2" style="border-top: 2px solid #000">
+                <td class="footer-meta" colspan="2">
                     Invoice {{ $invoice }} | Delivery {{ $deliveryNumber }}
                 </td>
             </tr>
