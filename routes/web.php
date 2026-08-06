@@ -4,6 +4,7 @@ use App\Http\Controllers\PageController;
 use App\Http\Controllers\KayPaoloAdminController;
 use App\Http\Controllers\ZionApiProxyController;
 use App\Http\Controllers\ZionSessionController;
+use App\Mail\ConfirmShipmentMail;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', [PageController::class, 'home'])->name('home');
@@ -27,6 +28,43 @@ Route::get('/tracking', fn () => view('pages.tracking'))->name('tracking');
 Route::get('/tracking-detail', fn () => view('pages.tracking-detail'))->name('tracking.detail');
 Route::get('/shipment-confirmation', fn () => view('pages.shipment-confirmation'))->name('shipment.confirmation');
 Route::redirect('/confirmation', '/shipment-confirmation');
+Route::get('/emails/confirm-shipment', function () {
+    return (new ConfirmShipmentMail([
+        'recipientName' => request('name', 'Customer'),
+        'shipmentNumber' => request('shipment', 'KP-DEMO-1001'),
+        'trackingNumber' => request('tracking', 'KP-DEMO-1001'),
+        'packageCount' => (int) request('packages', 1),
+        'serviceName' => request('service', 'Express Freight'),
+        'shipperName' => 'Kay Paolo Shipping',
+        'shipperAddress' => '414 Main St, Asbury Park, NJ 07712',
+        'shipperContact' => 'info@kaypaoloshipping.com',
+        'consigneeName' => 'Destination Customer',
+        'consigneeAddress' => 'Port-au-Prince, Haiti',
+        'consigneeContact' => '+509 0000 0000',
+    ]))->render();
+})->name('emails.confirm-shipment');
+Route::get('/emails/confirm-shipment', function () {
+    return new \App\Mail\ConfirmShipmentMail([
+        'customerName' => 'Maria Jean',
+        'shipmentNumber' => 'HTS1048291',
+        'trackingNumber' => 'HTS1048291-1/1',
+        'packageCount' => 2,
+        'serviceName' => 'Ocean Freight — Standard',
+        'createdAt' => now()->format('M d, Y'),
+        'total' => '$148.50',
+        'shipperName' => 'Kay Paolo Shipping',
+        'shipperAddress' => '414 Main St, Asbury Park, NJ 07712',
+        'shipperPhone' => '(732) 898-9303',
+        'consigneeName' => 'Jean Baptiste',
+        'consigneeAddress' => 'Port-au-Prince, Haiti',
+        'consigneePhone' => '+509 5555-0101',
+        'labelUrl' => route('shipment.label'),
+        'receiptUrl' => route('shipment.receipt'),
+        'trackingUrl' => route('tracking'),
+        'confirmationUrl' => route('shipment.confirmation'),
+        'homeUrl' => route('home'),
+    ]);
+})->name('emails.confirm-shipment');
 Route::get('/invoice', fn () => view('pages.invoice'))->name('invoice');
 Route::get('/receipt', fn () => view('pages.receipt'))->name('receipt');
 Route::get('/receipt-a4', fn () => view('pages.receipt-a4'))->name('receipt.a4');

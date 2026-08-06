@@ -157,6 +157,21 @@ class ExampleTest extends TestCase
             ->assertRedirect('/shipment-confirmation');
     }
 
+    public function test_confirm_shipment_email_preview_renders(): void
+    {
+        $this->get('/emails/confirm-shipment')
+            ->assertStatus(200)
+            ->assertSee('Shipment booked successfully.', false)
+            ->assertSee('View Labels, Documents &amp; Receipt', false)
+            ->assertSee('Shipment Number', false)
+            ->assertSee('HTS1048291', false)
+            ->assertSee('Open Label', false)
+            ->assertSee('Open Receipt', false)
+            ->assertSee('Track Shipment', false)
+            ->assertSee('Thank You For Your Business', false)
+            ->assertSee('kay-paolo/assets/logo/kay-paolo.png', false);
+    }
+
     public function test_header_shows_my_profile_for_logged_in_users(): void
     {
         $this->get('/')
