@@ -41,4 +41,11 @@ return [
         'timeout' => env('ZION_SHIPPING_API_TIMEOUT', 45),
     ],
 
+    'zeptomail' => [
+        'host' => env('ZEPTOMAIL_HOST', 'api.zeptomail.com'),
+        'token' => env('ZEPTOMAIL_TOKEN'),
+        'agent_alias' => env('ZEPTOMAIL_AGENT_ALIAS'),
+        'bounce_address' => env('ZEPTOMAIL_BOUNCE_ADDRESS'),
+    ],
+
 ];
