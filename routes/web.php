@@ -4,6 +4,7 @@ use App\Http\Controllers\PageController;
 use App\Http\Controllers\KayPaoloAdminController;
 use App\Http\Controllers\ZionApiProxyController;
 use App\Http\Controllers\ZionSessionController;
+use App\Mail\ConfirmShipmentMail;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', [PageController::class, 'home'])->name('home');
@@ -27,6 +28,21 @@ Route::get('/tracking', fn () => view('pages.tracking'))->name('tracking');
 Route::get('/tracking-detail', fn () => view('pages.tracking-detail'))->name('tracking.detail');
 Route::get('/shipment-confirmation', fn () => view('pages.shipment-confirmation'))->name('shipment.confirmation');
 Route::redirect('/confirmation', '/shipment-confirmation');
+Route::get('/emails/confirm-shipment', function () {
+    return (new ConfirmShipmentMail([
+        'recipientName' => request('name', 'Customer'),
+        'shipmentNumber' => request('shipment', 'KP-DEMO-1001'),
+        'trackingNumber' => request('tracking', 'KP-DEMO-1001'),
+        'packageCount' => (int) request('packages', 1),
+        'serviceName' => request('service', 'Express Freight'),
+        'shipperName' => 'Kay Paolo Shipping',
+        'shipperAddress' => '414 Main St, Asbury Park, NJ 07712',
+        'shipperContact' => 'info@kaypaoloshipping.com',
+        'consigneeName' => 'Destination Customer',
+        'consigneeAddress' => 'Port-au-Prince, Haiti',
+        'consigneeContact' => '+509 0000 0000',
+    ]))->render();
+})->name('emails.confirm-shipment');
 Route::get('/invoice', fn () => view('pages.invoice'))->name('invoice');
 Route::get('/receipt', fn () => view('pages.receipt'))->name('receipt');
 Route::get('/receipt-a4', fn () => view('pages.receipt-a4'))->name('receipt.a4');

@@ -2,12 +2,14 @@
 
 namespace App\Http\Controllers;
 
+use App\Mail\ConfirmShipmentMail;
 use App\Services\ShipmentDocumentPdfService;
 use App\Services\ZionShippingApi;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
+use Illuminate\Support\Facades\Mail;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class ZionApiProxyController extends Controller
@@ -62,7 +64,12 @@ class ZionApiProxyController extends Controller
 
     public function consigneeList(Request $request): JsonResponse
     {
-        return $this->forwardAuthenticated('kay-paolo/consignee-list', $request);
+        return $this->forwardAuthenticatedWithFallback([
+            ['endpoint' => 'kay-paolo/consignee-list'],
+            ['endpoint' => 'bocicot/consignee-list'],
+            ['endpoint' => 'web-api/consignee-list-bocicot', 'web' => true],
+            ['endpoint' => 'web-api/fetch-consignee-for-quote-bocicot', 'web' => true],
+        ], $request);
     }
 
     public function countries(Request $request): JsonResponse
@@ -220,14 +227,29 @@ class ZionApiProxyController extends Controller
 
     public function emailShipment(Request $request): JsonResponse
     {
-        $request->validate([
+        $validated = $request->validate([
             'email' => ['required', 'email'],
             'shipment_id' => ['nullable'],
             'shipping_id' => ['nullable'],
             'id' => ['nullable'],
+            'invoice' => ['nullable', 'string'],
+            'recipient_name' => ['nullable', 'string', 'max:120'],
+            'shipment_number' => ['nullable', 'string', 'max:120'],
+            'tracking_number' => ['nullable', 'string', 'max:120'],
+            'package_count' => ['nullable', 'integer', 'min:1', 'max:500'],
+            'service_name' => ['nullable', 'string', 'max:180'],
+            'created_at' => ['nullable', 'string', 'max:80'],
+            'shipper_name' => ['nullable', 'string', 'max:180'],
+            'shipper_address' => ['nullable', 'string', 'max:500'],
+            'shipper_contact' => ['nullable', 'string', 'max:180'],
+            'consignee_name' => ['nullable', 'string', 'max:180'],
+            'consignee_address' => ['nullable', 'string', 'max:500'],
+            'consignee_contact' => ['nullable', 'string', 'max:180'],
+            'label_url' => ['nullable', 'string', 'max:1000'],
+            'receipt_url' => ['nullable', 'string', 'max:1000'],
         ]);
 
-        $token = $request->bearerToken();
+        $token = $request->bearerToken() ?: session('zion.access_token');
         if (!$token) {
             return response()->json([
                 'status' => 'error',
@@ -235,16 +257,56 @@ class ZionApiProxyController extends Controller
             ], 401);
         }
 
-        $shipmentId = $request->input('shipment_id', $request->input('shipping_id', $request->input('id')));
-        $response = $this->zion->post('kay-paolo/email-shipment', $request->except('_token'), $token);
+        $shipmentNumber = $validated['shipment_number']
+            ?? $validated['tracking_number']
+            ?? $validated['invoice']
+            ?? $validated['id']
+            ?? $validated['shipment_id']
+            ?? $validated['shipping_id']
+            ?? 'Pending';
 
-        if (!$response['ok'] && $shipmentId) {
-            $response = $this->zion->postWeb('email-shipment/'.urlencode((string) $shipmentId), [
-                'email' => $request->input('email'),
-            ], $token);
+        $query = array_filter([
+            'shipment_id' => $validated['shipment_id'] ?? $validated['shipping_id'] ?? null,
+            'invoice' => $validated['invoice'] ?? null,
+            'id' => $validated['tracking_number'] ?? $validated['shipment_number'] ?? $validated['id'] ?? null,
+        ], static fn ($value) => $value !== null && $value !== '');
+
+        try {
+            Mail::to($validated['email'])->send(new ConfirmShipmentMail([
+                'recipientName' => $validated['recipient_name'] ?? null,
+                'shipmentNumber' => (string) $shipmentNumber,
+                'trackingNumber' => (string) ($validated['tracking_number'] ?? $shipmentNumber),
+                'packageCount' => (int) ($validated['package_count'] ?? 1),
+                'serviceName' => $validated['service_name'] ?? 'Shipping Service',
+                'createdAt' => $validated['created_at'] ?? now()->format('M d, Y'),
+                'shipperName' => $validated['shipper_name'] ?? 'Kay Paolo Shipping',
+                'shipperAddress' => $validated['shipper_address'] ?? '414 Main St, Asbury Park, NJ 07712',
+                'shipperContact' => $validated['shipper_contact'] ?? 'info@kaypaoloshipping.com',
+                'consigneeName' => $validated['consignee_name'] ?? 'Destination Customer',
+                'consigneeAddress' => $validated['consignee_address'] ?? 'Destination address pending',
+                'consigneeContact' => $validated['consignee_contact'] ?? 'Phone pending',
+                'labelUrl' => $validated['label_url'] ?? route('shipment.label', $query),
+                'receiptUrl' => $validated['receipt_url'] ?? route('shipment.receipt', $query),
+                'trackingUrl' => route('tracking'),
+                'confirmationUrl' => route('shipment.confirmation'),
+                'homeUrl' => route('home'),
+            ]));
+        } catch (\Throwable $exception) {
+            report($exception);
+
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Unable to send shipment confirmation email.',
+                'error' => config('app.debug') ? $exception->getMessage() : null,
+            ], 502);
         }
 
-        return $this->jsonResponse($response);
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Shipment confirmation email sent.',
+            'email' => $validated['email'],
+            'shipment_number' => $shipmentNumber,
+        ]);
     }
 
     public function shipmentLabel(Request $request): BinaryFileResponse|RedirectResponse|JsonResponse|Response
