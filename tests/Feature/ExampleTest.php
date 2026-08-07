@@ -347,6 +347,46 @@ class ExampleTest extends TestCase
             ->assertJsonPath('options.0.value', 'COLLECT');
     }
 
+    public function test_fetch_user_for_quote_falls_back_when_preprod_kay_api_is_locked(): void
+    {
+        Http::fake([
+            '*/api/kay-paolo/fetch-user-for-quote' => Http::response([
+                'status' => 200,
+                'error' => 'true',
+                'message' => 'Your App is Locked!',
+                'message_type' => 'warning',
+                'app_locked' => 'true',
+            ]),
+            '*/web-api/fetch-user-for-quote-bocicot' => Http::response([
+                'status' => 'success',
+                'error' => false,
+                'message' => 'User found! Proceeding...',
+                'quote_user_id' => 7020,
+                'user_id' => 7020,
+                'customer' => [
+                    'id' => 7020,
+                    'account_number' => '9400',
+                    'name' => 'Therlande Louis Jean',
+                    'email' => 'zlionline@gmail.com',
+                ],
+            ]),
+        ]);
+
+        $this->withHeader('Authorization', 'Bearer agent-token')
+            ->postJson('/api/kay-paolo/fetch-user-for-quote', [
+                'phone_or_account' => '9400',
+                'customer' => '9400',
+            ])
+            ->assertOk()
+            ->assertJsonPath('status', 'success')
+            ->assertJsonPath('error', false)
+            ->assertJsonPath('quote_user_id', 7020)
+            ->assertJsonPath('customer.account_number', '9400');
+
+        Http::assertSent(fn ($request) => str_contains((string) $request->url(), '/api/kay-paolo/fetch-user-for-quote'));
+        Http::assertSent(fn ($request) => str_contains((string) $request->url(), '/web-api/fetch-user-for-quote-bocicot'));
+    }
+
     public function test_shipment_document_routes_render_kay_branded_document_ui(): void
     {
         Http::fake();
