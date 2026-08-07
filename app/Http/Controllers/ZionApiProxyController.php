@@ -57,18 +57,12 @@ class ZionApiProxyController extends Controller
 
     public function fetchUserForQuote(Request $request): JsonResponse
     {
-        return $this->forwardAuthenticatedWithFallback([
-            ['endpoint' => 'kay-paolo/fetch-user-for-quote'],
-            ['endpoint' => 'web-api/fetch-user-for-quote-bocicot', 'web' => true],
-        ], $request);
+        return $this->forwardAuthenticated('kay-paolo/fetch-user-for-quote', $request);
     }
 
     public function consigneeList(Request $request): JsonResponse
     {
-        return $this->forwardAuthenticatedWithFallback([
-            ['endpoint' => 'kay-paolo/consignee-list'],
-            ['endpoint' => 'web-api/consignee-list-bocicot', 'web' => true],
-        ], $request);
+        return $this->forwardAuthenticated('kay-paolo/consignee-list', $request);
     }
 
     public function countries(Request $request): JsonResponse
@@ -130,10 +124,7 @@ class ZionApiProxyController extends Controller
 
     public function saveConsignee(Request $request): JsonResponse
     {
-        return $this->forwardAuthenticatedWithFallback([
-            ['endpoint' => 'kay-paolo/save-consignee'],
-            ['endpoint' => 'web-api/save-consignee-bocicot', 'web' => true],
-        ], $request);
+        return $this->forwardAuthenticated('kay-paolo/save-consignee', $request);
     }
 
     public function quote(Request $request): JsonResponse
@@ -158,7 +149,7 @@ class ZionApiProxyController extends Controller
         $payload = $this->sanitizeShipmentPayload($request->except('_token'));
         $response = $this->zion->post('kay-paolo/update-shipping', $payload, $token);
 
-        if ($this->isAppLockedResponse($response) || (!$response['ok'] && $this->shouldTryFallback($response))) {
+        if (!$response['ok'] && $this->shouldTryFallback($response)) {
             $response = $this->zion->postWeb('web-api/update-shipping-bocicot', $payload, $token);
         }
 
@@ -512,11 +503,11 @@ class ZionApiProxyController extends Controller
                 ? $this->zion->postWeb($endpoint, $payload ?? $request->except('_token'), $token)
                 : $this->zion->post($endpoint, $payload ?? $request->except('_token'), $token);
 
-            if (($lastResponse['ok'] ?? false) && !$this->isAppLockedResponse($lastResponse)) {
+            if ($lastResponse['ok']) {
                 return $this->jsonResponse($lastResponse);
             }
 
-            if (!$this->isAppLockedResponse($lastResponse) && !$this->shouldTryFallback($lastResponse)) {
+            if (!$this->shouldTryFallback($lastResponse)) {
                 return $this->jsonResponse($lastResponse);
             }
         }
@@ -831,24 +822,8 @@ class ZionApiProxyController extends Controller
         $status = (int) ($response['status'] ?? 0);
         $message = strtolower((string) ($response['data']['message'] ?? ''));
 
-        return $this->isAppLockedResponse($response)
-            || in_array($status, [404, 405], true)
+        return in_array($status, [404, 405], true)
             || ($status >= 500 && str_contains($message, 'session store not set'));
-    }
-
-    private function isAppLockedResponse(array $response): bool
-    {
-        $data = $response['data'] ?? [];
-        if (!is_array($data)) {
-            return false;
-        }
-
-        $message = strtolower((string) ($data['message'] ?? ''));
-        $locked = strtolower((string) ($data['app_locked'] ?? ''));
-        $error = strtolower((string) ($data['error'] ?? ''));
-
-        return $locked === 'true'
-            || ($error === 'true' && str_contains($message, 'app is locked'));
     }
 
     private function normalizeCountries(array $payload): array
