@@ -590,7 +590,7 @@ document.addEventListener('DOMContentLoaded', () => {
           result.className = 'api-inline-result success';
           result.textContent = response.message || 'Customer ready for quote.';
         }
-        moveNext(response.quote_user_id || response.user_id || response.id || lookup);
+        moveNext(response.quote_user_id || response.user_id || response.data?.quote_user_id || response.data?.user_id || response.customer?.id || response.data?.customer?.id || lookup);
       } catch (error) {
         if (result) {
           result.className = 'api-inline-result api-alert error';
