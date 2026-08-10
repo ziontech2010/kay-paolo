@@ -122,6 +122,9 @@
                     <div class="from-label">From</div>
                     <div class="from-name">{{ $shipperName }}</div>
                     <div class="from-meta">{{ $shipperPhone }}</div>
+                    @if (!empty($shipperEmail))
+                        <div class="from-meta">{{ $shipperEmail }}</div>
+                    @endif
                     <div class="from-meta" style="white-space: pre-line">{{ \Illuminate\Support\Str::limit(preg_replace("/\n{2,}/", "\n", trim($shipperAddress)), 90, '') }}</div>
                     <div class="weight">{{ $weightDim }}</div>
                 </td>

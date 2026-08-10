@@ -3745,6 +3745,55 @@ footer ul li a:hover {
   color: var(--gold-500);
 }
 
+.history-more {
+  position: relative;
+  display: inline-flex;
+}
+
+.history-more .more-link {
+  background: transparent;
+  border: 0;
+  padding: 0;
+  font: inherit;
+}
+
+.history-more-menu {
+  display: none;
+  position: absolute;
+  left: 0;
+  bottom: calc(100% + 8px);
+  min-width: 160px;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.14);
+  padding: 6px;
+  z-index: 20;
+}
+
+.history-more-menu.open {
+  display: grid;
+  gap: 2px;
+}
+
+.history-more-menu button {
+  appearance: none;
+  background: transparent;
+  border: 0;
+  border-radius: 8px;
+  color: var(--navy-900);
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 10px 12px;
+  text-align: left;
+}
+
+.history-more-menu button:hover {
+  background: #f8fafc;
+  color: var(--gold-500);
+}
+
 .history-card-details {
   display: none;
   padding: 20px 28px;

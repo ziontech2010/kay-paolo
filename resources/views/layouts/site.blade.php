@@ -201,7 +201,8 @@
             flatRates: @json(route('api.kay-paolo.flat-rates')),
             saveConsignee: @json(route('api.kay-paolo.save-consignee')),
             shippingHistory: @json(route('api.kay-paolo.shipping-history')),
-            emailShipment: @json(route('api.kay-paolo.email-shipment'))
+            emailShipment: @json(route('api.kay-paolo.email-shipment')),
+            voidShipment: @json(route('api.kay-paolo.void-shipping'))
         },
         assets: {
             generatingQuote: @json(asset('kay-paolo/assets/generating-quote.gif')),

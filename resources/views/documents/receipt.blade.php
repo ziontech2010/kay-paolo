@@ -293,7 +293,8 @@
                         <div class="shipment-details">
                             <strong id="documentShipperName">Kay Paolo Shipping</strong><br>
                             <span id="documentShipperAddress">414 Main St, Asbury Park, NJ 07712</span><br>
-                            <strong>Phone:</strong> <span id="documentShipperContact">info@kaypaoloshipping.com</span>
+                            <strong>Phone:</strong> <span id="documentShipperPhone">Phone pending</span><br>
+                            <strong>Email:</strong> <span id="documentShipperEmail">info@kaypaoloshipping.com</span>
                         </div>
                     </td>
                     <td>
@@ -301,7 +302,7 @@
                         <div class="shipment-details">
                             <strong id="documentConsigneeName">Destination Customer</strong><br>
                             <span id="documentConsigneeAddress">Destination address pending</span><br>
-                            <strong>Phone:</strong> <span id="documentConsigneeContact">Phone pending</span>
+                            <strong>Phone:</strong> <span id="documentConsigneePhone">Phone pending</span>
                         </div>
                     </td>
                 </tr>
