@@ -92,6 +92,7 @@ Route::prefix('zion-api')->name('zion-api.')->group(function () {
     Route::post('/shipping', [ZionApiProxyController::class, 'createShipment'])->name('shipping');
     Route::post('/store-shipment-document-context', [ZionApiProxyController::class, 'storeShipmentDocumentContext'])->name('store-shipment-document-context');
     Route::post('/shipping-history', [ZionApiProxyController::class, 'shippingHistory'])->name('shipping-history');
+    Route::post('/void-shipping', [ZionApiProxyController::class, 'voidShipment'])->name('void-shipping');
     Route::post('/tracking', [ZionApiProxyController::class, 'tracking'])->name('tracking');
     Route::post('/email-shipment', [ZionApiProxyController::class, 'emailShipment'])->name('email-shipment');
 });

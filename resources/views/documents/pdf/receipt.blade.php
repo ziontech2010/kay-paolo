@@ -61,7 +61,8 @@
                 <div class="info-label">Shipper:</div>
                 <strong>{{ $shipperName }}</strong><br>
                 {!! nl2br(e($shipperAddress)) !!}<br>
-                <strong>Phone:</strong> {{ $shipperPhone }}
+                <strong>Phone:</strong> {{ $shipperPhone }}@if (!empty($shipperEmail))<br>
+                <strong>Email:</strong> {{ $shipperEmail }}@endif
             </td>
             <td>
                 <div class="info-label">Consignee:</div>

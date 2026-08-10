@@ -255,7 +255,7 @@
                                 <label for="couponCode">Coupon/Promo Code</label>
                                 <div style="display: flex; gap: 10px">
                                     <input type="text" id="couponCode" placeholder="Enter code" style="flex-grow: 1; margin-bottom: 0">
-                                    <button type="button" class="btn btn-navy" style="padding: 0 20px; font-size: 13px; border-radius: 8px">Apply</button>
+                                    <button type="button" id="applyCouponBtn" class="btn btn-navy" style="padding: 0 20px; font-size: 13px; border-radius: 8px">Apply</button>
                                 </div>
                             </div>
                             <div class="form-row-2 inline-checkbox-row">

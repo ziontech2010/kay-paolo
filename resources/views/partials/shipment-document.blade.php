@@ -34,13 +34,14 @@
             <h3>Shipper</h3>
             <strong id="documentShipperName">Kay Paolo Shipping</strong>
             <p id="documentShipperAddress">414 Main St, Asbury Park, NJ 07712</p>
-            <p id="documentShipperContact">info@kaypaoloshipping.com</p>
+            <p><strong>Phone:</strong> <span id="documentShipperPhone">Phone pending</span></p>
+            <p><strong>Email:</strong> <span id="documentShipperEmail">info@kaypaoloshipping.com</span></p>
         </div>
         <div>
             <h3>Consignee</h3>
             <strong id="documentConsigneeName">Destination Customer</strong>
             <p id="documentConsigneeAddress">Destination address pending</p>
-            <p id="documentConsigneeContact">Phone pending</p>
+            <p><strong>Phone:</strong> <span id="documentConsigneePhone">Phone pending</span></p>
         </div>
     </section>
 
