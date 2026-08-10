@@ -1052,7 +1052,19 @@ document.addEventListener('DOMContentLoaded', () => {
       slug: option.slug || option.value || option.typeCode || option.type_code || option.code || option.shipment_type || option.id || key || '',
       label: option.label || option.name || option.title || option.description || option.typeCode || option.slug || 'Flat Rate Item',
       group: option.group || option.category || 'Flat Rate',
-      price: option.price || option.amount || option.rate || option.total || '',
+      price: option.price
+        || option.amount
+        || option.rate
+        || option.total
+        || option.cost
+        || option.flat_price
+        || option.flat_rate_price
+        || option.flatRatePrice
+        || option.unit_price
+        || option.unitPrice
+        || option.usd
+        || option.usd_price
+        || '',
       readonly: option.readonly_dimensions !== false,
       restricted: option.restricted === true || option.is_restricted === true || option.disabled === true || ['restricted', 'inactive', 'disabled'].includes(status),
       defaults: {
@@ -1128,8 +1140,7 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
-    quoteForm.addEventListener('submit', async (event) => {
-      event.preventDefault();
+    const requestQuote = async () => {
       const container = document.getElementById('quoteResult');
       const shippingResult = document.getElementById('shippingResult');
       if (container) container.innerHTML = '';
@@ -1147,6 +1158,16 @@ document.addEventListener('DOMContentLoaded', () => {
       } finally {
         showLoader('quoteLoader', false);
       }
+    };
+
+    quoteForm.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      await requestQuote();
+    });
+
+    document.getElementById('applyCouponBtn')?.addEventListener('click', async (event) => {
+      event.preventDefault();
+      await requestQuote();
     });
 
     document.addEventListener('click', (event) => {
@@ -1166,7 +1187,13 @@ document.addEventListener('DOMContentLoaded', () => {
         deliveryEstimatePrice: quoteCardTotal(card) || undefined,
         deliveryEstimateDate: quoteCardEta(card) || undefined,
         delivery_option: quoteCardService(card) || undefined,
-        selected_shipper: quoteCardService(card) || undefined
+        selected_shipper: quoteCardService(card) || undefined,
+        home_delivery: card.home_delivery
+          || card.home_delivery_fee
+          || card.homeDelivery
+          || card.delivery_fee
+          || card.delivery
+          || undefined
       };
 
       window.localStorage.setItem(pendingShipmentKey, JSON.stringify({
@@ -1200,8 +1227,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const mergedPayload = await ensureConsigneeForShipment(mergeShipmentFormPayload(pending.payload || {}));
         const payload = buildBocicotShipmentPayload(mergedPayload);
         const response = await postJson(route('shipping', '/api/kay-paolo/shipping'), payload);
-        await queueShipmentEmailNotifications(response, payload);
         window.localStorage.setItem(shipmentResponseKey, JSON.stringify({ response, payload, selected: pending.card || {} }));
+        await queueShipmentEmailNotifications(response, payload, pending.card || {});
         window.location.href = route('shipmentConfirmation', '/shipment-confirmation');
       } catch (error) {
         showError(result, error.message);
@@ -1349,9 +1376,12 @@ document.addEventListener('DOMContentLoaded', () => {
     setText('documentDeliveryDate', data.deliveryDate);
     setText('documentShipperName', data.shipperName);
     setText('documentShipperAddress', data.shipperAddress);
+    setText('documentShipperPhone', data.shipperPhone);
+    setText('documentShipperEmail', data.shipperEmail || '');
     setText('documentShipperContact', data.shipperPhone || data.shipperContact);
     setText('documentConsigneeName', data.consigneeName);
     setText('documentConsigneeAddress', data.consigneeAddress);
+    setText('documentConsigneePhone', data.consigneePhone);
     setText('documentConsigneeContact', data.consigneePhone || data.consigneeContact);
     setText('documentNotes', data.notes);
     setText('documentFreight', dollarText(data.freight));
@@ -1394,8 +1424,17 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     const barcodeValue = labelBarcodeValue(data);
-      const shipperText = [data.shipperName, data.shipperContact, data.shipperAddress].filter(Boolean).join('\n\n');
-    const receiverText = [data.consigneeName, data.consigneeAddress, data.consigneeContact].filter(Boolean).join('\n\n');
+    const shipperText = [
+      data.shipperName,
+      data.shipperPhone,
+      data.shipperEmail,
+      data.shipperAddress
+    ].filter(Boolean).join('\n');
+    const receiverText = [
+      data.consigneeName,
+      data.consigneeAddress,
+      data.consigneePhone
+    ].filter(Boolean).join('\n');
     const weightDim = labelWeightDimText(data);
     const packageText = `${data.description || 'Package'} (${data.packageCount} pcs)`;
 
@@ -1501,8 +1540,14 @@ document.addEventListener('DOMContentLoaded', () => {
       || responseData.invoice_num
       || shipping.invoice_num
       || tracking;
-    const description = payload.package_description || shipping.package_description || '';
-    const items = packageRowsFromPayload(payload, description);
+    const description = payload.package_description
+      || shipping.package_description
+      || shipping.description
+      || response.package_description
+      || responseData.package_description
+      || response.description
+      || '';
+    const items = packageRowsFromPayload(payload, description || 'Package');
     const totalWeight = items.reduce((sum, item) => sum + numberValue(item.weight, 0), 0) || 1;
     const paymentType = payload.payment_type || shipping.payment_type || 'PAID AT AGENT';
     const toCity = payload.to_city || shipping.consignee_city || shipping.to_city || '';
@@ -1523,9 +1568,16 @@ document.addEventListener('DOMContentLoaded', () => {
     const deliveryDateRaw = payload.deliveryEstimateDate
       || selected.eta
       || selected.delivery_date
+      || selected.arrives_on
       || response.delivery_date
+      || response.deliveryEstimateDate
+      || response.expected_arrival_date
       || responseData.delivery_date
+      || responseData.deliveryEstimateDate
       || shipping.delivery_date
+      || shipping.deliveryEstimateDate
+      || shipping.expected_arrival_date
+      || shipping.arrives_on
       || '';
     const deliveryDate = deliveryDateRaw
       ? `by ${readableDate(deliveryDateRaw)}`
@@ -1535,8 +1587,27 @@ document.addEventListener('DOMContentLoaded', () => {
       : String(paymentType).toUpperCase().includes('PAID')
         ? 'Paid'
         : String(paymentType || 'Payment is Due');
-    const shipperPhone = payload.from_phone || shipping.shipper_phone || '';
-    const consigneePhone = payload.to_phone_1 || payload.consignee_phone || shipping.consignee_phone || '';
+    const shipperPhone = payload.from_phone
+      || shipping.shipper_phone
+      || shipping.from_phone
+      || response.shipper_phone
+      || responseData.shipper_phone
+      || '';
+    const shipperEmail = payload.from_email
+      || shipping.shipper_email
+      || shipping.from_email
+      || response.shipper_email
+      || responseData.shipper_email
+      || storedUser().email
+      || '';
+    const consigneePhone = payload.to_phone_1
+      || payload.consignee_phone
+      || shipping.consignee_phone
+      || shipping.to_phone_1
+      || shipping.consignee_homephone
+      || response.consignee_phone
+      || responseData.consignee_phone
+      || '';
     const shipperAddress = [
       [payload.from_address, payload.from_apt].filter(Boolean).join(' '),
       [payload.from_city, payload.from_state, payload.from_zip].filter(Boolean).join(' '),
@@ -1591,20 +1662,28 @@ document.addEventListener('DOMContentLoaded', () => {
       labelNumbers,
       shipperName: payload.from_name || shipping.shipper_name || storedUser().name || 'Kay Paolo Customer',
       shipperAddress,
-      shipperPhone: shipperPhone || 'info@kaypaoloshipping.com',
-      shipperContact: [shipperPhone, payload.from_email || storedUser().email].filter(Boolean).join(' / ') || 'info@kaypaoloshipping.com',
+      shipperPhone: shipperPhone || 'Phone pending',
+      shipperEmail: shipperEmail || '',
+      shipperContact: [shipperPhone, shipperEmail].filter(Boolean).join(' / ') || 'info@kaypaoloshipping.com',
       consigneeName: payload.to_name || payload.consignee_name || shipping.consignee_name || 'Destination Customer',
       consigneeAddress,
       consigneePhone: consigneePhone || 'Phone pending',
-      consigneeContact: [consigneePhone, payload.to_phone_2].filter(Boolean).join(' / ') || 'Phone pending',
-      description,
+      consigneeContact: [consigneePhone, payload.to_phone_2 || shipping.consignee_homephone].filter(Boolean).join(' / ') || 'Phone pending',
+      description: description || 'Package',
       items,
       packageCount: packagePieceCount(payload) || items.reduce((sum, item) => sum + numberValue(item.count, 0), 0) || 1,
       totalWeight,
       declaredValue,
       freight: selected.freight || response.freight || responseData.freight || shipping.freight || selected.total || selected.price || 0,
       insurance: selected.insurance || response.insurance || responseData.insurance || shipping.insurance || 0,
-      homeDelivery: selected.home_delivery || selected.delivery || response.home_delivery || responseData.home_delivery || shipping.home_delivery || 0,
+      homeDelivery: selected.home_delivery
+        || selected.home_delivery_fee
+        || selected.delivery
+        || response.home_delivery
+        || responseData.home_delivery
+        || shipping.home_delivery
+        || payload.home_delivery
+        || 0,
       tax: selected.tax || response.tax || responseData.tax || shipping.tax || 0,
       total: selected.total || selected.price || selected.amount || payload.deliveryEstimatePrice || response.total || responseData.total || shipping.total || 0,
       notes: 'Special Notice: Due to current situational instabilities and territorial security issues in Haiti, we cannot guarantee any delivery date. The provided date is only an estimated timeframe.'
@@ -1758,9 +1837,10 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('timeSelect')?.addEventListener('change', load);
     document.querySelectorAll('.status-filter,.category-filter').forEach((input) => input.addEventListener('change', filter));
 
-    list.addEventListener('click', (event) => {
+    list.addEventListener('click', async (event) => {
       const quickView = event.target.closest('.quick-view-link');
-      const moreLink = event.target.closest('.more-link');
+      const moreToggle = event.target.closest('[data-history-more-toggle]');
+      const moreAction = event.target.closest('[data-history-action]');
       const card = event.target.closest('.shipment-card[data-status]');
 
       if (quickView && card) {
@@ -1772,14 +1852,115 @@ document.addEventListener('DOMContentLoaded', () => {
         }
       }
 
-      if (moreLink && card) {
+      if (moreToggle && card) {
         event.preventDefault();
-        const tracking = card.dataset.tracking || card.querySelector('.history-card-col h4')?.textContent?.trim() || '';
-        window.location.href = `${route('trackingDetail', '/tracking-detail')}${tracking ? `?id=${encodeURIComponent(tracking)}` : ''}`;
+        event.stopPropagation();
+        const menu = card.querySelector('.history-more-menu');
+        const open = menu?.classList.contains('open');
+        document.querySelectorAll('.history-more-menu.open').forEach((item) => item.classList.remove('open'));
+        if (menu && !open) menu.classList.add('open');
+        return;
+      }
+
+      if (moreAction && card) {
+        event.preventDefault();
+        event.stopPropagation();
+        const action = moreAction.getAttribute('data-history-action');
+        const tracking = card.dataset.tracking || '';
+        const invoice = card.dataset.invoice || '';
+        const shipmentId = card.dataset.shipmentId || '';
+        const query = new URLSearchParams();
+        if (shipmentId) query.set('shipment_id', shipmentId);
+        if (invoice) query.set('invoice', invoice);
+        if (tracking) query.set('id', tracking);
+        const queryString = query.toString();
+
+        if (action === 'label') {
+          window.open(`${route('shipmentLabel', '/shipment-label')}${queryString ? `?${queryString}` : ''}`, '_blank');
+        } else if (action === 'receipt') {
+          window.open(`${route('shipmentReceipt', '/shipment-receipt')}${queryString ? `?${queryString}` : ''}`, '_blank');
+        } else if (action === 'track') {
+          window.location.href = `${route('trackingDetail', '/tracking-detail')}${tracking ? `?id=${encodeURIComponent(tracking)}` : ''}`;
+        } else if (action === 'edit') {
+          prepareHistoryEdit(card);
+        } else if (action === 'void') {
+          await voidHistoryShipment(card);
+        }
+
+        card.querySelector('.history-more-menu')?.classList.remove('open');
+      }
+    });
+
+    document.addEventListener('click', (event) => {
+      if (!event.target.closest('.history-more')) {
+        document.querySelectorAll('.history-more-menu.open').forEach((item) => item.classList.remove('open'));
       }
     });
 
     load();
+  }
+
+  function prepareHistoryEdit(card) {
+    const tracking = card.dataset.tracking || '';
+    const invoice = card.dataset.invoice || '';
+    const shipmentId = card.dataset.shipmentId || '';
+    const row = storedJson(`kayPaoloHistoryRow:${shipmentId || invoice || tracking}`, null)
+      || {
+        id: shipmentId,
+        invoice_num: invoice,
+        tracking_number: tracking,
+        package_description: card.dataset.description || '',
+        shipper_name: card.dataset.shipperName || '',
+        consignee_name: card.dataset.consigneeName || ''
+      };
+
+    window.localStorage.setItem(pendingShipmentKey, JSON.stringify({
+      payload: {
+        quote_id: row.quote_id || undefined,
+        package_description: row.package_description || card.dataset.description || '',
+        from_name: row.shipper_name || card.dataset.shipperName || '',
+        to_name: row.consignee_name || card.dataset.consigneeName || '',
+        consignee_name: row.consignee_name || card.dataset.consigneeName || '',
+        delivery_option: row.delivery_option || row.selected_shipper || '',
+        selected_shipper: row.delivery_option || row.selected_shipper || '',
+        deliveryEstimatePrice: row.total || row.deliveryEstimatePrice || undefined,
+        deliveryEstimateDate: row.delivery_date || row.expected_arrival_date || undefined,
+        shipment_id: shipmentId || undefined,
+        invoice_num: invoice || undefined,
+        tracking_number: tracking || undefined
+      },
+      card: row,
+      quote: {}
+    }));
+    window.location.href = route('createShipmentPage', '/create-shipment');
+  }
+
+  async function voidHistoryShipment(card) {
+    const tracking = card.dataset.tracking || '';
+    const invoice = card.dataset.invoice || '';
+    const shipmentId = card.dataset.shipmentId || '';
+    if (!shipmentId && !invoice && !tracking) {
+      window.alert('Unable to void this shipment because no shipment id was found.');
+      return;
+    }
+
+    const confirmed = window.confirm(`Void shipment ${tracking || invoice || shipmentId}? This cannot be undone.`);
+    if (!confirmed) return;
+
+    try {
+      await postJson(route('voidShipment', '/api/kay-paolo/void-shipping'), {
+        shipment_id: shipmentId || undefined,
+        shipping_id: shipmentId || undefined,
+        invoice: invoice || undefined,
+        invoice_num: invoice || undefined,
+        tracking_number: tracking || undefined,
+        id: shipmentId || tracking || invoice || undefined
+      });
+      window.alert('Shipment void request submitted.');
+      document.getElementById('timeSelect')?.dispatchEvent(new Event('change'));
+    } catch (error) {
+      window.alert(error.message || 'Unable to void shipment.');
+    }
   }
 
   function normalizeHistoryRows(response) {
@@ -1808,6 +1989,8 @@ document.addEventListener('DOMContentLoaded', () => {
     container.innerHTML = rows.map((row) => {
       const tracking = historyField(row, ['tracking_number', 'trackingNumber', 'tracking', 'tracking_numbers', 'invoice_num', 'invoice', 'invoice_number', 'awb', 'id'], '-');
       const trackingDisplay = formatShipmentNumberDisplay(tracking);
+      const invoice = historyField(row, ['invoice_num', 'invoice', 'invoice_number'], '');
+      const shipmentId = historyField(row, ['id', 'shipment_id', 'shipping_id'], '');
       const status = historyStatus(row);
       const createdBy = historyField(row, ['created_by', 'shipper_name', 'from_name'], 'Kay Paolo Shipping');
       const date = readableDate(historyField(row, ['created_at', 'shipment_date', 'date'], ''));
@@ -1829,9 +2012,13 @@ document.addEventListener('DOMContentLoaded', () => {
       const pickupDate = readableDate(historyField(row, ['scheduled_pickup', 'pickup_date', 'plannedShippingDateAndTime'], ''));
       const searchPool = [tracking, trackingDisplay, status, createdBy, fromName, toName, option, description, fromAddress, toAddress].join(' ');
       const cardStyle = status === 'Delivered' ? 'margin-bottom: 0; border-top-color: #059669' : 'margin-bottom: 0';
+      const rowKey = shipmentId || invoice || tracking;
+      if (rowKey) {
+        window.localStorage.setItem(`kayPaoloHistoryRow:${rowKey}`, JSON.stringify(row));
+      }
 
       return `
-        <div class="shipment-card" data-status="${escapeHtml(status)}" data-category="${escapeHtml(category)}" data-tracking="${escapeHtml(tracking)}" data-search-pool="${escapeHtml(searchPool)}" style="${cardStyle}">
+        <div class="shipment-card" data-status="${escapeHtml(status)}" data-category="${escapeHtml(category)}" data-tracking="${escapeHtml(tracking)}" data-invoice="${escapeHtml(invoice)}" data-shipment-id="${escapeHtml(shipmentId)}" data-description="${escapeHtml(description)}" data-shipper-name="${escapeHtml(fromName)}" data-consignee-name="${escapeHtml(toName)}" data-search-pool="${escapeHtml(searchPool)}" style="${cardStyle}">
           <div class="history-card-main">
             <div class="history-card-col">
               <h4 style="color: var(--navy-800)">${escapeHtml(trackingDisplay)}</h4>
@@ -1896,10 +2083,19 @@ document.addEventListener('DOMContentLoaded', () => {
             </div>
           </div>
           <div class="history-card-footer">
-            <span class="more-link">
-              More
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle; margin-left:2px"><polyline points="6 9 12 15 18 9"/></svg>
-            </span>
+            <div class="history-more">
+              <button type="button" class="more-link" data-history-more-toggle aria-haspopup="true" aria-expanded="false">
+                More
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle; margin-left:2px"><polyline points="6 9 12 15 18 9"/></svg>
+              </button>
+              <div class="history-more-menu" role="menu">
+                <button type="button" data-history-action="label" role="menuitem">Label</button>
+                <button type="button" data-history-action="receipt" role="menuitem">Receipt</button>
+                <button type="button" data-history-action="edit" role="menuitem">Edit</button>
+                <button type="button" data-history-action="void" role="menuitem">Void</button>
+                <button type="button" data-history-action="track" role="menuitem">Track</button>
+              </div>
+            </div>
           </div>
         </div>
       `;
@@ -2178,9 +2374,12 @@ document.addEventListener('DOMContentLoaded', () => {
       shipment_type: shipmentType,
       delivery_location: deliveryLocation,
       deliveryLocation,
+      promo: firstValue('couponCode'),
       coupon_code: firstValue('couponCode'),
       extra_service_charge: firstValue('extraServiceCharge'),
       include_in_receipt: document.getElementById('includeReceipt')?.checked ? 1 : 0,
+      flaterateinside: flatRate.some(flatRateIsOn) || shipmentType.some(Boolean) ? 1 : 0,
+      agent_id: storedUser().agent_id || storedUser().id || undefined,
       fragile_shipment: fragileShipment,
       is_fragile_shipment: fragileShipment
     };
@@ -2494,15 +2693,22 @@ document.addEventListener('DOMContentLoaded', () => {
     };
   }
 
-  async function queueShipmentEmailNotifications(response, payload) {
-    const data = buildShipmentDocumentData(response || {}, payload || {}, {});
+  async function queueShipmentEmailNotifications(response, payload, selected = {}) {
+    const data = buildShipmentDocumentData(response || {}, payload || {}, selected || {});
     const emails = Array.from(new Set([
-      'info@kaypaoloshipping.com',
       payload?.from_email,
-      storedUser().email
-    ].filter(Boolean)));
+      data.shipperEmail,
+      storedUser().email,
+      'info@kaypaoloshipping.com'
+    ].filter((email) => typeof email === 'string' && email.includes('@'))));
 
     if (!emails.length) return;
+
+    await syncShipmentDocumentContext({
+      response: response || {},
+      payload: payload || {},
+      selected: selected || {}
+    });
 
     const shipmentNo = data.tracking || data.documentNumber || data.shipmentId || '';
     const query = new URLSearchParams();
@@ -2525,7 +2731,7 @@ document.addEventListener('DOMContentLoaded', () => {
       created_at: data.date || undefined,
       shipper_name: data.shipperName || undefined,
       shipper_address: data.shipperAddress || undefined,
-      shipper_contact: data.shipperContact || data.shipperPhone || undefined,
+      shipper_contact: data.shipperContact || data.shipperPhone || data.shipperEmail || undefined,
       consignee_name: data.consigneeName || undefined,
       consignee_address: data.consigneeAddress || undefined,
       consignee_contact: data.consigneeContact || data.consigneePhone || undefined,
@@ -2533,13 +2739,18 @@ document.addEventListener('DOMContentLoaded', () => {
       receipt_url: absoluteUrl(receiptUrl)
     };
 
-    await Promise.allSettled(emails.map((email) => postJson(route('emailShipment', '/api/kay-paolo/email-shipment'), {
+    const results = await Promise.allSettled(emails.map((email) => postJson(route('emailShipment', '/api/kay-paolo/email-shipment'), {
       email,
-      recipient_name: email === payload?.from_email
+      recipient_name: email === payload?.from_email || email === data.shipperEmail
         ? (payload?.from_name || data.shipperName || undefined)
         : (email === storedUser().email ? (storedUser().name || undefined) : undefined),
       ...mailPayload
     })));
+
+    const failed = results.find((result) => result.status === 'rejected');
+    if (failed) {
+      console.warn('Shipment confirmation email failed', failed.reason);
+    }
   }
 
   function absoluteUrl(path) {
@@ -2646,7 +2857,15 @@ document.addEventListener('DOMContentLoaded', () => {
     const total = quoteCardTotal(card) || '0.00';
     const freight = card.freight || card.base_rate || '0.00';
     const insurance = card.insurance || '0.00';
-    const homeDelivery = card.home_delivery || card.delivery || '0.00';
+    const homeDelivery = card.home_delivery
+      || card.home_delivery_fee
+      || card.homeDelivery
+      || card.homeDeliveryFee
+      || card.delivery_fee
+      || card.deliveryFee
+      || card.delivery
+      || card.door_delivery
+      || '0.00';
     const tax = card.tax || '0.00';
 
     return `
@@ -2712,13 +2931,38 @@ document.addEventListener('DOMContentLoaded', () => {
     return normalizePartner(card.carrier || card.partner || card.carrier_key || card.carrier_name || card.integration || card.full_integration);
   }
 
+  function isFullIntegrationCard(card) {
+    const raw = [
+      card?.carrier,
+      card?.partner,
+      card?.carrier_key,
+      card?.carrier_name,
+      card?.integration,
+      card?.full_integration,
+      card?.service_name,
+      card?.service,
+      card?.name,
+      card?.shipper,
+      card?.provider
+    ].map((value) => String(value || '').toLowerCase()).join(' ');
+
+    return raw.includes('full integration')
+      || raw.includes('full_integration')
+      || raw.includes('full-integration')
+      || raw.includes('kay paolo')
+      || raw.includes('kaypaolo');
+  }
+
   function normalizePartner(value) {
     const raw = String(value || 'zion').toLowerCase();
-    if (raw.includes('full integration')) return 'ZION';
     if (raw.includes('ups')) return 'UPS';
     if (raw.includes('fedex')) return 'FEDEX';
     if (raw.includes('usps')) return 'USPS';
     if (raw.includes('dhl')) return 'DHL';
+    // Full Integration / Kay Paolo book through the Zion partner channel.
+    if (raw.includes('full integration') || raw.includes('kay paolo') || raw.includes('kaypaolo') || raw.includes('zion')) {
+      return 'ZION';
+    }
     return 'ZION';
   }
 
@@ -2771,6 +3015,13 @@ document.addEventListener('DOMContentLoaded', () => {
       || card.icon
       || '';
     const zionLogo = config.assets?.zionCarrierLogo || '/kay-paolo/assets/images/zion-carrier-logo.png';
+    const fullIntegrationLogo = config.assets?.fullIntegrationLogo
+      || config.assets?.kayPaoloLogo
+      || '/kay-paolo/assets/logo/kay-paolo.svg';
+
+    if (isFullIntegrationCard(card)) {
+      return `<img src="${escapeHtml(fullIntegrationLogo)}" alt="Full Integration logo" width="100" height="50">`;
+    }
 
     if (partner === 'ZION') {
       return `<img src="${escapeHtml(zionLogo)}" alt="Zion Shipping logo" width="100" height="50">`;

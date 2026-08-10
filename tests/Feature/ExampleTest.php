@@ -164,7 +164,7 @@ class ExampleTest extends TestCase
             ->assertSee('Shipment booked successfully.', false)
             ->assertSee('View Labels, Documents &amp; Receipt', false)
             ->assertSee('Shipment Number', false)
-            ->assertSee('HTS1048291', false)
+            ->assertSee('KP-DEMO-1001', false)
             ->assertSee('Open Label', false)
             ->assertSee('Open Receipt', false)
             ->assertSee('Track Shipment', false)
@@ -293,6 +293,8 @@ class ExampleTest extends TestCase
         $this->assertStringContainsString('Detailed Pricing', $script);
         $this->assertStringContainsString('Package Specs', $script);
         $this->assertStringContainsString('Carrier Tracking Details', $script);
+        $this->assertStringContainsString('history-more-menu', $script);
+        $this->assertStringContainsString('voidHistoryShipment', $script);
         $this->assertStringContainsString('extractHistoryCards', $script);
         $this->assertStringContainsString('updateHistoryBadgesFromRows', $script);
         $this->assertStringContainsString('Object.entries(rawCountries)', $script);
@@ -316,10 +318,17 @@ class ExampleTest extends TestCase
         $this->assertStringContainsString('Home Delivery', $script);
         $this->assertStringContainsString('include_in_receipt', $script);
         $this->assertStringContainsString("raw.includes('full integration')", $script);
+        $this->assertStringContainsString('isFullIntegrationCard', $script);
+        $this->assertStringContainsString('fullIntegrationLogo', $script);
+        $this->assertStringContainsString('Full Integration logo', $script);
         $this->assertStringContainsString('filterQuoteCardsForPayload', $script);
         $this->assertStringContainsString('totalPackageWeight(payload) !== 0', $script);
         $this->assertStringContainsString('zionCarrierLogo', $script);
         $this->assertStringContainsString('Zion Shipping logo', $script);
+        $this->assertStringContainsString('history-more-menu', $script);
+        $this->assertStringContainsString("data-history-action=\"label\"", $script);
+        $this->assertStringContainsString('applyCouponBtn', $script);
+        $this->assertStringContainsString('promo: firstValue(\'couponCode\')', $script);
         $this->assertStringContainsString('labelDestination', $script);
         $this->assertStringContainsString('receiptPackageCount', $script);
         $this->assertStringContainsString('renderPackageLabels', $script);
@@ -444,15 +453,15 @@ class ExampleTest extends TestCase
     public function test_quote_proxy_falls_back_when_api_endpoint_requires_session_store(): void
     {
         Http::fake([
-            '*/api/kay-paolo/get-quote-result' => Http::response([
-                'message' => 'Session store not set on request.',
-            ], 500),
             '*/web-api/get-quote-result-bocicot' => Http::response([
                 'status' => 'success',
                 'quotes' => [
                     ['carrier' => 'ZION', 'service' => 'Economical Air', 'total' => '25.00'],
                 ],
             ]),
+            '*/api/kay-paolo/get-quote-result' => Http::response([
+                'message' => 'Session store not set on request.',
+            ], 500),
         ]);
 
         $this->withHeader('Authorization', 'Bearer fake-token')
@@ -460,10 +469,19 @@ class ExampleTest extends TestCase
                 'user_id' => 7020,
                 'from_country' => 'US',
                 'to_country' => 'HT',
+                'coupon_code' => 'SAVE10',
+                'delivery_location' => 'Home Delivery',
             ])
             ->assertOk()
             ->assertJsonPath('status', 'success')
             ->assertJsonPath('quotes.0.service', 'Economical Air');
+
+        Http::assertSent(function ($request) {
+            return str_contains($request->url(), '/web-api/get-quote-result-bocicot')
+                && ($request['promo'] ?? null) === 'SAVE10'
+                && ($request['coupon_code'] ?? null) === 'SAVE10'
+                && ($request['delivery_location'] ?? null) === 'Home Delivery';
+        });
     }
 
     public function test_admin_page_is_role_gated_and_updates_content(): void

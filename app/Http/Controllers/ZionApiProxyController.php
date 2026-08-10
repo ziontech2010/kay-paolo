@@ -124,8 +124,8 @@ class ZionApiProxyController extends Controller
     public function flatRates(Request $request): JsonResponse
     {
         return $this->forwardAuthenticatedWithFallback([
-            ['endpoint' => 'kay-paolo/get-flat-rates'],
             ['endpoint' => 'web-api/get-flat-rates-bocicot', 'web' => true],
+            ['endpoint' => 'kay-paolo/get-flat-rates'],
         ], $request);
     }
 
@@ -136,10 +136,12 @@ class ZionApiProxyController extends Controller
 
     public function quote(Request $request): JsonResponse
     {
+        $payload = $this->sanitizeQuotePayload($request->except('_token'));
+
         return $this->forwardAuthenticatedWithFallback([
-            ['endpoint' => 'kay-paolo/get-quote-result'],
             ['endpoint' => 'web-api/get-quote-result-bocicot', 'web' => true],
-        ], $request);
+            ['endpoint' => 'kay-paolo/get-quote-result'],
+        ], $request, $payload);
     }
 
     public function createShipment(Request $request): JsonResponse
@@ -217,6 +219,16 @@ class ZionApiProxyController extends Controller
             ['endpoint' => 'kay-paolo/shipping-history-filter'],
             ['endpoint' => 'bocicot/shipping-history-filter'],
             ['endpoint' => 'web-api/shipping-history-filter-bocicot', 'web' => true],
+        ], $request);
+    }
+
+    public function voidShipment(Request $request): JsonResponse
+    {
+        return $this->forwardAuthenticatedWithFallback([
+            ['endpoint' => 'kay-paolo/void-shipping'],
+            ['endpoint' => 'bocicot/void-shipping'],
+            ['endpoint' => 'web-api/void-shipping-bocicot', 'web' => true],
+            ['endpoint' => 'web-api/void-shipment-bocicot', 'web' => true],
         ], $request);
     }
 
@@ -439,30 +451,45 @@ class ZionApiProxyController extends Controller
         return [
             'response' => $remote,
             'payload' => array_merge($sessionPayload, $remote, array_filter([
-                'package_description' => $remote['package_description'] ?? null,
+                'package_description' => $remote['package_description'] ?? $remote['description'] ?? null,
                 'package_count' => $remote['package_count'] ?? null,
                 'dimensions' => is_array($remoteDimensions) && $remoteDimensions !== [] ? $remoteDimensions : null,
                 'packages' => is_array($remotePackages) && $remotePackages !== [] ? $remotePackages : null,
                 'delivery_option' => $remote['delivery_option'] ?? $remote['selected_shipper'] ?? null,
                 'selected_shipper' => $remote['selected_shipper'] ?? null,
+                'delivery_location' => $remote['delivery_location'] ?? null,
+                'deliveryEstimateDate' => $remote['deliveryEstimateDate']
+                    ?? $remote['delivery_date']
+                    ?? $remote['expected_arrival_date']
+                    ?? $remote['arrives_on']
+                    ?? null,
                 'from_name' => $remote['from_name'] ?? $remote['shipper_name'] ?? null,
-                'from_address' => $remote['shipper_address'] ?? null,
-                'from_city' => $remote['shipper_city'] ?? null,
-                'from_state' => $remote['shipper_state'] ?? null,
-                'from_zip' => $remote['shipper_zip'] ?? null,
-                'from_country_name' => $remote['shipper_country'] ?? null,
+                'from_email' => $remote['from_email'] ?? $remote['shipper_email'] ?? null,
+                'from_phone' => $remote['from_phone'] ?? $remote['shipper_phone'] ?? null,
+                'from_address' => $remote['shipper_address'] ?? $remote['from_address'] ?? null,
+                'from_city' => $remote['shipper_city'] ?? $remote['from_city'] ?? null,
+                'from_state' => $remote['shipper_state'] ?? $remote['from_state'] ?? null,
+                'from_zip' => $remote['shipper_zip'] ?? $remote['from_zip'] ?? null,
+                'from_country_name' => $remote['shipper_country'] ?? $remote['from_country_name'] ?? null,
                 'to_name' => $remote['to_name'] ?? $remote['consignee_name'] ?? null,
-                'to_address' => $remote['consignee_address'] ?? null,
-                'to_city' => $remote['consignee_city'] ?? null,
-                'to_state' => $remote['consignee_state'] ?? null,
-                'to_zip' => $remote['consignee_zip'] ?? null,
-                'to_country_name' => $remote['consignee_country'] ?? null,
+                'to_phone_1' => $remote['to_phone_1'] ?? $remote['consignee_phone'] ?? null,
+                'to_phone_2' => $remote['to_phone_2'] ?? $remote['consignee_homephone'] ?? null,
+                'consignee_phone' => $remote['consignee_phone'] ?? $remote['to_phone_1'] ?? null,
+                'to_address' => $remote['consignee_address'] ?? $remote['to_address'] ?? null,
+                'to_city' => $remote['consignee_city'] ?? $remote['to_city'] ?? null,
+                'to_state' => $remote['consignee_state'] ?? $remote['to_state'] ?? null,
+                'to_zip' => $remote['consignee_zip'] ?? $remote['to_zip'] ?? null,
+                'to_country_name' => $remote['consignee_country'] ?? $remote['to_country_name'] ?? null,
+                'payment_type' => $remote['payment_type'] ?? null,
+                'total_value' => $remote['total_value'] ?? $remote['package_value'] ?? null,
             ], static fn ($value) => $value !== null && $value !== '' && $value !== [])),
             'selected' => array_merge($sessionSelected, array_filter([
                 'freight' => $remote['freight'] ?? null,
                 'tax' => $remote['tax'] ?? null,
                 'total' => $remote['total'] ?? null,
                 'insurance' => $remote['insurance'] ?? null,
+                'home_delivery' => $remote['home_delivery'] ?? $remote['home_delivery_fee'] ?? $remote['delivery'] ?? null,
+                'eta' => $remote['deliveryEstimateDate'] ?? $remote['delivery_date'] ?? $remote['expected_arrival_date'] ?? null,
                 'service' => $remote['selected_shipper'] ?? $remote['delivery_option'] ?? null,
             ], static fn ($value) => $value !== null && $value !== '')),
         ];
@@ -599,6 +626,7 @@ class ZionApiProxyController extends Controller
             'user_id' => $payload['user_id'] ?? $payload['quote_user_id'] ?? null,
             'quote_user_id' => $payload['quote_user_id'] ?? $payload['user_id'] ?? null,
             'quote_id' => $payload['quote_id'] ?? null,
+            'agent_id' => $payload['agent_id'] ?? null,
             'partner' => $this->normalizePartner($payload['partner'] ?? 'ZION'),
             'selected_shipper' => $selectedShipper,
             'delivery_option' => $selectedShipper,
@@ -649,6 +677,67 @@ class ZionApiProxyController extends Controller
             'deliveryEstimateDate' => $payload['deliveryEstimateDate'] ?? null,
             'promo' => $payload['promo'] ?? $payload['coupon_code'] ?? '',
             'coupon_code' => $payload['coupon_code'] ?? $payload['promo'] ?? '',
+            'extra_service_charge' => $payload['extra_service_charge'] ?? '',
+            'include_in_receipt' => $payload['include_in_receipt'] ?? $payload['include_receipt'] ?? 0,
+            'flaterateinside' => $this->hasFlatRate($flatRate, $shipmentType) ? 1 : 0,
+            'fragile_shipment' => $fragileShipment,
+            'is_fragile_shipment' => $fragileShipment,
+        ]);
+    }
+
+    private function sanitizeQuotePayload(array $payload): array
+    {
+        $dimensions = $this->normalizeShipmentDimensions($payload);
+        $rowCount = $this->dimensionRowCount($dimensions);
+        $flatRate = $this->padArray($payload['flat_rate'] ?? [], $rowCount, '0');
+        $shipmentType = $this->padArray($payload['shipment_type'] ?? [], $rowCount, '');
+        $deliveryLocation = $this->normalizeDeliveryLocation($payload['delivery_location'] ?? $payload['deliveryLocation'] ?? '');
+        $declaredValue = $this->positiveNumber($payload['total_value'] ?? $payload['package_value'] ?? null, 10);
+        $fragileShipment = $payload['is_fragile_shipment'] ?? $payload['fragile_shipment'] ?? 0;
+        $promo = trim((string) ($payload['promo'] ?? $payload['coupon_code'] ?? ''));
+
+        return $this->compactPayload([
+            'user_id' => $payload['user_id'] ?? $payload['quote_user_id'] ?? null,
+            'quote_user_id' => $payload['quote_user_id'] ?? $payload['user_id'] ?? null,
+            'agent_id' => $payload['agent_id'] ?? null,
+            'phone_or_account' => $payload['phone_or_account'] ?? null,
+            'from_name' => $payload['from_name'] ?? null,
+            'from_email' => $payload['from_email'] ?? null,
+            'from_phone' => $payload['from_phone'] ?? null,
+            'from_account' => $payload['from_account'] ?? null,
+            'from_country_name' => $payload['from_country_name'] ?? null,
+            'from_country' => $payload['from_country'] ?? null,
+            'from_address' => $payload['from_address'] ?? null,
+            'from_zip' => $payload['from_zip'] ?? null,
+            'from_city' => $payload['from_city'] ?? null,
+            'from_state' => $payload['from_state'] ?? null,
+            'to_country_name' => $payload['to_country_name'] ?? null,
+            'to_country' => $payload['to_country'] ?? null,
+            'to_address' => $payload['to_address'] ?? null,
+            'to_apt' => $payload['to_apt'] ?? '',
+            'to_zip_input' => $payload['to_zip_input'] ?? $payload['to_zip'] ?? null,
+            'to_city_dropdown' => $payload['to_city_dropdown'] ?? $payload['to_city'] ?? null,
+            'to_zip' => $payload['to_zip'] ?? null,
+            'to_city' => $payload['to_city'] ?? null,
+            'to_state' => $payload['to_state'] ?? null,
+            'to_name' => $payload['to_name'] ?? $payload['consignee_name'] ?? null,
+            'consignee_name' => $payload['consignee_name'] ?? $payload['to_name'] ?? null,
+            'consignee_id' => $payload['consignee_id'] ?? $payload['consignees_id'] ?? null,
+            'consignees_id' => $payload['consignees_id'] ?? $payload['consignee_id'] ?? null,
+            'to_phone_1' => $payload['to_phone_1'] ?? $payload['consignee_phone'] ?? null,
+            'to_phone_2' => $payload['to_phone_2'] ?? $payload['consignee_homephone'] ?? '',
+            'consignee_phone' => $payload['consignee_phone'] ?? $payload['to_phone_1'] ?? null,
+            'package_count' => $this->dimensionPieceCount($dimensions),
+            'total_value' => $declaredValue,
+            'package_value' => $declaredValue,
+            'dimensions' => $dimensions,
+            'flat_rate' => $flatRate,
+            'shipment_type' => $shipmentType,
+            'packages' => $this->expandedPackages($dimensions, $flatRate, $shipmentType),
+            'delivery_location' => $deliveryLocation,
+            'deliveryLocation' => $deliveryLocation,
+            'promo' => $promo,
+            'coupon_code' => $promo,
             'extra_service_charge' => $payload['extra_service_charge'] ?? '',
             'include_in_receipt' => $payload['include_in_receipt'] ?? $payload['include_receipt'] ?? 0,
             'flaterateinside' => $this->hasFlatRate($flatRate, $shipmentType) ? 1 : 0,

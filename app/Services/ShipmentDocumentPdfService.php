@@ -197,7 +197,21 @@ class ShipmentDocumentPdfService
             ]))),
             $payload['from_country_name'] ?? $payload['from_country'] ?? $shipping['shipper_country'] ?? null,
         ]))) ?: '414 Main St, Asbury Park, NJ 07712';
-        $shipperPhone = (string) ($payload['from_phone'] ?? $shipping['shipper_phone'] ?? 'info@kaypaoloshipping.com');
+        $shipperPhone = (string) ($this->firstNonEmptyString([
+            $payload['from_phone'] ?? null,
+            $shipping['shipper_phone'] ?? null,
+            $shipping['from_phone'] ?? null,
+            $response['shipper_phone'] ?? null,
+            $responseData['shipper_phone'] ?? null,
+        ]) ?: 'Phone pending');
+        $shipperEmail = (string) ($this->firstNonEmptyString([
+            $payload['from_email'] ?? null,
+            $shipping['shipper_email'] ?? null,
+            $shipping['from_email'] ?? null,
+            $response['shipper_email'] ?? null,
+            $responseData['shipper_email'] ?? null,
+            session('zion.user.email'),
+        ]) ?: '');
 
         $consigneeName = (string) ($payload['to_name'] ?? $payload['consignee_name'] ?? $shipping['consignee_name'] ?? 'Destination Customer');
         $consigneeAddress = trim(implode("\n", array_filter([
@@ -209,13 +223,23 @@ class ShipmentDocumentPdfService
             ]))),
             $payload['to_country_name'] ?? $payload['to_country'] ?? $shipping['consignee_country'] ?? null,
         ]))) ?: 'Destination address pending';
-        $consigneePhone = (string) ($payload['to_phone_1'] ?? $payload['consignee_phone'] ?? $shipping['consignee_phone'] ?? 'Phone pending');
+        $consigneePhone = (string) ($this->firstNonEmptyString([
+            $payload['to_phone_1'] ?? null,
+            $payload['consignee_phone'] ?? null,
+            $shipping['consignee_phone'] ?? null,
+            $shipping['to_phone_1'] ?? null,
+            $response['consignee_phone'] ?? null,
+            $responseData['consignee_phone'] ?? null,
+        ]) ?: 'Phone pending');
 
         $description = (string) ($this->firstNonEmptyString([
             $payload['package_description'] ?? null,
             $shipping['package_description'] ?? null,
+            $shipping['description'] ?? null,
             $response['package_description'] ?? null,
             $responseData['package_description'] ?? null,
+            $response['description'] ?? null,
+            $responseData['description'] ?? null,
         ]) ?: 'Package');
 
         $dimensions = $this->firstNonEmptyArray([
@@ -254,7 +278,18 @@ class ShipmentDocumentPdfService
         $deliveryLocation = (string) ($payload['delivery_location'] ?? $shipping['delivery_location'] ?? '');
         $serviceSummary = trim($deliveryOption.($deliveryLocation !== '' ? ' | '.$deliveryLocation : ''));
         $created = $response['created_at'] ?? $shipping['created_at'] ?? $responseData['created_at'] ?? now()->toDateTimeString();
-        $deliveryDate = $payload['deliveryEstimateDate'] ?? $selected['eta'] ?? $response['delivery_date'] ?? $shipping['delivery_date'] ?? 'Pending';
+        $deliveryDate = $this->firstNonEmptyString([
+            $payload['deliveryEstimateDate'] ?? null,
+            $selected['eta'] ?? null,
+            $selected['delivery_date'] ?? null,
+            $response['delivery_date'] ?? null,
+            $response['deliveryEstimateDate'] ?? null,
+            $response['expected_arrival_date'] ?? null,
+            $shipping['delivery_date'] ?? null,
+            $shipping['deliveryEstimateDate'] ?? null,
+            $shipping['expected_arrival_date'] ?? null,
+            $shipping['arrives_on'] ?? null,
+        ]) ?: 'Pending';
 
         // Prefer shipper/consignee fields from shipping history when payload is empty.
         if ($shipperName === 'Kay Paolo Shipping' && !empty($shipping['shipper_name'])) {
@@ -271,6 +306,12 @@ class ShipmentDocumentPdfService
                 $shipping['shipper_country'] ?? null,
             ])));
         }
+        if (($shipperPhone === '' || $shipperPhone === 'Phone pending') && !empty($shipping['shipper_phone'])) {
+            $shipperPhone = (string) $shipping['shipper_phone'];
+        }
+        if ($shipperEmail === '' && !empty($shipping['shipper_email'])) {
+            $shipperEmail = (string) $shipping['shipper_email'];
+        }
         if ($consigneeName === 'Destination Customer' && !empty($shipping['consignee_name'])) {
             $consigneeName = (string) $shipping['consignee_name'];
         }
@@ -284,6 +325,9 @@ class ShipmentDocumentPdfService
                 ]))),
                 $shipping['consignee_country'] ?? null,
             ])));
+        }
+        if (($consigneePhone === '' || $consigneePhone === 'Phone pending') && !empty($shipping['consignee_phone'])) {
+            $consigneePhone = (string) $shipping['consignee_phone'];
         }
 
         return [
@@ -300,6 +344,7 @@ class ShipmentDocumentPdfService
             'shipperName' => $shipperName,
             'shipperAddress' => $shipperAddress,
             'shipperPhone' => $shipperPhone,
+            'shipperEmail' => $shipperEmail,
             'consigneeName' => $consigneeName,
             'consigneeAddress' => $consigneeAddress,
             'consigneePhone' => $consigneePhone,
