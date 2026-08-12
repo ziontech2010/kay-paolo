@@ -475,7 +475,7 @@ class ZionApiProxyController extends Controller
             try {
                 $query = ['invoice' => $invoice];
                 $shipment = $this->resolveShipmentContext(request(), $query);
-                if ($this->documents->shipmentHasPackageDetails($shipment)) {
+                if ($this->documents->shipmentHasPackageDetails($shipment) || $this->documents->shipmentHasDocumentDetails($shipment)) {
                     $query['regen'] = '1';
                 }
                 if ($directory === 'label') {

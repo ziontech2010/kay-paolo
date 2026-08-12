@@ -1610,6 +1610,41 @@ document.addEventListener('DOMContentLoaded', () => {
   function buildShipmentDocumentData(response, payload, selected) {
     const responseData = response.data || {};
     const shipping = response.shipping_data || response.shipping || responseData.shipping_data || responseData.shipping || {};
+    const shipperSources = documentFieldSources([shipping, response, responseData, payload], [
+      'shipper',
+      'sender',
+      'customer',
+      'user',
+      'from',
+      'shipper_data',
+      'sender_data',
+      'customer_data',
+      'shipper_details',
+      'sender_details',
+      'customer_details'
+    ]);
+    const consigneeSources = documentFieldSources([shipping, response, responseData, payload], [
+      'consignee',
+      'receiver',
+      'recipient',
+      'to',
+      'destination',
+      'consignee_data',
+      'receiver_data',
+      'recipient_data',
+      'consignee_details',
+      'receiver_details',
+      'recipient_details'
+    ]);
+    const deliverySources = documentFieldSources([selected, shipping, response, responseData, payload], [
+      'delivery',
+      'eta',
+      'quote',
+      'rate',
+      'service',
+      'selected',
+      'selected_rate'
+    ]);
     const query = new URLSearchParams(window.location.search);
     const queryTracking = query.get('id') || query.get('tracking_number') || query.get('tracking') || query.get('awb') || '';
     const queryInvoice = query.get('invoice') || query.get('invoice_num') || '';
@@ -1652,40 +1687,31 @@ document.addEventListener('DOMContentLoaded', () => {
       || shipping.selected_shipper
       || 'Shipping Service';
     const serviceSummary = [deliveryOption, deliveryLocation].filter(Boolean).join(' | ') || 'Shipping Service';
-    const deliveryDateRaw = payload.deliveryEstimateDate
-      || payload.delivery_estimate_date
-      || payload.delivery_date
-      || payload.expected_arrival_date
-      || payload.estimated_delivery_date
-      || payload.eta
-      || payload.arrives_on
-      || selected.eta
-      || selected.deliveryEstimateDate
-      || selected.delivery_estimate_date
-      || selected.delivery_date
-      || selected.expected_arrival_date
-      || selected.arrives_on
-      || response.delivery_date
-      || response.deliveryEstimateDate
-      || response.delivery_estimate_date
-      || response.expected_arrival_date
-      || response.estimated_delivery_date
-      || response.eta
-      || response.arrives_on
-      || responseData.delivery_date
-      || responseData.deliveryEstimateDate
-      || responseData.delivery_estimate_date
-      || responseData.expected_arrival_date
-      || responseData.estimated_delivery_date
-      || responseData.eta
-      || shipping.delivery_date
-      || shipping.deliveryEstimateDate
-      || shipping.delivery_estimate_date
-      || shipping.expected_arrival_date
-      || shipping.estimated_delivery_date
-      || shipping.eta
-      || shipping.arrives_on
-      || '';
+    const deliveryDateRaw = firstDocumentFieldValue(documentFieldValues(deliverySources, [
+      'deliveryEstimateDate',
+      'delivery_estimate_date',
+      'deliveryDate',
+      'delivery_date',
+      'expected_arrival_date',
+      'expectedArrivalDate',
+      'expected_delivery_date',
+      'expectedDeliveryDate',
+      'estimated_delivery_date',
+      'estimatedDeliveryDate',
+      'estimated_arrival_date',
+      'estimatedArrivalDate',
+      'arrival_date',
+      'arrivalDate',
+      'arrives_on',
+      'arrivesOn',
+      'eta',
+      'eta_date',
+      'etaDate',
+      'delivery_by',
+      'deliveryBy',
+      'delivery_by_date',
+      'deliveryByDate'
+    ])) || '';
     const deliveryDate = deliveryDateRaw
       ? `by ${readableDate(deliveryDateRaw)}`
       : 'Pending';
@@ -1694,54 +1720,86 @@ document.addEventListener('DOMContentLoaded', () => {
       : String(paymentType).toUpperCase().includes('PAID')
         ? 'Paid'
         : String(paymentType || 'Payment is Due');
-    const shipperPhone = payload.from_phone
-      || shipping.shipper_phone
-      || shipping.from_phone
-      || shipping.shipper_contact
-      || shipping.shipper_mobile
-      || response.shipper_phone
-      || response.shipper_contact
-      || response.from_phone
-      || responseData.shipper_phone
-      || responseData.shipper_contact
-      || responseData.from_phone
-      || '';
-    const shipperEmail = payload.from_email
-      || shipping.shipper_email
-      || shipping.from_email
-      || emailFromValue(shipping.shipper_contact)
-      || shipping.customer_email
-      || shipping.email
-      || response.shipper_email
-      || response.from_email
-      || response.customer_email
-      || response.email
-      || responseData.shipper_email
-      || responseData.from_email
-      || responseData.customer_email
-      || responseData.email
-      || storedUser().email
-      || '';
-    const consigneePhone = payload.to_phone_1
-      || payload.to_phone
-      || payload.consignee_phone
-      || shipping.consignee_phone
-      || shipping.consignee_contact
-      || shipping.consignee_mobile
-      || shipping.to_phone_1
-      || shipping.to_phone
-      || shipping.receiver_phone
-      || shipping.recipient_phone
-      || shipping.consignee_homephone
-      || response.consignee_phone
-      || response.consignee_contact
-      || response.to_phone_1
-      || response.to_phone
-      || responseData.consignee_phone
-      || responseData.consignee_contact
-      || responseData.to_phone_1
-      || responseData.to_phone
-      || '';
+    const shipperPhone = phoneFromValues(documentFieldValues(shipperSources, [
+      'from_phone',
+      'fromPhone',
+      'shipper_phone',
+      'shipperPhone',
+      'sender_phone',
+      'senderPhone',
+      'customer_phone',
+      'customerPhone',
+      'phone',
+      'phone_number',
+      'phoneNumber',
+      'mobile',
+      'mobile_phone',
+      'mobilePhone',
+      'shipper_mobile',
+      'shipperMobile',
+      'sender_mobile',
+      'senderMobile',
+      'contact_phone',
+      'contactPhone',
+      'shipper_contact',
+      'shipperContact',
+      'sender_contact',
+      'senderContact',
+      'contact',
+      'telephone',
+      'tel'
+    ])) || '';
+    const shipperEmail = emailFromValues([
+      ...documentFieldValues(shipperSources, [
+        'from_email',
+        'fromEmail',
+        'shipper_email',
+        'shipperEmail',
+        'sender_email',
+        'senderEmail',
+        'customer_email',
+        'customerEmail',
+        'email',
+        'email_address',
+        'emailAddress',
+        'shipper_contact',
+        'shipperContact',
+        'sender_contact',
+        'senderContact',
+        'contact'
+      ]),
+      storedUser().email
+    ]) || '';
+    const consigneePhone = phoneFromValues(documentFieldValues(consigneeSources, [
+      'to_phone_1',
+      'toPhone1',
+      'to_phone',
+      'toPhone',
+      'consignee_phone',
+      'consigneePhone',
+      'consignee_contact',
+      'consigneeContact',
+      'consignee_mobile',
+      'consigneeMobile',
+      'receiver_phone',
+      'receiverPhone',
+      'recipient_phone',
+      'recipientPhone',
+      'phone',
+      'phone_number',
+      'phoneNumber',
+      'mobile',
+      'mobile_phone',
+      'mobilePhone',
+      'home_phone',
+      'homePhone',
+      'consignee_homephone',
+      'contact_phone',
+      'contactPhone',
+      'contact',
+      'telephone',
+      'tel'
+    ])) || '';
     const consigneeEmail = payload.to_email
       || payload.consignee_email
       || shipping.consignee_email
@@ -3058,9 +3116,89 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
+  function documentFieldSources(candidates, nestedKeys = []) {
+    const sources = [];
+
+    candidates.forEach((candidate) => {
+      const source = objectCandidate(candidate);
+      if (!source) return;
+
+      sources.push(source);
+      nestedKeys.forEach((key) => {
+        const nested = objectCandidate(source[key]);
+        if (nested) sources.push(nested);
+      });
+    });
+
+    return sources;
+  }
+
+  function objectCandidate(value) {
+    if (!value) return null;
+    if (typeof value === 'object' && !Array.isArray(value)) return value;
+    if (typeof value !== 'string') return null;
+
+    try {
+      const parsed = JSON.parse(value);
+      return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : null;
+    } catch (error) {
+      return null;
+    }
+  }
+
+  function documentFieldValues(sources, keys) {
+    const values = [];
+
+    sources.forEach((source) => {
+      keys.forEach((key) => {
+        if (Object.prototype.hasOwnProperty.call(source, key)) {
+          values.push(source[key]);
+        }
+      });
+    });
+
+    return values;
+  }
+
+  function firstDocumentFieldValue(values) {
+    for (const item of values) {
+      if (item === undefined || item === null || typeof item === 'object') continue;
+      const value = String(item).trim();
+      if (value) return value;
+    }
+
+    return '';
+  }
+
+  function phoneFromValues(values) {
+    for (const item of values) {
+      if (item === undefined || item === null || typeof item === 'object') continue;
+      const value = String(item).trim();
+      if (!value || emailFromValue(value) === value) continue;
+
+      const phoneMatch = value.match(/\+?\d[\d\s().-]{5,}\d/);
+      if (phoneMatch) return phoneMatch[0].trim();
+
+      const digits = value.replace(/\D+/g, '');
+      if (digits.length >= 6) return value;
+    }
+
+    return '';
+  }
+
+  function emailFromValues(values) {
+    for (const item of values) {
+      const email = emailFromValue(item);
+      if (email) return email;
+    }
+
+    return '';
+  }
+
   function emailFromValue(rawValue) {
     const value = String(rawValue || '').trim();
-    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value) ? value : '';
+    const match = value.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i);
+    return match ? match[0] : '';
   }
 
   function fillCreateShipmentPage() {

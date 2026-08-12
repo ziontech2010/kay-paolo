@@ -161,6 +161,41 @@ class ShipmentDocumentPdfService
             ?? $responseData['shipping_data']
             ?? $responseData['shipping']
             ?? [];
+        $shipperSources = $this->documentSources([$shipping, $response, $responseData, $payload], [
+            'shipper',
+            'sender',
+            'customer',
+            'user',
+            'from',
+            'shipper_data',
+            'sender_data',
+            'customer_data',
+            'shipper_details',
+            'sender_details',
+            'customer_details',
+        ]);
+        $consigneeSources = $this->documentSources([$shipping, $response, $responseData, $payload], [
+            'consignee',
+            'receiver',
+            'recipient',
+            'to',
+            'destination',
+            'consignee_data',
+            'receiver_data',
+            'recipient_data',
+            'consignee_details',
+            'receiver_details',
+            'recipient_details',
+        ]);
+        $deliverySources = $this->documentSources([$selected, $shipping, $response, $responseData, $payload], [
+            'delivery',
+            'eta',
+            'quote',
+            'rate',
+            'service',
+            'selected',
+            'selected_rate',
+        ]);
 
         $invoice = $this->resolveInvoice($query);
         $labels = $this->labelNumbers($query);
@@ -197,36 +232,56 @@ class ShipmentDocumentPdfService
             ]))),
             $payload['from_country_name'] ?? $payload['from_country'] ?? $shipping['shipper_country'] ?? null,
         ]))) ?: '414 Main St, Asbury Park, NJ 07712';
-        $shipperPhone = (string) ($this->firstNonEmptyString([
-            $payload['from_phone'] ?? null,
-            $shipping['shipper_phone'] ?? null,
-            $shipping['from_phone'] ?? null,
-            $shipping['shipper_contact'] ?? null,
-            $shipping['shipper_mobile'] ?? null,
-            $response['shipper_phone'] ?? null,
-            $response['shipper_contact'] ?? null,
-            $response['from_phone'] ?? null,
-            $responseData['shipper_phone'] ?? null,
-            $responseData['shipper_contact'] ?? null,
-            $responseData['from_phone'] ?? null,
-        ]) ?: 'Phone pending');
-        $shipperEmail = (string) ($this->firstEmailString([
-            $payload['from_email'] ?? null,
-            $shipping['shipper_email'] ?? null,
-            $shipping['from_email'] ?? null,
-            $shipping['customer_email'] ?? null,
-            $shipping['email'] ?? null,
-            $shipping['shipper_contact'] ?? null,
-            $response['shipper_email'] ?? null,
-            $responseData['shipper_email'] ?? null,
-            $response['from_email'] ?? null,
-            $responseData['from_email'] ?? null,
-            $response['customer_email'] ?? null,
-            $responseData['customer_email'] ?? null,
-            $response['email'] ?? null,
-            $responseData['email'] ?? null,
-            session('zion.user.email'),
-        ]) ?: '');
+        $shipperPhone = (string) ($this->firstPhoneString($this->sourceValues($shipperSources, [
+            'from_phone',
+            'fromPhone',
+            'shipper_phone',
+            'shipperPhone',
+            'sender_phone',
+            'senderPhone',
+            'customer_phone',
+            'customerPhone',
+            'phone',
+            'phone_number',
+            'phoneNumber',
+            'mobile',
+            'mobile_phone',
+            'mobilePhone',
+            'shipper_mobile',
+            'shipperMobile',
+            'sender_mobile',
+            'senderMobile',
+            'contact_phone',
+            'contactPhone',
+            'shipper_contact',
+            'shipperContact',
+            'sender_contact',
+            'senderContact',
+            'contact',
+            'telephone',
+            'tel',
+        ])) ?: 'Phone pending');
+        $shipperEmail = (string) ($this->firstEmailString(array_merge(
+            $this->sourceValues($shipperSources, [
+                'from_email',
+                'fromEmail',
+                'shipper_email',
+                'shipperEmail',
+                'sender_email',
+                'senderEmail',
+                'customer_email',
+                'customerEmail',
+                'email',
+                'email_address',
+                'emailAddress',
+                'shipper_contact',
+                'shipperContact',
+                'sender_contact',
+                'senderContact',
+                'contact',
+            ]),
+            [session('zion.user.email')]
+        )) ?: '');
 
         $consigneeName = (string) ($payload['to_name'] ?? $payload['consignee_name'] ?? $shipping['consignee_name'] ?? 'Destination Customer');
         $consigneeAddress = trim(implode("\n", array_filter([
@@ -238,26 +293,36 @@ class ShipmentDocumentPdfService
             ]))),
             $payload['to_country_name'] ?? $payload['to_country'] ?? $shipping['consignee_country'] ?? null,
         ]))) ?: 'Destination address pending';
-        $consigneePhone = (string) ($this->firstNonEmptyString([
-            $payload['to_phone_1'] ?? null,
-            $payload['to_phone'] ?? null,
-            $payload['consignee_phone'] ?? null,
-            $shipping['consignee_phone'] ?? null,
-            $shipping['consignee_contact'] ?? null,
-            $shipping['consignee_mobile'] ?? null,
-            $shipping['to_phone_1'] ?? null,
-            $shipping['to_phone'] ?? null,
-            $shipping['receiver_phone'] ?? null,
-            $shipping['recipient_phone'] ?? null,
-            $response['consignee_phone'] ?? null,
-            $response['consignee_contact'] ?? null,
-            $response['to_phone_1'] ?? null,
-            $response['to_phone'] ?? null,
-            $responseData['consignee_phone'] ?? null,
-            $responseData['consignee_contact'] ?? null,
-            $responseData['to_phone_1'] ?? null,
-            $responseData['to_phone'] ?? null,
-        ]) ?: 'Phone pending');
+        $consigneePhone = (string) ($this->firstPhoneString($this->sourceValues($consigneeSources, [
+            'to_phone_1',
+            'toPhone1',
+            'to_phone',
+            'toPhone',
+            'consignee_phone',
+            'consigneePhone',
+            'consignee_contact',
+            'consigneeContact',
+            'consignee_mobile',
+            'consigneeMobile',
+            'receiver_phone',
+            'receiverPhone',
+            'recipient_phone',
+            'recipientPhone',
+            'phone',
+            'phone_number',
+            'phoneNumber',
+            'mobile',
+            'mobile_phone',
+            'mobilePhone',
+            'home_phone',
+            'homePhone',
+            'consignee_homephone',
+            'contact_phone',
+            'contactPhone',
+            'contact',
+            'telephone',
+            'tel',
+        ])) ?: 'Phone pending');
 
         $description = (string) ($this->firstNonEmptyString([
             $payload['package_description'] ?? null,
@@ -305,35 +370,31 @@ class ShipmentDocumentPdfService
         $deliveryLocation = (string) ($payload['delivery_location'] ?? $shipping['delivery_location'] ?? '');
         $serviceSummary = trim($deliveryOption.($deliveryLocation !== '' ? ' | '.$deliveryLocation : ''));
         $created = $response['created_at'] ?? $shipping['created_at'] ?? $responseData['created_at'] ?? now()->toDateTimeString();
-        $deliveryDate = $this->firstNonEmptyString([
-            $payload['deliveryEstimateDate'] ?? null,
-            $payload['delivery_estimate_date'] ?? null,
-            $payload['delivery_date'] ?? null,
-            $payload['expected_arrival_date'] ?? null,
-            $payload['estimated_delivery_date'] ?? null,
-            $payload['eta'] ?? null,
-            $payload['arrives_on'] ?? null,
-            $selected['eta'] ?? null,
-            $selected['deliveryEstimateDate'] ?? null,
-            $selected['delivery_estimate_date'] ?? null,
-            $selected['delivery_date'] ?? null,
-            $selected['expected_arrival_date'] ?? null,
-            $selected['arrives_on'] ?? null,
-            $response['delivery_date'] ?? null,
-            $response['deliveryEstimateDate'] ?? null,
-            $response['delivery_estimate_date'] ?? null,
-            $response['expected_arrival_date'] ?? null,
-            $response['estimated_delivery_date'] ?? null,
-            $response['eta'] ?? null,
-            $response['arrives_on'] ?? null,
-            $shipping['delivery_date'] ?? null,
-            $shipping['deliveryEstimateDate'] ?? null,
-            $shipping['delivery_estimate_date'] ?? null,
-            $shipping['expected_arrival_date'] ?? null,
-            $shipping['estimated_delivery_date'] ?? null,
-            $shipping['eta'] ?? null,
-            $shipping['arrives_on'] ?? null,
-        ]) ?: 'Pending';
+        $deliveryDate = $this->firstNonEmptyString($this->sourceValues($deliverySources, [
+            'deliveryEstimateDate',
+            'delivery_estimate_date',
+            'deliveryDate',
+            'delivery_date',
+            'expected_arrival_date',
+            'expectedArrivalDate',
+            'expected_delivery_date',
+            'expectedDeliveryDate',
+            'estimated_delivery_date',
+            'estimatedDeliveryDate',
+            'estimated_arrival_date',
+            'estimatedArrivalDate',
+            'arrival_date',
+            'arrivalDate',
+            'arrives_on',
+            'arrivesOn',
+            'eta',
+            'eta_date',
+            'etaDate',
+            'delivery_by',
+            'deliveryBy',
+            'delivery_by_date',
+            'deliveryByDate',
+        ])) ?: 'Pending';
 
         // Prefer shipper/consignee fields from shipping history when payload is empty.
         if ($shipperName === 'Kay Paolo Shipping' && !empty($shipping['shipper_name'])) {
@@ -502,6 +563,64 @@ class ShipmentDocumentPdfService
         return false;
     }
 
+    public function shipmentHasDocumentDetails(array $shipment): bool
+    {
+        $payload = $shipment['payload'] ?? [];
+        $response = $shipment['response'] ?? $shipment;
+        $responseData = is_array($response['data'] ?? null) ? $response['data'] : [];
+        $shipping = $response['shipping_data']
+            ?? $response['shipping']
+            ?? $responseData['shipping_data']
+            ?? $responseData['shipping']
+            ?? [];
+        $sources = $this->documentSources([$shipping, $response, $responseData, $payload], [
+            'shipper',
+            'sender',
+            'customer',
+            'consignee',
+            'receiver',
+            'recipient',
+            'delivery',
+            'eta',
+        ]);
+
+        return $this->firstPhoneString($this->sourceValues($sources, [
+            'from_phone',
+            'shipper_phone',
+            'sender_phone',
+            'to_phone_1',
+            'to_phone',
+            'consignee_phone',
+            'receiver_phone',
+            'recipient_phone',
+            'phone',
+            'phone_number',
+            'mobile',
+            'contact',
+        ])) !== null
+            || $this->firstEmailString($this->sourceValues($sources, [
+                'from_email',
+                'shipper_email',
+                'sender_email',
+                'customer_email',
+                'email',
+                'contact',
+            ])) !== null
+            || $this->firstNonEmptyString($this->sourceValues($sources, [
+                'deliveryEstimateDate',
+                'delivery_estimate_date',
+                'deliveryDate',
+                'delivery_date',
+                'expected_arrival_date',
+                'expected_delivery_date',
+                'estimated_delivery_date',
+                'arrival_date',
+                'arrives_on',
+                'eta',
+                'eta_date',
+            ])) !== null;
+    }
+
     private function firstNonEmptyArray(array $candidates): array
     {
         foreach ($candidates as $candidate) {
@@ -517,10 +636,69 @@ class ShipmentDocumentPdfService
         return [];
     }
 
+    private function documentSources(array $candidates, array $nestedKeys = []): array
+    {
+        $sources = [];
+
+        foreach ($candidates as $candidate) {
+            $source = $this->arrayCandidate($candidate);
+            if ($source === []) {
+                continue;
+            }
+
+            $sources[] = $source;
+
+            foreach ($nestedKeys as $key) {
+                if (!array_key_exists($key, $source)) {
+                    continue;
+                }
+
+                $nested = $this->arrayCandidate($source[$key]);
+                if ($nested !== []) {
+                    $sources[] = $nested;
+                }
+            }
+        }
+
+        return $sources;
+    }
+
+    private function arrayCandidate(mixed $candidate): array
+    {
+        if (is_string($candidate)) {
+            $decoded = json_decode($candidate, true);
+            $candidate = is_array($decoded) ? $decoded : null;
+        }
+
+        return is_array($candidate) ? $candidate : [];
+    }
+
+    private function sourceValues(array $sources, array $keys): array
+    {
+        $values = [];
+
+        foreach ($sources as $source) {
+            if (!is_array($source)) {
+                continue;
+            }
+
+            foreach ($keys as $key) {
+                if (array_key_exists($key, $source)) {
+                    $values[] = $source[$key];
+                }
+            }
+        }
+
+        return $values;
+    }
+
     private function firstNonEmptyString(array $candidates): ?string
     {
         foreach ($candidates as $candidate) {
             if ($candidate === null) {
+                continue;
+            }
+            if (is_array($candidate)) {
                 continue;
             }
             $value = trim((string) $candidate);
@@ -532,16 +710,45 @@ class ShipmentDocumentPdfService
         return null;
     }
 
+    private function firstPhoneString(array $candidates): ?string
+    {
+        foreach ($candidates as $candidate) {
+            if ($candidate === null || is_array($candidate)) {
+                continue;
+            }
+
+            $value = trim((string) $candidate);
+            if ($value === '' || filter_var($value, FILTER_VALIDATE_EMAIL)) {
+                continue;
+            }
+
+            if (preg_match('/\+?\d[\d\s().-]{5,}\d/', $value, $matches)) {
+                return trim($matches[0]);
+            }
+
+            $digits = preg_replace('/\D+/', '', $value) ?? '';
+            if (strlen($digits) >= 6) {
+                return $value;
+            }
+        }
+
+        return null;
+    }
+
     private function firstEmailString(array $candidates): ?string
     {
         foreach ($candidates as $candidate) {
-            if ($candidate === null) {
+            if ($candidate === null || is_array($candidate)) {
                 continue;
             }
 
             $value = trim((string) $candidate);
             if ($value !== '' && filter_var($value, FILTER_VALIDATE_EMAIL)) {
                 return $value;
+            }
+
+            if (preg_match('/[A-Z0-9._%+\-]+@[A-Z0-9.\-]+\.[A-Z]{2,}/i', $value, $matches)) {
+                return $matches[0];
             }
         }
 

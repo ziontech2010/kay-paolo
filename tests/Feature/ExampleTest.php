@@ -492,35 +492,48 @@ class ExampleTest extends TestCase
 
     public function test_receipt_pdf_includes_package_details_from_shipment_history(): void
     {
+        $historyRow = [
+            'id' => 24755,
+            'invoice_num' => '479029',
+            'tracking_number' => 'HTS479029-1/1',
+            'package_description' => 'Household Goods',
+            'package_count' => 2,
+            'packages' => [],
+            'dimensions' => [
+                'package_count_ind' => [2],
+                'weight' => [45],
+                'length' => [24],
+                'width' => [18],
+                'height' => [16],
+            ],
+            'shipper_name' => 'Kay Shipper',
+            'consignee_name' => 'Kay Consignee',
+            'shipper' => [
+                'phone' => '3051234567',
+                'contact' => '3051234567 / history-shipper@example.com',
+            ],
+            'consignee' => [
+                'phone' => '5099876543',
+            ],
+            'data' => [
+                'delivery_date' => '2026-08-24 11:59:00',
+            ],
+            'selected_shipper' => 'Economical Air',
+            'freight' => 80,
+            'tax' => 5,
+            'total' => 85,
+            'created_at' => '2026-08-01 10:00:00',
+        ];
+
         Http::fake([
             '*/api/bocicot/shipping-history-filter' => Http::response([
                 'status' => 'success',
-                'shippings' => [[
-                    'id' => 24755,
-                    'invoice_num' => '479029',
-                    'tracking_number' => 'HTS479029-1/1',
-                    'package_description' => 'Household Goods',
-                    'package_count' => 2,
-                    'packages' => [],
-                    'dimensions' => [
-                        'package_count_ind' => [2],
-                        'weight' => [45],
-                        'length' => [24],
-                        'width' => [18],
-                        'height' => [16],
-                    ],
-                    'shipper_name' => 'Kay Shipper',
-                    'consignee_name' => 'Kay Consignee',
-                    'selected_shipper' => 'Economical Air',
-                    'freight' => 80,
-                    'tax' => 5,
-                    'total' => 85,
-                    'created_at' => '2026-08-01 10:00:00',
-                ]],
+                'shippings' => [$historyRow],
             ]),
         ]);
 
         @unlink(storage_path('app/public/receipts/receipt_479029.pdf'));
+        @unlink(storage_path('app/public/label/label_479029.pdf'));
 
         $this->withSession(['zion.access_token' => 'test-token'])
             ->get('/shipment-receipt?invoice=479029&id=HTS479029-1%2F1')
@@ -535,7 +548,35 @@ class ExampleTest extends TestCase
             'Receipt PDF should embed package description or weight from history.'
         );
 
+        $service = app(\App\Services\ShipmentDocumentPdfService::class);
+        $reflection = new \ReflectionClass($service);
+        $method = $reflection->getMethod('documentPayload');
+        $method->setAccessible(true);
+        $documentPayload = $method->invoke($service, [
+            'invoice' => '479029',
+            'id' => 'HTS479029-1/1',
+        ], [
+            'response' => $historyRow,
+            'payload' => [],
+            'selected' => [],
+        ]);
+
+        $this->assertSame('history-shipper@example.com', $documentPayload['shipperEmail']);
+        $this->assertSame('3051234567', $documentPayload['shipperPhone']);
+        $this->assertSame('5099876543', $documentPayload['consigneePhone']);
+        $this->assertStringContainsString('Aug 24, 2026', $documentPayload['deliveryDate']);
+
+        $this->withSession(['zion.access_token' => 'test-token'])
+            ->get('/shipment-label?invoice=479029&id=HTS479029-1%2F1')
+            ->assertRedirect('/label/label_479029.pdf');
+
+        $labelPath = storage_path('app/public/label/label_479029.pdf');
+        $this->assertFileExists($labelPath);
+        $labelPdf = (string) file_get_contents($labelPath);
+        $this->assertStringStartsWith('%PDF', $labelPdf);
+
         @unlink($path);
+        @unlink($labelPath);
     }
 
     public function test_quote_proxy_falls_back_when_api_endpoint_requires_session_store(): void
