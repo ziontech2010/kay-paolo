@@ -181,21 +181,6 @@
             height: 48px;
             max-width: 100%;
         }
-        .package-info-box {
-            border: 2px solid #000;
-            min-height: 80px;
-            padding: 15px;
-        }
-        .package-info-title {
-            color: #000;
-            font-size: 14px;
-            font-weight: 600;
-            margin-bottom: 10px;
-        }
-        .package-info-content {
-            color: #000;
-            font-size: 14px;
-        }
         @page {
             size: A4 portrait;
             margin: 12mm;
@@ -291,11 +276,6 @@
                         @if ($loop->first) id="labelDeliveryBarcode" @endif
                     ></svg>
                     <div class="delivery-no-text">Delivery No. <span data-label-field="delivery" @if ($loop->first) id="labelDeliveryNumber" @endif>{{ $deliveryNumber }}</span></div>
-                </div>
-
-                <div class="package-info-box">
-                    <div class="package-info-title">Package Contents:</div>
-                    <div class="package-info-content" data-label-field="package" @if ($loop->first) id="receiptA4Package" @endif>Package (1 pcs)</div>
                 </div>
             </div>
         @endforeach

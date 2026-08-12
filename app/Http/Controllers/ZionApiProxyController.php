@@ -123,10 +123,12 @@ class ZionApiProxyController extends Controller
 
     public function flatRates(Request $request): JsonResponse
     {
+        $payload = $this->sanitizeFlatRatePayload($request->except('_token'));
+
         return $this->forwardAuthenticatedWithFallback([
-            ['endpoint' => 'web-api/get-flat-rates-bocicot', 'web' => true],
             ['endpoint' => 'kay-paolo/get-flat-rates'],
-        ], $request);
+            ['endpoint' => 'web-api/get-flat-rates-bocicot', 'web' => true],
+        ], $request, $payload);
     }
 
     public function saveConsignee(Request $request): JsonResponse
@@ -139,8 +141,8 @@ class ZionApiProxyController extends Controller
         $payload = $this->sanitizeQuotePayload($request->except('_token'));
 
         return $this->forwardAuthenticatedWithFallback([
-            ['endpoint' => 'web-api/get-quote-result-bocicot', 'web' => true],
             ['endpoint' => 'kay-paolo/get-quote-result'],
+            ['endpoint' => 'web-api/get-quote-result-bocicot', 'web' => true],
         ], $request, $payload);
     }
 
@@ -167,6 +169,7 @@ class ZionApiProxyController extends Controller
 
             if (!$this->isRecoverableZionAccountNumberSchemaError($retryResponse)) {
                 $this->rememberShipmentContext($request, $retryResponse['data'] ?? [], $payload);
+                $this->attachShipmentEmailResult($request, $retryResponse, $payload);
 
                 return $this->jsonResponse($retryResponse);
             }
@@ -176,6 +179,7 @@ class ZionApiProxyController extends Controller
 
         if ($response['ok'] ?? false) {
             $this->rememberShipmentContext($request, $response['data'] ?? [], $payload);
+            $this->attachShipmentEmailResult($request, $response, $payload);
         }
 
         return $this->jsonResponse($response);
@@ -464,21 +468,21 @@ class ZionApiProxyController extends Controller
                     ?? $remote['arrives_on']
                     ?? null,
                 'from_name' => $remote['from_name'] ?? $remote['shipper_name'] ?? null,
-                'from_email' => $remote['from_email'] ?? $remote['shipper_email'] ?? null,
-                'from_phone' => $remote['from_phone'] ?? $remote['shipper_phone'] ?? null,
+                'from_email' => $remote['from_email'] ?? $remote['shipper_email'] ?? $remote['customer_email'] ?? $remote['email'] ?? null,
+                'from_phone' => $remote['from_phone'] ?? $remote['shipper_phone'] ?? $remote['shipper_contact'] ?? $remote['shipper_mobile'] ?? $remote['phone'] ?? null,
                 'from_address' => $remote['shipper_address'] ?? $remote['from_address'] ?? null,
-                'from_city' => $remote['shipper_city'] ?? $remote['from_city'] ?? null,
-                'from_state' => $remote['shipper_state'] ?? $remote['from_state'] ?? null,
-                'from_zip' => $remote['shipper_zip'] ?? $remote['from_zip'] ?? null,
+                'from_city' => $remote['shipper_city'] ?? $remote['shipper_address_city'] ?? $remote['from_city'] ?? null,
+                'from_state' => $remote['shipper_state'] ?? $remote['shipper_address_state'] ?? $remote['from_state'] ?? null,
+                'from_zip' => $remote['shipper_zip'] ?? $remote['shipper_address_zip'] ?? $remote['from_zip'] ?? null,
                 'from_country_name' => $remote['shipper_country'] ?? $remote['from_country_name'] ?? null,
                 'to_name' => $remote['to_name'] ?? $remote['consignee_name'] ?? null,
-                'to_phone_1' => $remote['to_phone_1'] ?? $remote['consignee_phone'] ?? null,
+                'to_phone_1' => $remote['to_phone_1'] ?? $remote['to_phone'] ?? $remote['consignee_phone'] ?? $remote['consignee_contact'] ?? $remote['receiver_phone'] ?? $remote['recipient_phone'] ?? null,
                 'to_phone_2' => $remote['to_phone_2'] ?? $remote['consignee_homephone'] ?? null,
-                'consignee_phone' => $remote['consignee_phone'] ?? $remote['to_phone_1'] ?? null,
+                'consignee_phone' => $remote['consignee_phone'] ?? $remote['consignee_contact'] ?? $remote['to_phone_1'] ?? $remote['to_phone'] ?? null,
                 'to_address' => $remote['consignee_address'] ?? $remote['to_address'] ?? null,
-                'to_city' => $remote['consignee_city'] ?? $remote['to_city'] ?? null,
-                'to_state' => $remote['consignee_state'] ?? $remote['to_state'] ?? null,
-                'to_zip' => $remote['consignee_zip'] ?? $remote['to_zip'] ?? null,
+                'to_city' => $remote['consignee_city'] ?? $remote['consignee_address_city'] ?? $remote['to_city'] ?? null,
+                'to_state' => $remote['consignee_state'] ?? $remote['consignee_address_state'] ?? $remote['to_state'] ?? null,
+                'to_zip' => $remote['consignee_zip'] ?? $remote['consignee_address_zip'] ?? $remote['to_zip'] ?? null,
                 'to_country_name' => $remote['consignee_country'] ?? $remote['to_country_name'] ?? null,
                 'payment_type' => $remote['payment_type'] ?? null,
                 'total_value' => $remote['total_value'] ?? $remote['package_value'] ?? null,
@@ -486,10 +490,10 @@ class ZionApiProxyController extends Controller
             'selected' => array_merge($sessionSelected, array_filter([
                 'freight' => $remote['freight'] ?? null,
                 'tax' => $remote['tax'] ?? null,
-                'total' => $remote['total'] ?? null,
+                'total' => $remote['grand_total'] ?? $remote['final_total'] ?? $remote['total'] ?? null,
                 'insurance' => $remote['insurance'] ?? null,
-                'home_delivery' => $remote['home_delivery'] ?? $remote['home_delivery_fee'] ?? $remote['delivery'] ?? null,
-                'eta' => $remote['deliveryEstimateDate'] ?? $remote['delivery_date'] ?? $remote['expected_arrival_date'] ?? null,
+                'home_delivery' => $remote['home_delivery'] ?? $remote['home_delivery_fee'] ?? $remote['delivery_fee'] ?? $remote['delivery'] ?? null,
+                'eta' => $remote['deliveryEstimateDate'] ?? $remote['delivery_estimate_date'] ?? $remote['delivery_date'] ?? $remote['expected_arrival_date'] ?? $remote['estimated_delivery_date'] ?? $remote['eta'] ?? $remote['arrives_on'] ?? null,
                 'service' => $remote['selected_shipper'] ?? $remote['delivery_option'] ?? null,
             ], static fn ($value) => $value !== null && $value !== '')),
         ];
@@ -518,6 +522,8 @@ class ZionApiProxyController extends Controller
             'search' => $search !== '' ? $search : null,
             'date_range' => '365 Days',
             'limit' => 50,
+            'shipment_id' => $shipmentId,
+            'shipping_id' => $shipmentId,
         ]), $token);
 
         if (!($response['ok'] ?? false)) {
@@ -671,17 +677,57 @@ class ZionApiProxyController extends Controller
             'plannedShippingDateAndTime' => $payload['plannedShippingDateAndTime'] ?? $this->plannedShippingDateTime(),
             'delivery_location' => $deliveryLocation,
             'deliveryLocation' => $deliveryLocation,
+            'delivery_type' => $deliveryLocation,
+            'deliveryType' => $deliveryLocation,
+            'is_home_delivery' => $this->isHomeDelivery($deliveryLocation) ? 1 : 0,
+            'home_delivery_required' => $this->isHomeDelivery($deliveryLocation) ? 1 : 0,
             'delivery_description' => $payload['delivery_description'] ?? '',
             'payment_type' => $payload['payment_type'] ?? 'PAID AT AGENT',
             'deliveryEstimatePrice' => $payload['deliveryEstimatePrice'] ?? null,
             'deliveryEstimateDate' => $payload['deliveryEstimateDate'] ?? null,
-            'promo' => $payload['promo'] ?? $payload['coupon_code'] ?? '',
-            'coupon_code' => $payload['coupon_code'] ?? $payload['promo'] ?? '',
+            'promo' => $payload['promo'] ?? $payload['coupon_code'] ?? $payload['coupon'] ?? $payload['promo_code'] ?? '',
+            'coupon_code' => $payload['coupon_code'] ?? $payload['promo'] ?? $payload['coupon'] ?? $payload['promo_code'] ?? '',
+            'coupon' => $payload['coupon'] ?? $payload['coupon_code'] ?? $payload['promo'] ?? '',
+            'promo_code' => $payload['promo_code'] ?? $payload['promo'] ?? $payload['coupon_code'] ?? '',
+            'discount_code' => $payload['discount_code'] ?? $payload['coupon_code'] ?? $payload['promo'] ?? '',
             'extra_service_charge' => $payload['extra_service_charge'] ?? '',
             'include_in_receipt' => $payload['include_in_receipt'] ?? $payload['include_receipt'] ?? 0,
             'flaterateinside' => $this->hasFlatRate($flatRate, $shipmentType) ? 1 : 0,
+            'flat_rate_price' => $this->padArray($payload['flat_rate_price'] ?? [], $rowCount, ''),
+            'flat_rate_label' => $this->padArray($payload['flat_rate_label'] ?? [], $rowCount, ''),
             'fragile_shipment' => $fragileShipment,
             'is_fragile_shipment' => $fragileShipment,
+        ]);
+    }
+
+    private function sanitizeFlatRatePayload(array $payload): array
+    {
+        $toCountry = $payload['to_country']
+            ?? $payload['country']
+            ?? $payload['to']['country']
+            ?? null;
+        $toCountryName = $payload['to_country_name']
+            ?? $payload['country_name']
+            ?? $payload['to']['country_name']
+            ?? null;
+        $fromState = $payload['from_state']
+            ?? $payload['origin_state']
+            ?? $payload['from']['state']
+            ?? null;
+
+        return $this->compactPayload([
+            'user_id' => $payload['user_id'] ?? $payload['quote_user_id'] ?? null,
+            'quote_user_id' => $payload['quote_user_id'] ?? $payload['user_id'] ?? null,
+            'agent_id' => $payload['agent_id'] ?? $payload['agentId'] ?? null,
+            'to_country' => $toCountry,
+            'country' => $toCountry,
+            'country_code' => $toCountry,
+            'to_country_name' => $toCountryName,
+            'country_name' => $toCountryName,
+            'from_state' => $fromState,
+            'origin_state' => $fromState,
+            'selected_shipper' => $payload['selected_shipper'] ?? $payload['delivery_option'] ?? $payload['service'] ?? null,
+            'delivery_option' => $payload['delivery_option'] ?? $payload['selected_shipper'] ?? $payload['service'] ?? null,
         ]);
     }
 
@@ -694,20 +740,25 @@ class ZionApiProxyController extends Controller
         $deliveryLocation = $this->normalizeDeliveryLocation($payload['delivery_location'] ?? $payload['deliveryLocation'] ?? '');
         $declaredValue = $this->positiveNumber($payload['total_value'] ?? $payload['package_value'] ?? null, 10);
         $fragileShipment = $payload['is_fragile_shipment'] ?? $payload['fragile_shipment'] ?? 0;
-        $promo = trim((string) ($payload['promo'] ?? $payload['coupon_code'] ?? ''));
+        $promo = trim((string) ($payload['promo'] ?? $payload['coupon_code'] ?? $payload['coupon'] ?? $payload['promo_code'] ?? $payload['discount_code'] ?? ''));
 
         return $this->compactPayload([
             'user_id' => $payload['user_id'] ?? $payload['quote_user_id'] ?? null,
             'quote_user_id' => $payload['quote_user_id'] ?? $payload['user_id'] ?? null,
             'agent_id' => $payload['agent_id'] ?? null,
+            'agentId' => $payload['agentId'] ?? $payload['agent_id'] ?? null,
+            'created_by' => $payload['created_by'] ?? $payload['agent_id'] ?? null,
+            'created_by_id' => $payload['created_by_id'] ?? $payload['agent_id'] ?? null,
             'phone_or_account' => $payload['phone_or_account'] ?? null,
             'from_name' => $payload['from_name'] ?? null,
             'from_email' => $payload['from_email'] ?? null,
             'from_phone' => $payload['from_phone'] ?? null,
             'from_account' => $payload['from_account'] ?? null,
+            'account_number' => $payload['from_account'] ?? $payload['account_number'] ?? null,
             'from_country_name' => $payload['from_country_name'] ?? null,
             'from_country' => $payload['from_country'] ?? null,
             'from_address' => $payload['from_address'] ?? null,
+            'from_apt' => $payload['from_apt'] ?? '',
             'from_zip' => $payload['from_zip'] ?? null,
             'from_city' => $payload['from_city'] ?? null,
             'from_state' => $payload['from_state'] ?? null,
@@ -736,11 +787,20 @@ class ZionApiProxyController extends Controller
             'packages' => $this->expandedPackages($dimensions, $flatRate, $shipmentType),
             'delivery_location' => $deliveryLocation,
             'deliveryLocation' => $deliveryLocation,
+            'delivery_type' => $deliveryLocation,
+            'deliveryType' => $deliveryLocation,
+            'is_home_delivery' => $this->isHomeDelivery($deliveryLocation) ? 1 : 0,
+            'home_delivery_required' => $this->isHomeDelivery($deliveryLocation) ? 1 : 0,
             'promo' => $promo,
             'coupon_code' => $promo,
+            'coupon' => $promo,
+            'promo_code' => $promo,
+            'discount_code' => $promo,
             'extra_service_charge' => $payload['extra_service_charge'] ?? '',
             'include_in_receipt' => $payload['include_in_receipt'] ?? $payload['include_receipt'] ?? 0,
             'flaterateinside' => $this->hasFlatRate($flatRate, $shipmentType) ? 1 : 0,
+            'flat_rate_price' => $this->padArray($payload['flat_rate_price'] ?? [], $rowCount, ''),
+            'flat_rate_label' => $this->padArray($payload['flat_rate_label'] ?? [], $rowCount, ''),
             'fragile_shipment' => $fragileShipment,
             'is_fragile_shipment' => $fragileShipment,
         ]);
@@ -890,6 +950,134 @@ class ZionApiProxyController extends Controller
         }
 
         return $raw;
+    }
+
+    private function isHomeDelivery(string $deliveryLocation): bool
+    {
+        return str_contains(strtolower($deliveryLocation), 'home');
+    }
+
+    private function attachShipmentEmailResult(Request $request, array &$response, array $payload): void
+    {
+        if (!($response['ok'] ?? false)) {
+            return;
+        }
+
+        $response['data']['confirmation_email'] = $this->sendShipmentConfirmationForPayload(
+            $request,
+            is_array($response['data'] ?? null) ? $response['data'] : [],
+            $payload
+        );
+    }
+
+    private function sendShipmentConfirmationForPayload(Request $request, array $responseData, array $payload): array
+    {
+        $email = $this->firstEmail([
+            $payload['from_email'] ?? null,
+            $responseData['shipper_email'] ?? null,
+            $responseData['from_email'] ?? null,
+            session('zion.user.email'),
+        ]);
+
+        if (!$email) {
+            return [
+                'status' => 'skipped',
+                'message' => 'No customer email was available for confirmation.',
+            ];
+        }
+
+        $shipmentNumber = (string) ($responseData['tracking_number']
+            ?? $responseData['tracking_numbers']
+            ?? $responseData['invoice_num']
+            ?? $responseData['awb']
+            ?? $payload['tracking_number']
+            ?? $payload['quote_id']
+            ?? 'Pending');
+        $invoice = (string) ($responseData['invoice_num'] ?? $responseData['invoice'] ?? $payload['invoice_num'] ?? '');
+        $shipmentId = (string) ($responseData['shipment_id'] ?? $responseData['shipping_id'] ?? $responseData['id'] ?? '');
+        $query = array_filter([
+            'shipment_id' => $shipmentId ?: null,
+            'invoice' => $invoice ?: null,
+            'id' => $shipmentNumber !== 'Pending' ? $shipmentNumber : null,
+        ], static fn ($value) => $value !== null && $value !== '');
+
+        try {
+            Mail::to($email)->send(new ConfirmShipmentMail([
+                'recipientName' => $payload['from_name'] ?? session('zion.user.name') ?? null,
+                'shipmentNumber' => $shipmentNumber,
+                'trackingNumber' => $shipmentNumber,
+                'packageCount' => (int) ($payload['package_count'] ?? 1),
+                'serviceName' => $payload['delivery_option'] ?? $payload['selected_shipper'] ?? 'Shipping Service',
+                'createdAt' => now()->format('M d, Y'),
+                'shipperName' => $payload['from_name'] ?? 'Kay Paolo Shipping',
+                'shipperAddress' => $this->addressText($payload, 'from'),
+                'shipperContact' => $this->contactText([
+                    $payload['from_phone'] ?? null,
+                    $payload['from_email'] ?? null,
+                ]),
+                'consigneeName' => $payload['to_name'] ?? $payload['consignee_name'] ?? 'Destination Customer',
+                'consigneeAddress' => $this->addressText($payload, 'to'),
+                'consigneeContact' => $this->contactText([
+                    $payload['to_phone_1'] ?? null,
+                    $payload['consignee_phone'] ?? null,
+                    $payload['to_phone_2'] ?? null,
+                ]),
+                'labelUrl' => route('shipment.label', $query),
+                'receiptUrl' => route('shipment.receipt', $query),
+                'trackingUrl' => route('tracking'),
+                'confirmationUrl' => route('shipment.confirmation'),
+                'homeUrl' => route('home'),
+            ]));
+        } catch (\Throwable $exception) {
+            report($exception);
+
+            return [
+                'status' => 'error',
+                'email' => $email,
+                'message' => 'Unable to send shipment confirmation email.',
+                'error' => config('app.debug') ? $exception->getMessage() : null,
+            ];
+        }
+
+        return [
+            'status' => 'success',
+            'email' => $email,
+        ];
+    }
+
+    private function firstEmail(array $values): ?string
+    {
+        foreach ($values as $value) {
+            $candidate = trim((string) $value);
+            if ($candidate !== '' && filter_var($candidate, FILTER_VALIDATE_EMAIL)) {
+                return $candidate;
+            }
+        }
+
+        return null;
+    }
+
+    private function addressText(array $payload, string $side): string
+    {
+        $prefix = $side === 'from' ? 'from' : 'to';
+
+        return trim(implode("\n", array_filter([
+            trim((string) ($payload[$prefix.'_address'] ?? '').' '.(string) ($payload[$prefix.'_apt'] ?? '')),
+            trim(implode(' ', array_filter([
+                $payload[$prefix.'_city'] ?? null,
+                $payload[$prefix.'_state'] ?? null,
+                $payload[$prefix.'_zip'] ?? null,
+            ]))),
+            $payload[$prefix.'_country_name'] ?? $payload[$prefix.'_country'] ?? null,
+        ]))) ?: ($side === 'from' ? '414 Main St, Asbury Park, NJ 07712' : 'Destination address pending');
+    }
+
+    private function contactText(array $values): string
+    {
+        return implode(' / ', array_values(array_filter(array_map(
+            static fn ($value) => trim((string) $value),
+            $values
+        )))) ?: 'Phone pending';
     }
 
     private function normalizePartner(mixed $value): string
