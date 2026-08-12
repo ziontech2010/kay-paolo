@@ -95,8 +95,6 @@
             font-weight: 700;
             margin-top: 3px;
         }
-        .pkg-title { font-size: 11px; font-weight: 700; margin-bottom: 1px; }
-        .pkg-text { font-size: 12px; font-weight: 700; line-height: 1.15; }
         .footer-meta {
             font-size: 11px;
             font-weight: 700;
@@ -154,14 +152,8 @@
                 </td>
             </tr>
             <tr>
-                <td class="row-border" colspan="2" style="padding: 5px 7px">
-                    <div class="pkg-title">Package Contents</div>
-                    <div class="pkg-text">{{ \Illuminate\Support\Str::limit($packageText, 80, '') }}</div>
-                </td>
-            </tr>
-            <tr>
                 <td class="footer-meta" colspan="2">
-                    Invoice {{ $invoice }} | Delivery {{ $deliveryNumber }}
+                    Invoice {{ $invoice }} | Delivery {{ $deliveryNumber }} | ETA {{ $deliveryDate }}
                 </td>
             </tr>
         </table>

@@ -3,7 +3,9 @@
 namespace Tests\Feature;
 
 // use Illuminate\Foundation\Testing\RefreshDatabase;
+use App\Mail\ConfirmShipmentMail;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
@@ -323,12 +325,14 @@ class ExampleTest extends TestCase
         $this->assertStringContainsString('Full Integration logo', $script);
         $this->assertStringContainsString('filterQuoteCardsForPayload', $script);
         $this->assertStringContainsString('totalPackageWeight(payload) !== 0', $script);
-        $this->assertStringContainsString('zionCarrierLogo', $script);
-        $this->assertStringContainsString('Zion Shipping logo', $script);
+        $this->assertStringContainsString('carrier_logo_url', $script);
         $this->assertStringContainsString('history-more-menu', $script);
         $this->assertStringContainsString("data-history-action=\"label\"", $script);
         $this->assertStringContainsString('applyCouponBtn', $script);
-        $this->assertStringContainsString('promo: firstValue(\'couponCode\')', $script);
+        $this->assertStringContainsString('const couponCode = firstValue(\'couponCode\')', $script);
+        $this->assertStringContainsString('coupon: couponCode', $script);
+        $this->assertStringContainsString('home_delivery_required: isHomeDelivery', $script);
+        $this->assertStringContainsString('flat_rate_price: flatRatePrice', $script);
         $this->assertStringContainsString('labelDestination', $script);
         $this->assertStringContainsString('receiptPackageCount', $script);
         $this->assertStringContainsString('renderPackageLabels', $script);
@@ -338,8 +342,58 @@ class ExampleTest extends TestCase
         $this->assertStringContainsString('documentServiceSummary', $script);
         $this->assertStringNotContainsString("params.set('access_token', storedToken())", $script);
         $this->assertStringContainsString('isAdminRole', $script);
+        $this->assertStringContainsString('enhanceHistoryCards', $script);
+        $this->assertStringContainsString('confirmation_email', $script);
+        $this->assertStringContainsString('quoteCardValue', $script);
+        $this->assertStringNotContainsString('Zion Shipping logo', $script);
         $this->assertStringNotContainsString('Door to Door', $script);
         $this->assertStringNotContainsString('Port to Port', $script);
+    }
+
+    public function test_quote_proxy_uses_kay_paolo_endpoint_before_bocicot(): void
+    {
+        Http::fake([
+            '*/api/kay-paolo/get-quote-result' => Http::response([
+                'status' => 'success',
+                'quotes' => [
+                    ['carrier' => 'Kay Paolo', 'service' => 'Regular Boat', 'grand_total' => '88.00'],
+                ],
+            ]),
+            '*/web-api/get-quote-result-bocicot' => Http::response([
+                'status' => 'success',
+                'quotes' => [
+                    ['service' => 'Bocicot Regular Boat', 'total' => '25.00'],
+                ],
+            ]),
+        ]);
+
+        $this->withHeader('Authorization', 'Bearer fake-token')
+            ->postJson('/api/kay-paolo/quote', [
+                'user_id' => 7020,
+                'from_country' => 'US',
+                'to_country' => 'HT',
+                'coupon_code' => 'SAVE10',
+                'delivery_location' => 'Home Delivery',
+                'flat_rate' => ['on'],
+                'shipment_type' => ['regular_boat_box'],
+                'flat_rate_price' => ['88.00'],
+            ])
+            ->assertOk()
+            ->assertJsonPath('quotes.0.service', 'Regular Boat')
+            ->assertJsonPath('quotes.0.grand_total', '88.00');
+
+        Http::assertSent(function ($request) {
+            return str_contains($request->url(), '/api/kay-paolo/get-quote-result')
+                && ($request['promo'] ?? null) === 'SAVE10'
+                && ($request['coupon'] ?? null) === 'SAVE10'
+                && ($request['promo_code'] ?? null) === 'SAVE10'
+                && ($request['home_delivery_required'] ?? null) === 1
+                && ($request['flat_rate_price'][0] ?? null) === '88.00';
+        });
+
+        Http::assertNotSent(function ($request) {
+            return str_contains($request->url(), '/web-api/get-quote-result-bocicot');
+        });
     }
 
     public function test_countries_and_payment_options_proxy_to_shipping_api(): void
@@ -530,6 +584,8 @@ class ExampleTest extends TestCase
 
     public function test_shipping_proxy_sanitizes_bocicot_payload_for_multiple_packages(): void
     {
+        Mail::fake();
+
         Http::fake([
             '*/api/kay-paolo/update-shipping' => Http::response(['status' => 'success']),
         ]);
@@ -587,6 +643,11 @@ class ExampleTest extends TestCase
                 && $data['include_in_receipt'] === 1
                 && $data['selected_shipper'] === 'Regular Air'
                 && $data['delivery_option'] === 'Regular Air';
+        });
+
+        Mail::assertSent(ConfirmShipmentMail::class, function ($mail) {
+            return ($mail->shipment['recipientName'] ?? null) === 'Kay Sender'
+                && ($mail->shipment['shipperContact'] ?? null) === '3055551212 / sender@example.com';
         });
     }
 
