@@ -915,8 +915,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
     try {
       const response = await postJson(route('flatRates', '/api/kay-paolo/flat-rates'), {
+        user_id: firstValue('quoteUserId') || storedUser().id || undefined,
+        quote_user_id: firstValue('quoteUserId') || storedUser().id || undefined,
+        agent_id: storedUser().agent_id || storedUser().id || undefined,
         to_country: toCountryCode || undefined,
+        country: toCountryCode || undefined,
+        country_code: toCountryCode || undefined,
+        to_country_name: toCountryName || undefined,
         from_state: fromState || undefined,
+        origin_state: fromState || undefined,
         to: {
           country: toCountryCode || undefined,
           country_name: toCountryName || undefined
@@ -1060,6 +1067,10 @@ document.addEventListener('DOMContentLoaded', () => {
         || option.flat_price
         || option.flat_rate_price
         || option.flatRatePrice
+        || option.shipping_price
+        || option.shippingPrice
+        || option.regular_boat_price
+        || option.regularBoatPrice
         || option.unit_price
         || option.unitPrice
         || option.usd
@@ -1093,6 +1104,8 @@ document.addEventListener('DOMContentLoaded', () => {
       const optionElement = document.createElement('option');
       optionElement.value = option.slug;
       optionElement.textContent = option.price ? `${option.label} - ${moneyText(option.price)}` : option.label;
+      optionElement.dataset.label = option.label;
+      optionElement.dataset.price = option.price;
       optionElement.dataset.weight = option.defaults.weight;
       optionElement.dataset.length = option.defaults.length;
       optionElement.dataset.width = option.defaults.width;
@@ -1179,6 +1192,15 @@ document.addEventListener('DOMContentLoaded', () => {
       const cards = normalizeQuoteCards(quoteResponse);
       const card = cards[Number(button.dataset.cardIndex)] || {};
       const quoteId = quoteResponse.quote_id || quoteResponse.quoteId || quoteResponse.id || card.quote_id || '';
+      const homeDelivery = quoteCardValue(card, [
+        'home_delivery',
+        'home_delivery_fee',
+        'homeDelivery',
+        'homeDeliveryFee',
+        'delivery_fee',
+        'deliveryFee',
+        'delivery'
+      ]);
       const pendingPayload = {
         ...quotePayload,
         quote_id: quoteId,
@@ -1188,12 +1210,8 @@ document.addEventListener('DOMContentLoaded', () => {
         deliveryEstimateDate: quoteCardEta(card) || undefined,
         delivery_option: quoteCardService(card) || undefined,
         selected_shipper: quoteCardService(card) || undefined,
-        home_delivery: card.home_delivery
-          || card.home_delivery_fee
-          || card.homeDelivery
-          || card.delivery_fee
-          || card.delivery
-          || undefined
+        home_delivery: homeDelivery || undefined,
+        home_delivery_fee: homeDelivery || undefined
       };
 
       window.localStorage.setItem(pendingShipmentKey, JSON.stringify({
@@ -1436,12 +1454,10 @@ document.addEventListener('DOMContentLoaded', () => {
       data.consigneePhone
     ].filter(Boolean).join('\n');
     const weightDim = labelWeightDimText(data);
-    const packageText = `${data.description || 'Package'} (${data.packageCount} pcs)`;
 
     Array.from(stack.querySelectorAll('[data-package-label="true"]')).forEach((page, index) => {
       const labelNumber = labels[index] || data.tracking || 'Pending';
       setScopedLabelText(page, 'shipper', shipperText);
-      setScopedLabelText(page, 'package', packageText);
       setScopedLabelText(page, 'receiver', receiverText);
       setScopedLabelText(page, 'tracking', labelNumber);
       setScopedLabelText(page, 'due', data.chargeStatus);
@@ -1566,17 +1582,37 @@ document.addEventListener('DOMContentLoaded', () => {
       || 'Shipping Service';
     const serviceSummary = [deliveryOption, deliveryLocation].filter(Boolean).join(' | ') || 'Shipping Service';
     const deliveryDateRaw = payload.deliveryEstimateDate
+      || payload.delivery_estimate_date
+      || payload.delivery_date
+      || payload.expected_arrival_date
+      || payload.estimated_delivery_date
+      || payload.eta
+      || payload.arrives_on
       || selected.eta
+      || selected.deliveryEstimateDate
+      || selected.delivery_estimate_date
       || selected.delivery_date
+      || selected.expected_arrival_date
       || selected.arrives_on
       || response.delivery_date
       || response.deliveryEstimateDate
+      || response.delivery_estimate_date
       || response.expected_arrival_date
+      || response.estimated_delivery_date
+      || response.eta
+      || response.arrives_on
       || responseData.delivery_date
       || responseData.deliveryEstimateDate
+      || responseData.delivery_estimate_date
+      || responseData.expected_arrival_date
+      || responseData.estimated_delivery_date
+      || responseData.eta
       || shipping.delivery_date
       || shipping.deliveryEstimateDate
+      || shipping.delivery_estimate_date
       || shipping.expected_arrival_date
+      || shipping.estimated_delivery_date
+      || shipping.eta
       || shipping.arrives_on
       || '';
     const deliveryDate = deliveryDateRaw
@@ -1590,34 +1626,78 @@ document.addEventListener('DOMContentLoaded', () => {
     const shipperPhone = payload.from_phone
       || shipping.shipper_phone
       || shipping.from_phone
+      || shipping.shipper_contact
+      || shipping.shipper_mobile
       || response.shipper_phone
+      || response.shipper_contact
+      || response.from_phone
       || responseData.shipper_phone
+      || responseData.shipper_contact
+      || responseData.from_phone
       || '';
     const shipperEmail = payload.from_email
       || shipping.shipper_email
       || shipping.from_email
+      || emailFromValue(shipping.shipper_contact)
+      || shipping.customer_email
+      || shipping.email
       || response.shipper_email
+      || response.from_email
+      || response.customer_email
+      || response.email
       || responseData.shipper_email
+      || responseData.from_email
+      || responseData.customer_email
+      || responseData.email
       || storedUser().email
       || '';
     const consigneePhone = payload.to_phone_1
+      || payload.to_phone
       || payload.consignee_phone
       || shipping.consignee_phone
+      || shipping.consignee_contact
+      || shipping.consignee_mobile
       || shipping.to_phone_1
+      || shipping.to_phone
+      || shipping.receiver_phone
+      || shipping.recipient_phone
       || shipping.consignee_homephone
       || response.consignee_phone
+      || response.consignee_contact
+      || response.to_phone_1
+      || response.to_phone
       || responseData.consignee_phone
+      || responseData.consignee_contact
+      || responseData.to_phone_1
+      || responseData.to_phone
+      || '';
+    const consigneeEmail = payload.to_email
+      || payload.consignee_email
+      || shipping.consignee_email
+      || shipping.to_email
+      || response.consignee_email
+      || response.to_email
+      || responseData.consignee_email
+      || responseData.to_email
       || '';
     const shipperAddress = [
-      [payload.from_address, payload.from_apt].filter(Boolean).join(' '),
-      [payload.from_city, payload.from_state, payload.from_zip].filter(Boolean).join(' '),
+      [payload.from_address || shipping.shipper_address, payload.from_apt].filter(Boolean).join(' '),
+      [
+        payload.from_city || shipping.shipper_city || shipping.shipper_address_city,
+        payload.from_state || shipping.shipper_state || shipping.shipper_address_state,
+        payload.from_zip || shipping.shipper_zip || shipping.shipper_address_zip
+      ].filter(Boolean).join(' '),
       payload.from_country_name || payload.from_country || shipping.shipper_country || ''
     ].filter(Boolean).join('\n')
       || shipping.shipper_address
       || '414 Main St, Asbury Park, NJ 07712';
     const consigneeAddress = [
-      [payload.to_address, payload.to_apt].filter(Boolean).join(' '),
-      [payload.to_city, payload.to_state, payload.to_zip].filter(Boolean).join(' '),
+      [payload.to_address || shipping.consignee_address, payload.to_apt].filter(Boolean).join(' '),
+      [
+        payload.to_city || shipping.consignee_city || shipping.consignee_address_city,
+        payload.to_state || shipping.consignee_state || shipping.consignee_address_state,
+        payload.to_zip || shipping.consignee_zip || shipping.consignee_address_zip
+      ].filter(Boolean).join(' '),
       payload.to_country_name || payload.to_country || shipping.consignee_country || ''
     ].filter(Boolean).join('\n')
       || shipping.consignee_address
@@ -1668,7 +1748,8 @@ document.addEventListener('DOMContentLoaded', () => {
       consigneeName: payload.to_name || payload.consignee_name || shipping.consignee_name || 'Destination Customer',
       consigneeAddress,
       consigneePhone: consigneePhone || 'Phone pending',
-      consigneeContact: [consigneePhone, payload.to_phone_2 || shipping.consignee_homephone].filter(Boolean).join(' / ') || 'Phone pending',
+      consigneeEmail,
+      consigneeContact: [consigneePhone, consigneeEmail, payload.to_phone_2 || shipping.consignee_homephone].filter(Boolean).join(' / ') || 'Phone pending',
       description: description || 'Package',
       items,
       packageCount: packagePieceCount(payload) || items.reduce((sum, item) => sum + numberValue(item.count, 0), 0) || 1,
@@ -1685,7 +1766,7 @@ document.addEventListener('DOMContentLoaded', () => {
         || payload.home_delivery
         || 0,
       tax: selected.tax || response.tax || responseData.tax || shipping.tax || 0,
-      total: selected.total || selected.price || selected.amount || payload.deliveryEstimatePrice || response.total || responseData.total || shipping.total || 0,
+      total: selected.grand_total || selected.final_total || selected.total || selected.price || selected.amount || payload.deliveryEstimatePrice || response.grand_total || response.final_total || response.total || responseData.grand_total || responseData.final_total || responseData.total || shipping.grand_total || shipping.final_total || shipping.total || 0,
       notes: 'Special Notice: Due to current situational instabilities and territorial security issues in Haiti, we cannot guarantee any delivery date. The provided date is only an estimated timeframe.'
     };
   }
@@ -1817,12 +1898,15 @@ document.addEventListener('DOMContentLoaded', () => {
           const cards = extractHistoryCards(response.html);
           if (cards) {
             result.innerHTML = cards;
+            enhanceHistoryCards(result);
             updateHistoryBadgesFromCards();
           } else {
             renderHistoryRows(result, normalizeHistoryRows(response));
+            enhanceHistoryCards(result);
           }
         } else {
           renderHistoryRows(result, normalizeHistoryRows(response));
+          enhanceHistoryCards(result);
         }
         filter();
       } catch (error) {
@@ -2258,6 +2342,97 @@ document.addEventListener('DOMContentLoaded', () => {
     return cards.map((card) => card.outerHTML).join('');
   }
 
+  function enhanceHistoryCards(container) {
+    if (!container) return;
+
+    container.querySelectorAll('.shipment-card[data-status]').forEach((card) => {
+      const tracking = card.dataset.tracking || historyCardParam(card, ['id', 'tracking', 'tracking_number']) || historyCardTextToken(card, 'tracking');
+      const invoice = card.dataset.invoice || historyCardParam(card, ['invoice', 'invoice_num']) || historyCardTextToken(card, 'invoice');
+      const shipmentId = card.dataset.shipmentId || historyCardParam(card, ['shipment_id', 'shipping_id']) || '';
+
+      if (tracking) card.dataset.tracking = tracking;
+      if (invoice) card.dataset.invoice = invoice;
+      if (shipmentId) card.dataset.shipmentId = shipmentId;
+      if (!card.dataset.category) card.dataset.category = historyCardCategoryFromText(card);
+      if (!card.dataset.searchPool) card.dataset.searchPool = card.textContent || '';
+
+      ensureHistoryMoreActions(card);
+    });
+  }
+
+  function ensureHistoryMoreActions(card) {
+    let footer = card.querySelector('.history-card-footer');
+    if (!footer) {
+      footer = document.createElement('div');
+      footer.className = 'history-card-footer';
+      card.appendChild(footer);
+    }
+
+    let more = card.querySelector('.history-more');
+    if (!more) {
+      more = document.createElement('div');
+      more.className = 'history-more';
+      more.innerHTML = `
+        <button type="button" class="more-link" data-history-more-toggle aria-haspopup="true" aria-expanded="false">
+          More
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle; margin-left:2px"><polyline points="6 9 12 15 18 9"/></svg>
+        </button>
+        <div class="history-more-menu" role="menu"></div>
+      `;
+      footer.appendChild(more);
+    }
+
+    const menu = more.querySelector('.history-more-menu');
+    if (!menu) return;
+
+    [
+      ['label', 'Label'],
+      ['receipt', 'Receipt'],
+      ['edit', 'Edit'],
+      ['void', 'Void'],
+      ['track', 'Track']
+    ].forEach(([action, label]) => {
+      if (menu.querySelector(`[data-history-action="${action}"]`)) return;
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.setAttribute('data-history-action', action);
+      button.setAttribute('role', 'menuitem');
+      button.textContent = label;
+      menu.appendChild(button);
+    });
+  }
+
+  function historyCardParam(card, keys) {
+    const links = Array.from(card.querySelectorAll('a[href]'));
+    for (const link of links) {
+      try {
+        const url = new URL(link.getAttribute('href'), window.location.origin);
+        for (const key of keys) {
+          const value = url.searchParams.get(key);
+          if (value) return value;
+        }
+      } catch (error) {}
+    }
+
+    return '';
+  }
+
+  function historyCardTextToken(card, type) {
+    const text = card.textContent || '';
+    if (type === 'invoice') {
+      const invoiceMatch = text.match(/\b\d{4,}\b/);
+      return invoiceMatch ? invoiceMatch[0] : '';
+    }
+
+    const trackingMatch = text.match(/\b[A-Z]{2,6}\d{4,}(?:-\d+\/\d+)?\b/i);
+    return trackingMatch ? trackingMatch[0] : '';
+  }
+
+  function historyCardCategoryFromText(card) {
+    const text = String(card.textContent || '').toLowerCase();
+    return text.includes('domestic') ? 'Domestic' : 'International';
+  }
+
   function updateHistoryBadgesFromRows(rows) {
     updateHistoryBadges(rows.map((row) => ({
       status: historyStatus(row),
@@ -2301,6 +2476,8 @@ document.addEventListener('DOMContentLoaded', () => {
     };
     const flatRate = [];
     const shipmentType = [];
+    const flatRatePrice = [];
+    const flatRateLabel = [];
 
     if (packageBlocks.length) {
       packageBlocks.forEach((block) => {
@@ -2310,7 +2487,9 @@ document.addEventListener('DOMContentLoaded', () => {
         const width = numberValue(block.querySelector('.pkg-width')?.value, 1);
         const height = numberValue(block.querySelector('.pkg-height')?.value, 1);
         const isFlat = Boolean(block.querySelector('.pkg-flat-rate')?.checked);
-        const flatType = block.querySelector('.pkg-flat-rate-type')?.value || '';
+        const flatTypeSelect = block.querySelector('.pkg-flat-rate-type');
+        const selectedFlatOption = flatTypeSelect?.selectedOptions?.[0] || null;
+        const flatType = flatTypeSelect?.value || '';
         dimensions.package_count_ind.push(count);
         dimensions.weight.push(weight);
         dimensions.length.push(length);
@@ -2318,6 +2497,8 @@ document.addEventListener('DOMContentLoaded', () => {
         dimensions.height.push(height);
         flatRate.push(isFlat ? 'on' : '0');
         shipmentType.push(isFlat ? flatType : '');
+        flatRatePrice.push(isFlat ? (selectedFlatOption?.dataset.price || '') : '');
+        flatRateLabel.push(isFlat ? (selectedFlatOption?.dataset.label || selectedFlatOption?.textContent || '') : '');
       });
     } else {
       dimensions.package_count_ind.push(1);
@@ -2327,26 +2508,34 @@ document.addEventListener('DOMContentLoaded', () => {
       dimensions.height.push(numberValue(firstValue('package_height'), 1));
       flatRate.push(firstValue('shipment_type') ? 'on' : '0');
       shipmentType.push(firstValue('shipment_type'));
+      flatRatePrice.push('');
+      flatRateLabel.push('');
     }
 
     const toCountryName = selectedCountryName(toCountry);
     const fromCountryName = selectedCountryName(fromCountry);
     const deliveryLocation = normalizeDeliveryLocation(firstValue('deliveryLocation', 'delivery_location'));
     const fragileShipment = document.getElementById('fragileShipment')?.checked ? 1 : 0;
+    const couponCode = firstValue('couponCode');
+    const isHomeDelivery = deliveryLocation.toLowerCase().includes('home') ? 1 : 0;
 
     const quoteCustomerId = firstValue('quoteUserId') || queryParam('customer');
+    const agentId = storedUser().agent_id || storedUser().id || undefined;
 
     return {
       user_id: quoteCustomerId || undefined,
       quote_user_id: quoteCustomerId || undefined,
+      customer_id: quoteCustomerId || undefined,
       phone_or_account: queryParam('lookup') || undefined,
       from_name: firstValue('from_name'),
       from_email: firstValue('from_email'),
       from_phone: firstValue('from_phone'),
       from_account: firstValue('from_account'),
+      account_number: firstValue('from_account'),
       from_country_name: fromCountryName,
       from_country: countryCode(fromCountry?.value || fromCountryName),
       from_address: firstValue('from_address'),
+      from_apt: firstValue('from_apt'),
       from_zip: firstValue('from_zip'),
       from_city: firstValue('from_city'),
       from_state: firstValue('from_state'),
@@ -2372,14 +2561,26 @@ document.addEventListener('DOMContentLoaded', () => {
       dimensions,
       flat_rate: flatRate,
       shipment_type: shipmentType,
+      flat_rate_price: flatRatePrice,
+      flat_rate_label: flatRateLabel,
       delivery_location: deliveryLocation,
       deliveryLocation,
-      promo: firstValue('couponCode'),
-      coupon_code: firstValue('couponCode'),
+      delivery_type: deliveryLocation,
+      deliveryType: deliveryLocation,
+      is_home_delivery: isHomeDelivery,
+      home_delivery_required: isHomeDelivery,
+      promo: couponCode,
+      coupon_code: couponCode,
+      coupon: couponCode,
+      promo_code: couponCode,
+      discount_code: couponCode,
       extra_service_charge: firstValue('extraServiceCharge'),
       include_in_receipt: document.getElementById('includeReceipt')?.checked ? 1 : 0,
       flaterateinside: flatRate.some(flatRateIsOn) || shipmentType.some(Boolean) ? 1 : 0,
-      agent_id: storedUser().agent_id || storedUser().id || undefined,
+      agent_id: agentId,
+      agentId,
+      created_by: agentId,
+      created_by_id: agentId,
       fragile_shipment: fragileShipment,
       is_fragile_shipment: fragileShipment
     };
@@ -2581,15 +2782,24 @@ document.addEventListener('DOMContentLoaded', () => {
     const rowCount = dimensionRowCountFromDimensions(dimensions);
     const flatRate = padArray(payload.flat_rate, rowCount, '0');
     const shipmentType = padArray(payload.shipment_type, rowCount, '');
+    const flatRatePrice = padArray(payload.flat_rate_price, rowCount, '');
+    const flatRateLabel = padArray(payload.flat_rate_label, rowCount, '');
     const deliveryLocation = normalizeDeliveryLocation(payload.delivery_location || payload.deliveryLocation);
     const selectedShipper = payload.selected_shipper || payload.delivery_option || '';
     const declaredValue = numberValue(payload.total_value || payload.package_value, 10);
     const fragileShipment = payload.is_fragile_shipment ?? payload.fragile_shipment ?? 0;
+    const couponCode = payload.promo || payload.coupon_code || payload.coupon || payload.promo_code || payload.discount_code || '';
+    const isHomeDelivery = deliveryLocation.toLowerCase().includes('home') ? 1 : 0;
 
     return compactPayload({
       user_id: payload.user_id || payload.quote_user_id || storedUser().id || undefined,
       quote_user_id: payload.quote_user_id || payload.user_id || storedUser().id || undefined,
+      customer_id: payload.customer_id || payload.quote_user_id || payload.user_id || undefined,
       quote_id: payload.quote_id || undefined,
+      agent_id: payload.agent_id || storedUser().agent_id || storedUser().id || undefined,
+      agentId: payload.agentId || payload.agent_id || storedUser().agent_id || storedUser().id || undefined,
+      created_by: payload.created_by || payload.agent_id || storedUser().id || undefined,
+      created_by_id: payload.created_by_id || payload.agent_id || storedUser().id || undefined,
       partner: normalizePartner(payload.partner),
       selected_shipper: selectedShipper || undefined,
       delivery_option: selectedShipper || undefined,
@@ -2625,6 +2835,8 @@ document.addEventListener('DOMContentLoaded', () => {
       dimensions,
       flat_rate: flatRate,
       shipment_type: shipmentType,
+      flat_rate_price: flatRatePrice,
+      flat_rate_label: flatRateLabel,
       packages: expandedPackagesFromPayload({ ...payload, dimensions, flat_rate: flatRate, shipment_type: shipmentType }),
       monetaryAmount: [
         {
@@ -2636,12 +2848,19 @@ document.addEventListener('DOMContentLoaded', () => {
       plannedShippingDateAndTime: payload.plannedShippingDateAndTime || plannedShippingDateTime(),
       delivery_location: deliveryLocation,
       deliveryLocation: deliveryLocation,
+      delivery_type: deliveryLocation,
+      deliveryType: deliveryLocation,
+      is_home_delivery: isHomeDelivery,
+      home_delivery_required: isHomeDelivery,
       delivery_description: payload.delivery_description || '',
       payment_type: payload.payment_type || '',
       deliveryEstimatePrice: payload.deliveryEstimatePrice || undefined,
       deliveryEstimateDate: payload.deliveryEstimateDate || undefined,
-      promo: payload.promo || payload.coupon_code || '',
-      coupon_code: payload.coupon_code || payload.promo || '',
+      promo: couponCode,
+      coupon_code: couponCode,
+      coupon: couponCode,
+      promo_code: couponCode,
+      discount_code: couponCode,
       extra_service_charge: payload.extra_service_charge || '',
       include_in_receipt: payload.include_in_receipt ?? payload.include_receipt ?? 0,
       flaterateinside: flatRate.some(flatRateIsOn) || shipmentType.some(Boolean) ? 1 : 0,
@@ -2695,12 +2914,19 @@ document.addEventListener('DOMContentLoaded', () => {
 
   async function queueShipmentEmailNotifications(response, payload, selected = {}) {
     const data = buildShipmentDocumentData(response || {}, payload || {}, selected || {});
+    const serverEmail = response?.confirmation_email || response?.data?.confirmation_email || {};
+    const serverSentEmail = serverEmail.status === 'success' ? String(serverEmail.email || '').toLowerCase() : '';
     const emails = Array.from(new Set([
       payload?.from_email,
+      payload?.customer_email,
+      payload?.to_email,
+      payload?.consignee_email,
       data.shipperEmail,
+      data.consigneeEmail,
       storedUser().email,
       'info@kaypaoloshipping.com'
-    ].filter((email) => typeof email === 'string' && email.includes('@'))));
+    ].filter((email) => typeof email === 'string' && email.includes('@'))))
+      .filter((email) => email.toLowerCase() !== serverSentEmail);
 
     if (!emails.length) return;
 
@@ -2759,6 +2985,11 @@ document.addEventListener('DOMContentLoaded', () => {
     } catch (error) {
       return path;
     }
+  }
+
+  function emailFromValue(rawValue) {
+    const value = String(rawValue || '').trim();
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value) ? value : '';
   }
 
   function fillCreateShipmentPage() {
@@ -2855,18 +3086,22 @@ document.addEventListener('DOMContentLoaded', () => {
     const carrier = quoteCardCarrier(card) || 'Kay Paolo Shipping';
     const service = quoteCardService(card) || 'Shipping Service';
     const total = quoteCardTotal(card) || '0.00';
-    const freight = card.freight || card.base_rate || '0.00';
-    const insurance = card.insurance || '0.00';
-    const homeDelivery = card.home_delivery
-      || card.home_delivery_fee
-      || card.homeDelivery
-      || card.homeDeliveryFee
-      || card.delivery_fee
-      || card.deliveryFee
-      || card.delivery
-      || card.door_delivery
-      || '0.00';
-    const tax = card.tax || '0.00';
+    const freight = quoteCardValue(card, ['freight', 'base_freight', 'base_rate', 'shipping_cost', 'shippingCost']) || '0.00';
+    const insurance = quoteCardValue(card, ['insurance', 'insurance_fee', 'insuranceFee', 'insurance_amount']) || '0.00';
+    const homeDelivery = quoteCardValue(card, [
+      'home_delivery',
+      'home_delivery_fee',
+      'home_delivery_price',
+      'homeDelivery',
+      'homeDeliveryFee',
+      'homeDeliveryPrice',
+      'delivery_fee',
+      'deliveryFee',
+      'delivery',
+      'door_delivery'
+    ]) || '0.00';
+    const discount = quoteCardValue(card, ['discount', 'coupon_discount', 'couponDiscount', 'promo_discount', 'promoDiscount']);
+    const tax = quoteCardValue(card, ['tax', 'tax_amount', 'taxAmount']) || '0.00';
 
     return `
       <div class="quote-rate-card">
@@ -2885,6 +3120,7 @@ document.addEventListener('DOMContentLoaded', () => {
           <div class="breakdown-item"><span>Freight:</span> <span class="mono">${escapeHtml(freight)}</span></div>
           <div class="breakdown-item"><span>Insurance:</span> <span class="mono">${escapeHtml(insurance)}</span></div>
           <div class="breakdown-item"><span>Home Delivery:</span> <span class="mono">${escapeHtml(homeDelivery)}</span></div>
+          ${discount ? `<div class="breakdown-item"><span>Discount:</span> <span class="mono">${escapeHtml(discount)}</span></div>` : ''}
           <div class="breakdown-item"><span>Tax:</span> <span class="mono">${escapeHtml(tax)}</span></div>
         </div>
         <div class="rate-price-action">
@@ -2900,13 +3136,14 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function quoteCardCarrier(card) {
-    return card.carrier_name
-      || card.carrier
-      || card.partner
-      || card.shipper
-      || card.shipping_company
-      || card.provider
-      || '';
+    return quoteCardValue(card, [
+      'carrier_name',
+      'carrier',
+      'partner',
+      'shipper',
+      'shipping_company',
+      'provider'
+    ]) || '';
   }
 
   function filterQuoteCardsForPayload(cards, payload) {
@@ -2928,7 +3165,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function quoteCardPartner(card) {
-    return normalizePartner(card.carrier || card.partner || card.carrier_key || card.carrier_name || card.integration || card.full_integration);
+    return normalizePartner(card.carrier || card.partner || card.carrier_key || card.carrier_name || card.integration || card.full_integration, '');
   }
 
   function isFullIntegrationCard(card) {
@@ -2953,8 +3190,9 @@ document.addEventListener('DOMContentLoaded', () => {
       || raw.includes('kaypaolo');
   }
 
-  function normalizePartner(value) {
+  function normalizePartner(value, fallback = 'ZION') {
     const raw = String(value || 'zion').toLowerCase();
+    if (!String(value || '').trim()) return fallback;
     if (raw.includes('ups')) return 'UPS';
     if (raw.includes('fedex')) return 'FEDEX';
     if (raw.includes('usps')) return 'USPS';
@@ -2963,76 +3201,100 @@ document.addEventListener('DOMContentLoaded', () => {
     if (raw.includes('full integration') || raw.includes('kay paolo') || raw.includes('kaypaolo') || raw.includes('zion')) {
       return 'ZION';
     }
-    return 'ZION';
+    return fallback;
   }
 
   function quoteCardService(card) {
-    return card.service_name
-      || card.service
-      || card.name
-      || card.delivery_option
-      || card.selected_shipper
-      || '';
+    return quoteCardValue(card, [
+      'service_name',
+      'service',
+      'name',
+      'delivery_option',
+      'selected_shipper'
+    ]) || '';
   }
 
   function quoteCardTotal(card) {
-    return card.total
-      || card.price
-      || card.amount
-      || card.deliveryEstimatePrice
-      || card.delivery_estimate_price
-      || card.rate
-      || '';
+    return quoteCardValue(card, [
+      'grand_total',
+      'final_total',
+      'total_with_delivery',
+      'totalWithDelivery',
+      'deliveryEstimatePrice',
+      'delivery_estimate_price',
+      'total_amount',
+      'amount_total',
+      'total_price',
+      'price_total',
+      'total',
+      'price',
+      'amount',
+      'rate'
+    ]) || '';
   }
 
   function quoteCardEta(card) {
-    return card.arrives_on
-      || card.arrival_date
-      || card.eta
-      || card.deliveryEstimateDate
-      || card.delivery_estimate_date
-      || card.commitment
-      || '';
+    return quoteCardValue(card, [
+      'arrives_on',
+      'arrival_date',
+      'eta',
+      'deliveryEstimateDate',
+      'delivery_estimate_date',
+      'expected_arrival_date',
+      'estimated_delivery_date',
+      'commitment'
+    ]) || '';
   }
 
   function quoteCardDeliveryTime(card) {
-    return card.delivered_by
-      || card.delivery_time
-      || card.delivery_by
-      || card.transit_time
-      || '';
+    return quoteCardValue(card, [
+      'delivered_by',
+      'delivery_time',
+      'delivery_by',
+      'transit_time'
+    ]) || '';
+  }
+
+  function quoteCardValue(card, keys) {
+    for (const key of keys) {
+      const nextValue = card?.[key] ?? card?.data?.[key] ?? card?.rate?.[key] ?? card?.price_breakdown?.[key] ?? card?.breakdown?.[key];
+      if (nextValue !== undefined && nextValue !== null && nextValue !== '') {
+        return nextValue;
+      }
+    }
+
+    return '';
   }
 
   function carrierLogoMarkup(card) {
     const carrier = quoteCardCarrier(card) || 'Carrier';
     const partner = quoteCardPartner(card);
-    const logo = card.logo
-      || card.logo_url
-      || card.carrier_logo
-      || card.carrier_logo_url
-      || card.image
-      || card.image_url
-      || card.icon
-      || '';
-    const zionLogo = config.assets?.zionCarrierLogo || '/kay-paolo/assets/images/zion-carrier-logo.png';
+    const logo = quoteCardValue(card, [
+      'logo',
+      'logo_url',
+      'logoUrl',
+      'carrier_logo',
+      'carrier_logo_url',
+      'carrierLogo',
+      'carrierLogoUrl',
+      'image',
+      'image_url',
+      'icon'
+    ]);
     const fullIntegrationLogo = config.assets?.fullIntegrationLogo
       || config.assets?.kayPaoloLogo
       || '/kay-paolo/assets/logo/kay-paolo.svg';
+
+    if (logo) {
+      return `<img src="${escapeHtml(resolveAssetUrl(logo))}" alt="${escapeHtml(carrier)} logo" width="100" height="50">`;
+    }
 
     if (isFullIntegrationCard(card)) {
       return `<img src="${escapeHtml(fullIntegrationLogo)}" alt="Full Integration logo" width="100" height="50">`;
     }
 
     if (partner === 'ZION') {
-      return `<img src="${escapeHtml(zionLogo)}" alt="Zion Shipping logo" width="100" height="50">`;
-    }
-
-    if (logo) {
-      return `<img src="${escapeHtml(resolveAssetUrl(logo))}" alt="${escapeHtml(carrier)} logo" width="100" height="50">`;
-    }
-
-    if (normalizePartner(carrier) === 'ZION') {
-      return `<img src="${escapeHtml(zionLogo)}" alt="Zion Shipping logo" width="100" height="50">`;
+      return `<div class="carrier-logo-fallback" aria-label="${escapeHtml(carrier)}">${escapeHtml(carrierInitials(carrier))}</div>`;
     }
 
     return `<div class="carrier-logo-fallback" aria-label="${escapeHtml(carrier)}">${escapeHtml(carrierInitials(carrier))}</div>`;
@@ -3066,15 +3328,52 @@ document.addEventListener('DOMContentLoaded', () => {
     const candidates = [
       response?.cards,
       response?.data?.cards,
+      response?.quote_cards,
+      response?.data?.quote_cards,
       response?.quotes,
       response?.rates,
       response?.rate_data,
+      response?.quote_result,
+      response?.quote,
+      response?.result,
+      response?.services,
+      response?.shipping_rates,
       response?.data?.quotes,
-      response?.data?.rates
+      response?.data?.rates,
+      response?.data?.rate_data,
+      response?.data?.quote_result,
+      response?.data?.quote,
+      response?.data?.result,
+      response?.data?.services,
+      response?.data?.shipping_rates,
+      response?.data?.data
     ].find((item) => Array.isArray(item) || (item && typeof item === 'object'));
 
     if (!candidates) return [];
-    return Array.isArray(candidates) ? candidates : Object.values(candidates);
+    const rows = Array.isArray(candidates)
+      ? candidates
+      : looksLikeQuoteCard(candidates)
+        ? [candidates]
+        : Object.values(candidates);
+
+    return rows.flatMap((row) => {
+      if (!row || typeof row !== 'object') return [];
+      if (looksLikeQuoteCard(row)) return [row];
+
+      return Object.values(row).filter((item) => item && typeof item === 'object' && looksLikeQuoteCard(item));
+    });
+  }
+
+  function looksLikeQuoteCard(card) {
+    if (!card || typeof card !== 'object') return false;
+
+    return Boolean(
+      card.message
+      || card.message_only
+      || quoteCardService(card)
+      || quoteCardCarrier(card)
+      || quoteCardTotal(card)
+    );
   }
 
   function populateTrackingDetail(response, requestedTrackingNumber = '') {

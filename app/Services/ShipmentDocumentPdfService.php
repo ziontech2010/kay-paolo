@@ -184,16 +184,16 @@ class ShipmentDocumentPdfService
 
         $paymentType = (string) ($payload['payment_type'] ?? $shipping['payment_type'] ?? 'PAID AT AGENT');
         $chargeStatus = str_contains(strtoupper($paymentType), 'PAID') ? 'PAID' : 'DUE';
-        $toCity = (string) ($payload['to_city'] ?? $shipping['consignee_city'] ?? $shipping['to_city'] ?? 'Destination');
+        $toCity = (string) ($payload['to_city'] ?? $shipping['consignee_city'] ?? $shipping['consignee_address_city'] ?? $shipping['to_city'] ?? 'Destination');
         $destination = $toCity !== '' ? strtoupper(substr($toCity, 0, 1)).' - '.$toCity : 'Destination';
 
         $shipperName = (string) ($payload['from_name'] ?? $shipping['shipper_name'] ?? 'Kay Paolo Shipping');
         $shipperAddress = trim(implode("\n", array_filter([
-            trim(($payload['from_address'] ?? '').' '.($payload['from_apt'] ?? '')),
+            trim(($payload['from_address'] ?? $shipping['shipper_address'] ?? '').' '.($payload['from_apt'] ?? '')),
             trim(implode(' ', array_filter([
-                $payload['from_city'] ?? null,
-                $payload['from_state'] ?? null,
-                $payload['from_zip'] ?? null,
+                $payload['from_city'] ?? $shipping['shipper_city'] ?? $shipping['shipper_address_city'] ?? null,
+                $payload['from_state'] ?? $shipping['shipper_state'] ?? $shipping['shipper_address_state'] ?? null,
+                $payload['from_zip'] ?? $shipping['shipper_zip'] ?? $shipping['shipper_address_zip'] ?? null,
             ]))),
             $payload['from_country_name'] ?? $payload['from_country'] ?? $shipping['shipper_country'] ?? null,
         ]))) ?: '414 Main St, Asbury Park, NJ 07712';
@@ -201,35 +201,62 @@ class ShipmentDocumentPdfService
             $payload['from_phone'] ?? null,
             $shipping['shipper_phone'] ?? null,
             $shipping['from_phone'] ?? null,
+            $shipping['shipper_contact'] ?? null,
+            $shipping['shipper_mobile'] ?? null,
             $response['shipper_phone'] ?? null,
+            $response['shipper_contact'] ?? null,
+            $response['from_phone'] ?? null,
             $responseData['shipper_phone'] ?? null,
+            $responseData['shipper_contact'] ?? null,
+            $responseData['from_phone'] ?? null,
         ]) ?: 'Phone pending');
-        $shipperEmail = (string) ($this->firstNonEmptyString([
+        $shipperEmail = (string) ($this->firstEmailString([
             $payload['from_email'] ?? null,
             $shipping['shipper_email'] ?? null,
             $shipping['from_email'] ?? null,
+            $shipping['customer_email'] ?? null,
+            $shipping['email'] ?? null,
+            $shipping['shipper_contact'] ?? null,
             $response['shipper_email'] ?? null,
             $responseData['shipper_email'] ?? null,
+            $response['from_email'] ?? null,
+            $responseData['from_email'] ?? null,
+            $response['customer_email'] ?? null,
+            $responseData['customer_email'] ?? null,
+            $response['email'] ?? null,
+            $responseData['email'] ?? null,
             session('zion.user.email'),
         ]) ?: '');
 
         $consigneeName = (string) ($payload['to_name'] ?? $payload['consignee_name'] ?? $shipping['consignee_name'] ?? 'Destination Customer');
         $consigneeAddress = trim(implode("\n", array_filter([
-            trim(($payload['to_address'] ?? '').' '.($payload['to_apt'] ?? '')),
+            trim(($payload['to_address'] ?? $shipping['consignee_address'] ?? '').' '.($payload['to_apt'] ?? '')),
             trim(implode(' ', array_filter([
-                $payload['to_city'] ?? null,
-                $payload['to_state'] ?? null,
-                $payload['to_zip'] ?? null,
+                $payload['to_city'] ?? $shipping['consignee_city'] ?? $shipping['consignee_address_city'] ?? null,
+                $payload['to_state'] ?? $shipping['consignee_state'] ?? $shipping['consignee_address_state'] ?? null,
+                $payload['to_zip'] ?? $shipping['consignee_zip'] ?? $shipping['consignee_address_zip'] ?? null,
             ]))),
             $payload['to_country_name'] ?? $payload['to_country'] ?? $shipping['consignee_country'] ?? null,
         ]))) ?: 'Destination address pending';
         $consigneePhone = (string) ($this->firstNonEmptyString([
             $payload['to_phone_1'] ?? null,
+            $payload['to_phone'] ?? null,
             $payload['consignee_phone'] ?? null,
             $shipping['consignee_phone'] ?? null,
+            $shipping['consignee_contact'] ?? null,
+            $shipping['consignee_mobile'] ?? null,
             $shipping['to_phone_1'] ?? null,
+            $shipping['to_phone'] ?? null,
+            $shipping['receiver_phone'] ?? null,
+            $shipping['recipient_phone'] ?? null,
             $response['consignee_phone'] ?? null,
+            $response['consignee_contact'] ?? null,
+            $response['to_phone_1'] ?? null,
+            $response['to_phone'] ?? null,
             $responseData['consignee_phone'] ?? null,
+            $responseData['consignee_contact'] ?? null,
+            $responseData['to_phone_1'] ?? null,
+            $responseData['to_phone'] ?? null,
         ]) ?: 'Phone pending');
 
         $description = (string) ($this->firstNonEmptyString([
@@ -272,7 +299,7 @@ class ShipmentDocumentPdfService
 
         $freight = (float) ($selected['freight'] ?? $response['freight'] ?? $shipping['freight'] ?? $selected['total'] ?? $selected['price'] ?? $payload['deliveryEstimatePrice'] ?? 0);
         $tax = (float) ($selected['tax'] ?? $response['tax'] ?? $shipping['tax'] ?? 0);
-        $total = (float) ($selected['total'] ?? $selected['price'] ?? $payload['deliveryEstimatePrice'] ?? $response['total'] ?? $shipping['total'] ?? ($freight + $tax));
+        $total = (float) ($selected['grand_total'] ?? $selected['final_total'] ?? $selected['total'] ?? $selected['price'] ?? $payload['deliveryEstimatePrice'] ?? $response['grand_total'] ?? $response['final_total'] ?? $response['total'] ?? $shipping['grand_total'] ?? $shipping['final_total'] ?? $shipping['total'] ?? ($freight + $tax));
         $declared = (float) ($payload['total_value'] ?? $payload['package_value'] ?? $shipping['total_value'] ?? 0);
         $deliveryOption = (string) ($payload['delivery_option'] ?? $payload['selected_shipper'] ?? $shipping['delivery_option'] ?? $shipping['selected_shipper'] ?? $selected['service'] ?? 'Shipping Service');
         $deliveryLocation = (string) ($payload['delivery_location'] ?? $shipping['delivery_location'] ?? '');
@@ -280,14 +307,31 @@ class ShipmentDocumentPdfService
         $created = $response['created_at'] ?? $shipping['created_at'] ?? $responseData['created_at'] ?? now()->toDateTimeString();
         $deliveryDate = $this->firstNonEmptyString([
             $payload['deliveryEstimateDate'] ?? null,
+            $payload['delivery_estimate_date'] ?? null,
+            $payload['delivery_date'] ?? null,
+            $payload['expected_arrival_date'] ?? null,
+            $payload['estimated_delivery_date'] ?? null,
+            $payload['eta'] ?? null,
+            $payload['arrives_on'] ?? null,
             $selected['eta'] ?? null,
+            $selected['deliveryEstimateDate'] ?? null,
+            $selected['delivery_estimate_date'] ?? null,
             $selected['delivery_date'] ?? null,
+            $selected['expected_arrival_date'] ?? null,
+            $selected['arrives_on'] ?? null,
             $response['delivery_date'] ?? null,
             $response['deliveryEstimateDate'] ?? null,
+            $response['delivery_estimate_date'] ?? null,
             $response['expected_arrival_date'] ?? null,
+            $response['estimated_delivery_date'] ?? null,
+            $response['eta'] ?? null,
+            $response['arrives_on'] ?? null,
             $shipping['delivery_date'] ?? null,
             $shipping['deliveryEstimateDate'] ?? null,
+            $shipping['delivery_estimate_date'] ?? null,
             $shipping['expected_arrival_date'] ?? null,
+            $shipping['estimated_delivery_date'] ?? null,
+            $shipping['eta'] ?? null,
             $shipping['arrives_on'] ?? null,
         ]) ?: 'Pending';
 
@@ -299,9 +343,9 @@ class ShipmentDocumentPdfService
             $shipperAddress = trim(implode("\n", array_filter([
                 $shipping['shipper_address'] ?? null,
                 trim(implode(' ', array_filter([
-                    $shipping['shipper_city'] ?? null,
-                    $shipping['shipper_state'] ?? null,
-                    $shipping['shipper_zip'] ?? null,
+                    $shipping['shipper_city'] ?? $shipping['shipper_address_city'] ?? null,
+                    $shipping['shipper_state'] ?? $shipping['shipper_address_state'] ?? null,
+                    $shipping['shipper_zip'] ?? $shipping['shipper_address_zip'] ?? null,
                 ]))),
                 $shipping['shipper_country'] ?? null,
             ])));
@@ -319,9 +363,9 @@ class ShipmentDocumentPdfService
             $consigneeAddress = trim(implode("\n", array_filter([
                 $shipping['consignee_address'] ?? null,
                 trim(implode(' ', array_filter([
-                    $shipping['consignee_city'] ?? null,
-                    $shipping['consignee_state'] ?? null,
-                    $shipping['consignee_zip'] ?? null,
+                    $shipping['consignee_city'] ?? $shipping['consignee_address_city'] ?? null,
+                    $shipping['consignee_state'] ?? $shipping['consignee_address_state'] ?? null,
+                    $shipping['consignee_zip'] ?? $shipping['consignee_address_zip'] ?? null,
                 ]))),
                 $shipping['consignee_country'] ?? null,
             ])));
@@ -481,6 +525,22 @@ class ShipmentDocumentPdfService
             }
             $value = trim((string) $candidate);
             if ($value !== '') {
+                return $value;
+            }
+        }
+
+        return null;
+    }
+
+    private function firstEmailString(array $candidates): ?string
+    {
+        foreach ($candidates as $candidate) {
+            if ($candidate === null) {
+                continue;
+            }
+
+            $value = trim((string) $candidate);
+            if ($value !== '' && filter_var($value, FILTER_VALIDATE_EMAIL)) {
                 return $value;
             }
         }
