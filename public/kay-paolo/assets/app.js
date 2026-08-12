@@ -172,7 +172,78 @@ document.addEventListener('DOMContentLoaded', () => {
       throw Object.assign(new Error(message), { response: data, status: response.status });
     }
 
+    if (data.html || data.status === 'error' || data.error === true || data.error === 'true') {
+      const message = data.message || data.error || 'Bocicot quote API did not return quote data.';
+      throw Object.assign(new Error(message), { response: data, status: response.status });
+    }
+
     return data;
+  }
+
+  async function postExternalJson(url, payload, options = {}) {
+    const headers = {
+      Accept: 'application/json',
+      'Content-Type': 'application/json'
+    };
+
+    const token = options.token === undefined ? storedToken() : options.token;
+    if (token) {
+      headers.Authorization = `Bearer ${token}`;
+    }
+
+    const response = await fetch(url, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(payload || {})
+    });
+
+    const text = await response.text();
+    let data = {};
+    try {
+      data = text ? JSON.parse(text) : {};
+    } catch (error) {
+      data = { status: 'error', message: text || 'Unexpected response.' };
+    }
+
+    if (!response.ok) {
+      const message = data.message || data.error || 'Request failed.';
+      throw Object.assign(new Error(message), { response: data, status: response.status });
+    }
+
+    if (data.html || data.status === 'error' || data.error === true || data.error === 'true') {
+      const message = data.message || data.error || 'Bocicot quote API did not return quote data.';
+      throw Object.assign(new Error(message), { response: data, status: response.status });
+    }
+
+    return data;
+  }
+
+  async function requestQuoteFromBocicot(payload) {
+    const bocicotPayload = {
+      ...payload,
+      source: 'bocicot',
+      quote_source: 'bocicot',
+      integration: 'full_integration',
+      full_integration: 1,
+      is_full_integration: 1
+    };
+
+    try {
+      const response = await postExternalJson(zionWebUrl('web-api/get-quote-result-bocicot'), bocicotPayload);
+      return markBocicotQuoteResponse(response);
+    } catch (error) {
+      console.warn('Bocicot quote API unavailable, falling back to Kay Paolo proxy.', error);
+      return markBocicotQuoteResponse(await postJson(route('quote', '/api/kay-paolo/quote'), bocicotPayload));
+    }
+  }
+
+  function markBocicotQuoteResponse(response) {
+    if (!response || typeof response !== 'object') return response;
+
+    return {
+      ...response,
+      kay_paolo_quote_source: 'bocicot'
+    };
   }
 
   async function getJson(url, query = {}, options = {}) {
@@ -1162,7 +1233,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
       try {
         const payload = buildQuotePayload();
-        const response = await postJson(route('quote', '/api/kay-paolo/quote'), payload);
+        const response = await requestQuoteFromBocicot(payload);
         window.localStorage.setItem('kayPaoloLastQuotePayload', JSON.stringify(payload));
         window.localStorage.setItem('kayPaoloLastQuoteResponse', JSON.stringify(response));
         renderQuoteCards(response, payload);
@@ -3000,7 +3071,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const hasSelection = Boolean(payload.quote_id || quote.quote_id || quote.quoteId || quote.id || Object.keys(card).length);
     const service = quoteCardService(card) || payload.delivery_option || 'Selected service';
     const total = quoteCardTotal(card) || payload.deliveryEstimatePrice || payload.total || '0.00';
-    const carrier = quoteCardCarrier(card) || payload.partner || 'ZION';
+    const carrier = quoteCardDisplayCarrier(card) || payload.partner || 'Full Integration';
     const eta = quoteCardEta(card) || payload.deliveryEstimateDate || '-';
     const deliveredBy = quoteCardDeliveryTime(card) || payload.delivered_by || '-';
 
@@ -3083,7 +3154,7 @@ document.addEventListener('DOMContentLoaded', () => {
       `;
     }
 
-    const carrier = quoteCardCarrier(card) || 'Kay Paolo Shipping';
+    const carrier = quoteCardDisplayCarrier(card) || 'Full Integration';
     const service = quoteCardService(card) || 'Shipping Service';
     const total = quoteCardTotal(card) || '0.00';
     const freight = quoteCardValue(card, ['freight', 'base_freight', 'base_rate', 'shipping_cost', 'shippingCost']) || '0.00';
@@ -3146,6 +3217,40 @@ document.addEventListener('DOMContentLoaded', () => {
     ]) || '';
   }
 
+  function quoteCardDisplayCarrier(card) {
+    const displayName = quoteCardValue(card, [
+      'display_carrier',
+      'displayCarrier',
+      'display_name',
+      'displayName',
+      'carrier_display_name',
+      'carrierDisplayName',
+      'integration_name',
+      'integrationName',
+      'full_integration_name',
+      'fullIntegrationName'
+    ]) || quoteCardNestedValue(card, [
+      'full_integration',
+      'fullIntegration',
+      'integration',
+      'integration_data',
+      'integrationData'
+    ], [
+      'name',
+      'label',
+      'display_name',
+      'displayName',
+      'carrier_name',
+      'carrierName'
+    ]);
+
+    if (isFullIntegrationQuote(card)) {
+      return displayName && !isZionBrand(displayName) ? displayName : 'Full Integration';
+    }
+
+    return quoteCardCarrier(card);
+  }
+
   function filterQuoteCardsForPayload(cards, payload) {
     if (totalPackageWeight(payload) !== 0) return cards;
 
@@ -3168,7 +3273,28 @@ document.addEventListener('DOMContentLoaded', () => {
     return normalizePartner(card.carrier || card.partner || card.carrier_key || card.carrier_name || card.integration || card.full_integration, '');
   }
 
+  function isFullIntegrationQuote(card) {
+    return isFullIntegrationCard(card)
+      || quoteCardPartner(card) === 'ZION'
+      || isZionBrand(quoteCardCarrier(card));
+  }
+
   function isFullIntegrationCard(card) {
+    const explicitFlags = [
+      card?.full_integration,
+      card?.fullIntegration,
+      card?.is_full_integration,
+      card?.isFullIntegration,
+      card?.data?.full_integration,
+      card?.data?.fullIntegration,
+      card?.data?.is_full_integration,
+      card?.data?.isFullIntegration
+    ];
+
+    if (explicitFlags.some((item) => item === true || item === 1 || ['1', 'true', 'yes', 'full_integration', 'full integration'].includes(String(item || '').toLowerCase()))) {
+      return true;
+    }
+
     const raw = [
       card?.carrier,
       card?.partner,
@@ -3176,11 +3302,39 @@ document.addEventListener('DOMContentLoaded', () => {
       card?.carrier_name,
       card?.integration,
       card?.full_integration,
+      card?.fullIntegration,
+      card?.integration_type,
+      card?.integrationType,
+      card?.source,
+      card?.source_type,
+      card?.sourceType,
+      card?.quote_source,
+      card?.quoteSource,
+      card?.data?.integration,
+      card?.data?.full_integration,
+      card?.data?.fullIntegration,
+      card?.data?.integration_type,
+      card?.data?.integrationType,
       card?.service_name,
       card?.service,
       card?.name,
       card?.shipper,
-      card?.provider
+      card?.provider,
+      quoteCardNestedValue(card, [
+        'full_integration',
+        'fullIntegration',
+        'integration',
+        'integration_data',
+        'integrationData'
+      ], [
+        'name',
+        'type',
+        'key',
+        'source',
+        'source_type',
+        'sourceType',
+        'label'
+      ])
     ].map((value) => String(value || '').toLowerCase()).join(' ');
 
     return raw.includes('full integration')
@@ -3266,9 +3420,68 @@ document.addEventListener('DOMContentLoaded', () => {
     return '';
   }
 
+  function quoteCardNestedValue(card, objectKeys, valueKeys) {
+    for (const objectKey of objectKeys) {
+      const nested = card?.[objectKey] ?? card?.data?.[objectKey] ?? card?.rate?.[objectKey];
+      if (typeof nested === 'string' && nested.trim() !== '') {
+        return nested.trim();
+      }
+      if (!nested || typeof nested !== 'object') continue;
+
+      for (const valueKey of valueKeys) {
+        const nextValue = nested[valueKey];
+        if (nextValue !== undefined && nextValue !== null && nextValue !== '') {
+          return nextValue;
+        }
+      }
+    }
+
+    return '';
+  }
+
+  function quoteCardFullIntegrationLogo(card) {
+    return quoteCardValue(card, [
+      'full_integration_logo',
+      'full_integration_logo_url',
+      'fullIntegrationLogo',
+      'fullIntegrationLogoUrl',
+      'full_integration_image',
+      'full_integration_image_url',
+      'fullIntegrationImage',
+      'fullIntegrationImageUrl',
+      'integration_logo',
+      'integration_logo_url',
+      'integrationLogo',
+      'integrationLogoUrl',
+      'api_logo',
+      'api_logo_url',
+      'apiLogo',
+      'apiLogoUrl'
+    ]) || quoteCardNestedValue(card, [
+      'full_integration',
+      'fullIntegration',
+      'integration',
+      'integration_data',
+      'integrationData'
+    ], [
+      'logo',
+      'logo_url',
+      'logoUrl',
+      'image',
+      'image_url',
+      'imageUrl',
+      'icon',
+      'icon_url',
+      'iconUrl'
+    ]);
+  }
+
+  function isZionBrand(value) {
+    return String(value || '').toLowerCase().includes('zion');
+  }
+
   function carrierLogoMarkup(card) {
-    const carrier = quoteCardCarrier(card) || 'Carrier';
-    const partner = quoteCardPartner(card);
+    const carrier = quoteCardDisplayCarrier(card) || 'Full Integration';
     const logo = quoteCardValue(card, [
       'logo',
       'logo_url',
@@ -3281,20 +3494,18 @@ document.addEventListener('DOMContentLoaded', () => {
       'image_url',
       'icon'
     ]);
+    const apiFullIntegrationLogo = quoteCardFullIntegrationLogo(card);
     const fullIntegrationLogo = config.assets?.fullIntegrationLogo
       || config.assets?.kayPaoloLogo
       || '/kay-paolo/assets/logo/kay-paolo.svg';
 
-    if (logo) {
+    if (isFullIntegrationQuote(card)) {
+      const fullLogo = apiFullIntegrationLogo || fullIntegrationLogo;
+      return `<img src="${escapeHtml(resolveAssetUrl(fullLogo))}" alt="Full Integration logo" width="100" height="50">`;
+    }
+
+    if (logo && !isZionBrand(logo)) {
       return `<img src="${escapeHtml(resolveAssetUrl(logo))}" alt="${escapeHtml(carrier)} logo" width="100" height="50">`;
-    }
-
-    if (isFullIntegrationCard(card)) {
-      return `<img src="${escapeHtml(fullIntegrationLogo)}" alt="Full Integration logo" width="100" height="50">`;
-    }
-
-    if (partner === 'ZION') {
-      return `<div class="carrier-logo-fallback" aria-label="${escapeHtml(carrier)}">${escapeHtml(carrierInitials(carrier))}</div>`;
     }
 
     return `<div class="carrier-logo-fallback" aria-label="${escapeHtml(carrier)}">${escapeHtml(carrierInitials(carrier))}</div>`;
@@ -3538,6 +3749,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const base = config.zionWebUrl || 'https://dev.zionshipping.com/';
     return `${base.replace(/\/+$/, '')}/${raw.replace(/^\/+/, '')}`;
+  }
+
+  function zionWebUrl(path) {
+    const base = config.zionWebUrl || 'https://dev.zionshipping.com/';
+    return `${base.replace(/\/+$/, '')}/${String(path || '').replace(/^\/+/, '')}`;
   }
 
   function showLoader(id, visible) {

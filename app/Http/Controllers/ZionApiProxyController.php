@@ -27,9 +27,15 @@ class ZionApiProxyController extends Controller
             'password' => ['required', 'string'],
         ]);
 
-        $response = $this->zion->post('kay-paolo/login', array_filter($payload, static function ($value) {
+        $cleanPayload = array_filter($payload, static function ($value) {
             return $value !== null && $value !== '';
-        }));
+        });
+
+        $response = $this->zion->post('bocicot/login', $cleanPayload);
+
+        if (!$response['ok'] && $this->shouldTryFallback($response)) {
+            $response = $this->zion->post('kay-paolo/login', $cleanPayload);
+        }
 
         $data = $response['data'] ?? [];
         $failed = !$response['ok']
@@ -59,29 +65,57 @@ class ZionApiProxyController extends Controller
 
     public function fetchUserForQuote(Request $request): JsonResponse
     {
-        return $this->forwardAuthenticated('kay-paolo/fetch-user-for-quote', $request);
+        return $this->forwardAuthenticatedWithFallback([
+            ['endpoint' => 'bocicot/fetch-user-for-quote'],
+            ['endpoint' => 'web-api/fetch-user-for-quote-bocicot', 'web' => true],
+            ['endpoint' => 'kay-paolo/fetch-user-for-quote'],
+        ], $request);
     }
 
     public function consigneeList(Request $request): JsonResponse
     {
         return $this->forwardAuthenticatedWithFallback([
-            ['endpoint' => 'kay-paolo/consignee-list'],
             ['endpoint' => 'bocicot/consignee-list'],
             ['endpoint' => 'web-api/consignee-list-bocicot', 'web' => true],
             ['endpoint' => 'web-api/fetch-consignee-for-quote-bocicot', 'web' => true],
+            ['endpoint' => 'kay-paolo/consignee-list'],
         ], $request);
     }
 
     public function countries(Request $request): JsonResponse
     {
         $token = $request->bearerToken();
-        $response = $this->zion->get('kay-paolo/countries', $request->query(), $token);
-        $countries = $response['ok'] ? $this->normalizeCountries($response['data']) : [];
+        $lastResponse = null;
 
-        if (!$response['ok'] || empty($countries)) {
-            $response = $this->zion->get('countries', $request->query(), $token);
+        foreach ([
+            ['endpoint' => 'bocicot/countries'],
+            ['endpoint' => 'web-api/countries-bocicot', 'web' => true],
+            ['endpoint' => 'kay-paolo/countries'],
+            ['endpoint' => 'countries'],
+        ] as $target) {
+            $response = !empty($target['web'])
+                ? $this->zion->getWeb($target['endpoint'], $request->query(), $token)
+                : $this->zion->get($target['endpoint'], $request->query(), $token);
+            $lastResponse = $response;
             $countries = $response['ok'] ? $this->normalizeCountries($response['data']) : [];
+
+            if ($response['ok'] && !empty($countries)) {
+                return response()->json([
+                    'status' => 'success',
+                    'countries' => $countries,
+                ]);
+            }
+
+            if (!$response['ok'] && !$this->shouldTryFallback($response)) {
+                break;
+            }
         }
+
+        $response = $lastResponse ?? [
+            'ok' => false,
+            'status' => 502,
+            'data' => [],
+        ];
 
         if (!$response['ok']) {
             return response()->json([
@@ -93,26 +127,54 @@ class ZionApiProxyController extends Controller
 
         return response()->json([
             'status' => 'success',
-            'countries' => $countries,
+            'countries' => [],
         ]);
     }
 
     public function paymentOptions(Request $request): JsonResponse
     {
         $token = $request->bearerToken();
-        $response = $this->zion->get('kay-paolo/payment-options', $request->query(), $token);
-        $options = $response['ok']
-            ? $this->normalizePaymentOptions($response['data'])
-            : [];
+        $emptySuccess = null;
 
-        if (!$response['ok']) {
-            return response()->json([
-                'status' => 'error',
-                'message' => $response['data']['message'] ?? 'Unable to load payment options from the shipping API.',
-                'options' => [],
-                'source' => 'api',
-            ], $response['status'] > 0 ? $response['status'] : 502);
+        foreach ([
+            ['endpoint' => 'bocicot/payment-options'],
+            ['endpoint' => 'web-api/payment-options-bocicot', 'web' => true],
+            ['endpoint' => 'web-api/get-payment-options-bocicot', 'web' => true],
+            ['endpoint' => 'kay-paolo/payment-options'],
+        ] as $target) {
+            $response = !empty($target['web'])
+                ? $this->zion->getWeb($target['endpoint'], $request->query(), $token)
+                : $this->zion->get($target['endpoint'], $request->query(), $token);
+            $options = $response['ok']
+                ? $this->normalizePaymentOptions($response['data'])
+                : [];
+
+            if ($response['ok'] && !empty($options)) {
+                return response()->json([
+                    'status' => 'success',
+                    'options' => $options,
+                    'source' => 'api',
+                ]);
+            }
+
+            if ($response['ok']) {
+                $emptySuccess = $response;
+                continue;
+            }
+
+            if (!$this->shouldTryFallback($response)) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => $response['data']['message'] ?? 'Unable to load payment options from the shipping API.',
+                    'options' => [],
+                    'source' => 'api',
+                ], $response['status'] > 0 ? $response['status'] : 502);
+            }
         }
+
+        $options = $emptySuccess
+            ? $this->normalizePaymentOptions($emptySuccess['data'])
+            : [];
 
         return response()->json([
             'status' => 'success',
@@ -126,14 +188,19 @@ class ZionApiProxyController extends Controller
         $payload = $this->sanitizeFlatRatePayload($request->except('_token'));
 
         return $this->forwardAuthenticatedWithFallback([
-            ['endpoint' => 'kay-paolo/get-flat-rates'],
             ['endpoint' => 'web-api/get-flat-rates-bocicot', 'web' => true],
+            ['endpoint' => 'bocicot/get-flat-rates'],
+            ['endpoint' => 'kay-paolo/get-flat-rates'],
         ], $request, $payload);
     }
 
     public function saveConsignee(Request $request): JsonResponse
     {
-        return $this->forwardAuthenticated('kay-paolo/save-consignee', $request);
+        return $this->forwardAuthenticatedWithFallback([
+            ['endpoint' => 'bocicot/save-consignee'],
+            ['endpoint' => 'web-api/save-consignee-bocicot', 'web' => true],
+            ['endpoint' => 'kay-paolo/save-consignee'],
+        ], $request);
     }
 
     public function quote(Request $request): JsonResponse
@@ -141,8 +208,9 @@ class ZionApiProxyController extends Controller
         $payload = $this->sanitizeQuotePayload($request->except('_token'));
 
         return $this->forwardAuthenticatedWithFallback([
-            ['endpoint' => 'kay-paolo/get-quote-result'],
             ['endpoint' => 'web-api/get-quote-result-bocicot', 'web' => true],
+            ['endpoint' => 'bocicot/get-quote-result'],
+            ['endpoint' => 'kay-paolo/get-quote-result'],
         ], $request, $payload);
     }
 
@@ -158,11 +226,11 @@ class ZionApiProxyController extends Controller
         }
 
         $payload = $this->sanitizeShipmentPayload($request->except('_token'));
-        $response = $this->zion->post('kay-paolo/update-shipping', $payload, $token);
-
-        if (!$response['ok'] && $this->shouldTryFallback($response)) {
-            $response = $this->zion->postWeb('web-api/update-shipping-bocicot', $payload, $token);
-        }
+        $response = $this->postWithFallback([
+            ['endpoint' => 'web-api/update-shipping-bocicot', 'web' => true],
+            ['endpoint' => 'bocicot/update-shipping'],
+            ['endpoint' => 'kay-paolo/update-shipping'],
+        ], $payload, $token);
 
         if ($this->isRecoverableZionAccountNumberSchemaError($response)) {
             $retryResponse = $this->zion->postWeb('web-api/update-shipping-bocicot', $payload, $token);
@@ -220,25 +288,31 @@ class ZionApiProxyController extends Controller
     public function shippingHistory(Request $request): JsonResponse
     {
         return $this->forwardAuthenticatedWithFallback([
-            ['endpoint' => 'kay-paolo/shipping-history-filter'],
             ['endpoint' => 'bocicot/shipping-history-filter'],
             ['endpoint' => 'web-api/shipping-history-filter-bocicot', 'web' => true],
+            ['endpoint' => 'kay-paolo/shipping-history-filter'],
         ], $request);
     }
 
     public function voidShipment(Request $request): JsonResponse
     {
         return $this->forwardAuthenticatedWithFallback([
-            ['endpoint' => 'kay-paolo/void-shipping'],
             ['endpoint' => 'bocicot/void-shipping'],
             ['endpoint' => 'web-api/void-shipping-bocicot', 'web' => true],
             ['endpoint' => 'web-api/void-shipment-bocicot', 'web' => true],
+            ['endpoint' => 'kay-paolo/void-shipping'],
         ], $request);
     }
 
     public function tracking(Request $request): JsonResponse
     {
-        return $this->forward('kay-paolo/validate-tracking', $request);
+        $response = $this->postWithFallback([
+            ['endpoint' => 'bocicot/validate-tracking'],
+            ['endpoint' => 'web-api/validate-tracking-bocicot', 'web' => true],
+            ['endpoint' => 'kay-paolo/validate-tracking'],
+        ], $request->except('_token'), $request->bearerToken());
+
+        return $this->jsonResponse($response);
     }
 
     public function emailShipment(Request $request): JsonResponse
@@ -518,7 +592,11 @@ class ZionApiProxyController extends Controller
             return null;
         }
 
-        $response = $this->zion->post('kay-paolo/shipping-history-filter', array_filter([
+        $response = $this->postWithFallback([
+            ['endpoint' => 'bocicot/shipping-history-filter'],
+            ['endpoint' => 'web-api/shipping-history-filter-bocicot', 'web' => true],
+            ['endpoint' => 'kay-paolo/shipping-history-filter'],
+        ], array_filter([
             'search' => $search !== '' ? $search : null,
             'date_range' => '365 Days',
             'limit' => 50,
@@ -591,30 +669,40 @@ class ZionApiProxyController extends Controller
             ], 401);
         }
 
+        return $this->jsonResponse($this->postWithFallback(
+            $targets,
+            $payload ?? $request->except('_token'),
+            $token
+        ));
+    }
+
+    private function postWithFallback(array $targets, array $payload, ?string $token = null): array
+    {
         $lastResponse = null;
+
         foreach ($targets as $target) {
             $endpoint = $target['endpoint'];
             $lastResponse = !empty($target['web'])
-                ? $this->zion->postWeb($endpoint, $payload ?? $request->except('_token'), $token)
-                : $this->zion->post($endpoint, $payload ?? $request->except('_token'), $token);
+                ? $this->zion->postWeb($endpoint, $payload, $token)
+                : $this->zion->post($endpoint, $payload, $token);
 
             if ($lastResponse['ok']) {
-                return $this->jsonResponse($lastResponse);
+                return $lastResponse;
             }
 
             if (!$this->shouldTryFallback($lastResponse)) {
-                return $this->jsonResponse($lastResponse);
+                return $lastResponse;
             }
         }
 
-        return $this->jsonResponse($lastResponse ?? [
+        return $lastResponse ?? [
             'ok' => false,
             'status' => 502,
             'data' => [
                 'status' => 'error',
                 'message' => 'Unable to reach the shipping API.',
             ],
-        ]);
+        ];
     }
 
     private function sanitizeShipmentPayload(array $payload): array

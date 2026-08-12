@@ -64,7 +64,7 @@ class ExampleTest extends TestCase
     public function test_api_login_redirects_browser_submits_to_home(): void
     {
         Http::fake([
-            '*/api/kay-paolo/login' => Http::response([
+            '*/api/bocicot/login' => Http::response([
                 'message' => 'Logged in Successfully',
                 'message_type' => 'success',
                 'error' => 'false',
@@ -93,7 +93,7 @@ class ExampleTest extends TestCase
     public function test_web_login_api_endpoint_sets_session_for_admin_role(): void
     {
         Http::fake([
-            '*/api/kay-paolo/login' => Http::response([
+            '*/api/bocicot/login' => Http::response([
                 'message' => 'Logged in Successfully',
                 'message_type' => 'success',
                 'error' => 'false',
@@ -350,19 +350,19 @@ class ExampleTest extends TestCase
         $this->assertStringNotContainsString('Port to Port', $script);
     }
 
-    public function test_quote_proxy_uses_kay_paolo_endpoint_before_bocicot(): void
+    public function test_quote_proxy_uses_bocicot_endpoint_before_kay_paolo(): void
     {
         Http::fake([
-            '*/api/kay-paolo/get-quote-result' => Http::response([
-                'status' => 'success',
-                'quotes' => [
-                    ['carrier' => 'Kay Paolo', 'service' => 'Regular Boat', 'grand_total' => '88.00'],
-                ],
-            ]),
             '*/web-api/get-quote-result-bocicot' => Http::response([
                 'status' => 'success',
                 'quotes' => [
                     ['service' => 'Bocicot Regular Boat', 'total' => '25.00'],
+                ],
+            ]),
+            '*/api/kay-paolo/get-quote-result' => Http::response([
+                'status' => 'success',
+                'quotes' => [
+                    ['carrier' => 'Kay Paolo', 'service' => 'Regular Boat', 'grand_total' => '88.00'],
                 ],
             ]),
         ]);
@@ -379,11 +379,11 @@ class ExampleTest extends TestCase
                 'flat_rate_price' => ['88.00'],
             ])
             ->assertOk()
-            ->assertJsonPath('quotes.0.service', 'Regular Boat')
-            ->assertJsonPath('quotes.0.grand_total', '88.00');
+            ->assertJsonPath('quotes.0.service', 'Bocicot Regular Boat')
+            ->assertJsonPath('quotes.0.total', '25.00');
 
         Http::assertSent(function ($request) {
-            return str_contains($request->url(), '/api/kay-paolo/get-quote-result')
+            return str_contains($request->url(), '/web-api/get-quote-result-bocicot')
                 && ($request['promo'] ?? null) === 'SAVE10'
                 && ($request['coupon'] ?? null) === 'SAVE10'
                 && ($request['promo_code'] ?? null) === 'SAVE10'
@@ -392,13 +392,15 @@ class ExampleTest extends TestCase
         });
 
         Http::assertNotSent(function ($request) {
-            return str_contains($request->url(), '/web-api/get-quote-result-bocicot');
+            return str_contains($request->url(), '/api/kay-paolo/get-quote-result');
         });
     }
 
     public function test_countries_and_payment_options_proxy_to_shipping_api(): void
     {
         Http::fake([
+            '*/api/bocicot/countries' => Http::response(['message' => 'Not Found'], 404),
+            '*/web-api/countries-bocicot' => Http::response(['message' => 'Not Found'], 404),
             '*/api/kay-paolo/countries' => Http::response(['countries' => []]),
             '*/api/countries' => Http::response([
                 'countries' => [
@@ -406,7 +408,7 @@ class ExampleTest extends TestCase
                     'US' => 'United States',
                 ],
             ]),
-            '*/api/kay-paolo/payment-options*' => Http::response([
+            '*/api/bocicot/payment-options*' => Http::response([
                 'options' => [
                     ['value' => 'COLLECT', 'label' => 'Collect'],
                 ],
@@ -459,7 +461,7 @@ class ExampleTest extends TestCase
     public function test_receipt_pdf_includes_package_details_from_shipment_history(): void
     {
         Http::fake([
-            '*/api/kay-paolo/shipping-history-filter' => Http::response([
+            '*/api/bocicot/shipping-history-filter' => Http::response([
                 'status' => 'success',
                 'shippings' => [[
                     'id' => 24755,
@@ -587,7 +589,7 @@ class ExampleTest extends TestCase
         Mail::fake();
 
         Http::fake([
-            '*/api/kay-paolo/update-shipping' => Http::response(['status' => 'success']),
+            '*/web-api/update-shipping-bocicot' => Http::response(['status' => 'success']),
         ]);
 
         $this->withHeader('Authorization', 'Bearer fake-token')
@@ -633,7 +635,7 @@ class ExampleTest extends TestCase
         Http::assertSent(function (\Illuminate\Http\Client\Request $request) {
             $data = $request->data();
 
-            return str_contains($request->url(), '/api/kay-paolo/update-shipping')
+            return str_contains($request->url(), '/web-api/update-shipping-bocicot')
                 && ! array_key_exists('account_number', $data)
                 && ! array_key_exists('phone_or_account', $data)
                 && $data['package_count'] === 3
@@ -654,14 +656,21 @@ class ExampleTest extends TestCase
     public function test_shipping_proxy_recovers_from_zion_account_number_schema_error(): void
     {
         Http::fake([
+            '*/web-api/update-shipping-bocicot' => Http::sequence()
+                ->push([
+                    'message' => 'Session store not set on request.',
+                ], 500)
+                ->push([
+                    'status' => 'success',
+                    'tracking_number' => 'HTE59174',
+                ]),
+            '*/api/bocicot/update-shipping' => Http::response([
+                'message' => 'Not Found',
+            ], 404),
             '*/api/kay-paolo/update-shipping' => Http::response([
                 'status' => 'error',
                 'message' => "SQLSTATE[42S22]: Column not found: 1054 Unknown column 'account_number' in 'field list' (SQL: update `shippings` set `account_number` = 9400 where `id` = 24745)",
             ], 500),
-            '*/web-api/update-shipping-bocicot' => Http::response([
-                'status' => 'success',
-                'tracking_number' => 'HTE59174',
-            ]),
         ]);
 
         $this->withHeader('Authorization', 'Bearer fake-token')
