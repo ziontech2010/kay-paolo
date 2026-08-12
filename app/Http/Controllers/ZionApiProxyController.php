@@ -1249,8 +1249,10 @@ class ZionApiProxyController extends Controller
         $status = (int) ($response['status'] ?? 0);
         $message = strtolower((string) ($response['data']['message'] ?? ''));
 
-        return in_array($status, [404, 405], true)
-            || ($status >= 500 && str_contains($message, 'session store not set'));
+        return $status === 0
+            || in_array($status, [404, 405], true)
+            || $status >= 500
+            || str_contains($message, 'session store not set');
     }
 
     private function normalizeCountries(array $payload): array

@@ -427,6 +427,38 @@ class ExampleTest extends TestCase
             ->assertJsonPath('options.0.value', 'COLLECT');
     }
 
+    public function test_flat_rates_proxy_falls_back_when_bocicot_returns_server_error(): void
+    {
+        Http::fake([
+            '*/web-api/get-flat-rates-bocicot' => Http::response([
+                'message' => 'Internal Server Error',
+            ], 500),
+            '*/api/bocicot/get-flat-rates' => Http::response([
+                'message' => 'Not Found',
+            ], 404),
+            '*/api/kay-paolo/get-flat-rates' => Http::response([
+                'status' => 'success',
+                'flat_rates' => [
+                    ['slug' => 'regular_boat_box', 'label' => 'Regular Boat Box', 'price' => '88.00'],
+                ],
+            ]),
+        ]);
+
+        $this->withHeader('Authorization', 'Bearer fake-token')
+            ->postJson('/api/kay-paolo/flat-rates', [
+                'from_country' => 'US',
+                'to_country' => 'HT',
+                'shipment_type' => 'regular_boat',
+            ])
+            ->assertOk()
+            ->assertJsonPath('flat_rates.0.slug', 'regular_boat_box')
+            ->assertJsonPath('flat_rates.0.price', '88.00');
+
+        Http::assertSent(function ($request) {
+            return str_contains($request->url(), '/api/kay-paolo/get-flat-rates');
+        });
+    }
+
     public function test_shipment_document_routes_render_kay_branded_document_ui(): void
     {
         Http::fake();
