@@ -225,7 +225,9 @@ class ZionApiProxyController extends Controller
             ], 401);
         }
 
-        $payload = $this->sanitizeShipmentPayload($request->except('_token'));
+        $rawPayload = $request->except('_token');
+        $payload = $this->sanitizeShipmentPayload($rawPayload);
+        $emailPayload = array_merge($rawPayload, $payload);
         $response = $this->postWithFallback([
             ['endpoint' => 'web-api/update-shipping-bocicot', 'web' => true],
             ['endpoint' => 'bocicot/update-shipping'],
@@ -237,7 +239,7 @@ class ZionApiProxyController extends Controller
 
             if (!$this->isRecoverableZionAccountNumberSchemaError($retryResponse)) {
                 $this->rememberShipmentContext($request, $retryResponse['data'] ?? [], $payload);
-                $this->attachShipmentEmailResult($request, $retryResponse, $payload);
+                $this->attachShipmentEmailResult($request, $retryResponse, $emailPayload);
 
                 return $this->jsonResponse($retryResponse);
             }
@@ -247,7 +249,7 @@ class ZionApiProxyController extends Controller
 
         if ($response['ok'] ?? false) {
             $this->rememberShipmentContext($request, $response['data'] ?? [], $payload);
-            $this->attachShipmentEmailResult($request, $response, $payload);
+            $this->attachShipmentEmailResult($request, $response, $emailPayload);
         }
 
         return $this->jsonResponse($response);
@@ -1122,9 +1124,34 @@ class ZionApiProxyController extends Controller
     {
         $email = $this->firstEmail([
             $payload['from_email'] ?? null,
+            $payload['shipper_email'] ?? null,
+            $payload['sender_email'] ?? null,
+            $payload['customer_email'] ?? null,
+            $payload['email'] ?? null,
+            $payload['email_address'] ?? null,
+            $payload['shipper_contact'] ?? null,
+            $payload['sender_contact'] ?? null,
+            $payload['customer_contact'] ?? null,
+            $payload['contact'] ?? null,
             $responseData['shipper_email'] ?? null,
             $responseData['from_email'] ?? null,
+            $responseData['sender_email'] ?? null,
+            $responseData['customer_email'] ?? null,
+            $responseData['email'] ?? null,
+            $responseData['email_address'] ?? null,
+            $responseData['shipper_contact'] ?? null,
+            $responseData['sender_contact'] ?? null,
+            $responseData['customer_contact'] ?? null,
+            $responseData['contact'] ?? null,
+            $responseData['shipper'] ?? null,
+            $responseData['sender'] ?? null,
+            $responseData['customer'] ?? null,
+            $responseData['user'] ?? null,
+            $responseData['shipping'] ?? null,
+            $responseData['shipping_data'] ?? null,
+            $responseData['data'] ?? null,
             session('zion.user.email'),
+            session('zion.user'),
         ]);
 
         if (!$email) {
@@ -1156,6 +1183,20 @@ class ZionApiProxyController extends Controller
         ]);
 
         try {
+            $shipperEmail = $this->firstEmail([
+                $payload['from_email'] ?? null,
+                $payload['shipper_email'] ?? null,
+                $payload['sender_email'] ?? null,
+                $payload['customer_email'] ?? null,
+                $payload['email'] ?? null,
+                $payload['email_address'] ?? null,
+                $payload['shipper_contact'] ?? null,
+                $payload['sender_contact'] ?? null,
+                $payload['customer_contact'] ?? null,
+                $payload['contact'] ?? null,
+                $email,
+            ]);
+
             Mail::to($email)->send(new ConfirmShipmentMail([
                 'recipientName' => $payload['from_name'] ?? session('zion.user.name') ?? null,
                 'shipmentNumber' => $shipmentNumber,
@@ -1167,7 +1208,7 @@ class ZionApiProxyController extends Controller
                 'shipperAddress' => $this->addressText($payload, 'from'),
                 'shipperContact' => $this->contactText([
                     $payload['from_phone'] ?? null,
-                    $payload['from_email'] ?? null,
+                    $shipperEmail,
                 ]),
                 'consigneeName' => $payload['to_name'] ?? $payload['consignee_name'] ?? 'Destination Customer',
                 'consigneeAddress' => $this->addressText($payload, 'to'),
@@ -1220,10 +1261,47 @@ class ZionApiProxyController extends Controller
     private function firstEmail(array $values): ?string
     {
         foreach ($values as $value) {
-            $candidate = trim((string) $value);
-            if ($candidate !== '' && filter_var($candidate, FILTER_VALIDATE_EMAIL)) {
-                return $candidate;
+            $email = $this->emailFromValue($value);
+            if ($email !== null) {
+                return $email;
             }
+        }
+
+        return null;
+    }
+
+    private function emailFromValue(mixed $value): ?string
+    {
+        if ($value === null) {
+            return null;
+        }
+
+        if (is_array($value)) {
+            foreach ($value as $nestedValue) {
+                $email = $this->emailFromValue($nestedValue);
+                if ($email !== null) {
+                    return $email;
+                }
+            }
+
+            return null;
+        }
+
+        if (is_object($value)) {
+            return $this->emailFromValue((array) $value);
+        }
+
+        $candidate = trim((string) $value);
+        if ($candidate === '') {
+            return null;
+        }
+
+        if (filter_var($candidate, FILTER_VALIDATE_EMAIL)) {
+            return $candidate;
+        }
+
+        if (preg_match('/[A-Z0-9._%+\-]+@[A-Z0-9.\-]+\.[A-Z]{2,}/i', $candidate, $matches) === 1) {
+            return $matches[0];
         }
 
         return null;

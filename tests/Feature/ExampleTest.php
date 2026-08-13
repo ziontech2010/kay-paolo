@@ -866,6 +866,71 @@ class ExampleTest extends TestCase
         });
     }
 
+    public function test_shipping_creation_sends_confirmation_to_customer_email_alias(): void
+    {
+        Mail::fake();
+
+        Http::fake([
+            '*/web-api/update-shipping-bocicot' => Http::response([
+                'status' => 'success',
+                'tracking_number' => 'HTCUST123',
+            ]),
+        ]);
+
+        $this->withHeader('Authorization', 'Bearer fake-token')
+            ->postJson('/api/kay-paolo/shipping', [
+                'user_id' => 7020,
+                'quote_id' => 24744,
+                'partner' => 'zion_products',
+                'selected_shipper' => 'Regular Air',
+                'from_name' => 'Kay Customer',
+                'customer_email' => 'customer@example.com',
+                'from_phone' => '3055551212',
+                'from_country' => 'US',
+                'from_address' => '1117 NE 163rd St.',
+                'from_zip' => '33162',
+                'from_city' => 'North Miami Beach',
+                'from_state' => 'FL',
+                'consignee_id' => 99,
+                'to_name' => 'Kay Receiver',
+                'to_phone_1' => '5095551212',
+                'to_country' => 'HT',
+                'to_address' => '10 Rue Test',
+                'to_zip' => '6110',
+                'to_city' => 'Port-au-Prince',
+                'to_state' => 'Ouest',
+                'package_count' => 1,
+                'dimensions' => [
+                    'package_count_ind' => [1],
+                    'weight' => [25],
+                    'length' => [41],
+                    'width' => [12],
+                    'height' => [16],
+                ],
+                'total_value' => 100,
+                'delivery_location' => 'Pickup in Office',
+                'payment_type' => 'PAID AT AGENT',
+            ])
+            ->assertOk()
+            ->assertJsonPath('confirmation_email.status', 'success')
+            ->assertJsonPath('confirmation_email.email', 'customer@example.com');
+
+        Http::assertSent(function (\Illuminate\Http\Client\Request $request) {
+            return str_contains($request->url(), '/web-api/update-shipping-bocicot')
+                && ! array_key_exists('customer_email', $request->data());
+        });
+
+        Mail::assertSent(ConfirmShipmentMail::class, function ($mail) {
+            $sentToCustomer = method_exists($mail, 'hasTo')
+                ? $mail->hasTo('customer@example.com')
+                : collect($mail->to)->contains(fn ($recipient) => ($recipient['address'] ?? null) === 'customer@example.com');
+
+            return $sentToCustomer
+                && ($mail->shipment['recipientName'] ?? null) === 'Kay Customer'
+                && ($mail->shipment['shipperContact'] ?? null) === '3055551212 / customer@example.com';
+        });
+    }
+
     public function test_shipping_proxy_recovers_from_zion_account_number_schema_error(): void
     {
         Http::fake([

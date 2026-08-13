@@ -3103,14 +3103,34 @@ document.addEventListener('DOMContentLoaded', () => {
     const serverSentEmail = serverEmail.status === 'success' ? String(serverEmail.email || '').toLowerCase() : '';
     const emails = Array.from(new Set([
       payload?.from_email,
+      payload?.shipper_email,
+      payload?.sender_email,
       payload?.customer_email,
+      payload?.email,
+      payload?.email_address,
       payload?.to_email,
       payload?.consignee_email,
+      payload?.contact,
+      payload?.shipper_contact,
+      payload?.sender_contact,
+      payload?.customer_contact,
+      response?.from_email,
+      response?.shipper_email,
+      response?.sender_email,
+      response?.customer_email,
+      response?.email,
+      response?.email_address,
+      response?.shipper,
+      response?.sender,
+      response?.customer,
+      response?.shipping,
+      response?.shipping_data,
+      response?.data,
       data.shipperEmail,
       data.consigneeEmail,
       storedUser().email,
       'info@kaypaoloshipping.com'
-    ].filter((email) => typeof email === 'string' && email.includes('@'))))
+    ].flatMap(emailListFromValue).map((email) => email.toLowerCase())))
       .filter((email) => email.toLowerCase() !== serverSentEmail);
 
     if (!emails.length) return;
@@ -3150,13 +3170,24 @@ document.addEventListener('DOMContentLoaded', () => {
       receipt_url: absoluteUrl(receiptUrl)
     };
 
-    const results = await Promise.allSettled(emails.map((email) => postJson(route('emailShipment', '/api/kay-paolo/email-shipment'), {
-      email,
-      recipient_name: email === payload?.from_email || email === data.shipperEmail
-        ? (payload?.from_name || data.shipperName || undefined)
-        : (email === storedUser().email ? (storedUser().name || undefined) : undefined),
-      ...mailPayload
-    })));
+    const results = await Promise.allSettled(emails.map((email) => {
+      const shipperEmails = [
+        payload?.from_email,
+        payload?.shipper_email,
+        payload?.sender_email,
+        payload?.customer_email,
+        data.shipperEmail
+      ].flatMap(emailListFromValue).map((value) => value.toLowerCase());
+      const storedEmail = emailFromValue(storedUser().email).toLowerCase();
+
+      return postJson(route('emailShipment', '/api/kay-paolo/email-shipment'), {
+        email,
+        recipient_name: shipperEmails.includes(email)
+          ? (payload?.from_name || data.shipperName || undefined)
+          : (email === storedEmail ? (storedUser().name || undefined) : undefined),
+        ...mailPayload
+      });
+    }));
 
     const failed = results.find((result) => result.status === 'rejected');
     if (failed) {
@@ -3255,6 +3286,15 @@ document.addEventListener('DOMContentLoaded', () => {
     const value = String(rawValue || '').trim();
     const match = value.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i);
     return match ? match[0] : '';
+  }
+
+  function emailListFromValue(rawValue) {
+    if (rawValue === undefined || rawValue === null) return [];
+    if (Array.isArray(rawValue)) return rawValue.flatMap(emailListFromValue);
+    if (typeof rawValue === 'object') return Object.values(rawValue).flatMap(emailListFromValue);
+
+    const matches = String(rawValue).match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi);
+    return matches || [];
   }
 
   function fillCreateShipmentPage() {
