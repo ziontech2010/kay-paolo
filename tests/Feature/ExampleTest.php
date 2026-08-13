@@ -649,6 +649,7 @@ class ExampleTest extends TestCase
                 'delivery_date' => '2026-08-24 11:59:00',
             ],
             'selected_shipper' => 'Economical Air',
+            'customer_account_number' => 'ACCT-479029',
             'freight' => 80,
             'tax' => 5,
             'total' => 85,
@@ -694,6 +695,7 @@ class ExampleTest extends TestCase
         $this->assertSame('history-shipper@example.com', $documentPayload['shipperEmail']);
         $this->assertSame('3051234567', $documentPayload['shipperPhone']);
         $this->assertSame('5099876543', $documentPayload['consigneePhone']);
+        $this->assertSame('ACCT-479029', $documentPayload['accountNumber']);
         $this->assertStringContainsString('Aug 24, 2026', $documentPayload['deliveryDate']);
 
         $this->withSession(['zion.access_token' => 'test-token'])
@@ -704,6 +706,14 @@ class ExampleTest extends TestCase
         $this->assertFileExists($labelPath);
         $labelPdf = (string) file_get_contents($labelPath);
         $this->assertStringStartsWith('%PDF', $labelPdf);
+        $labelHtml = view('documents.pdf.label', $documentPayload)->render();
+        $this->assertStringContainsString('Delivery Date:', $labelHtml);
+        $this->assertStringNotContainsString('Invoice 479029', $labelHtml);
+        $this->assertStringNotContainsString('Delivery DLV479029', $labelHtml);
+        $receiptTemplates = file_get_contents(resource_path('views/documents/pdf/receipt.blade.php'))
+            .file_get_contents(resource_path('views/documents/receipt.blade.php'));
+        $this->assertStringContainsString('Package Description', $receiptTemplates);
+        $this->assertStringNotContainsString('Task Description', $receiptTemplates);
 
         @unlink($path);
         @unlink($labelPath);

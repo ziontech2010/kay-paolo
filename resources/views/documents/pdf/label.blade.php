@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <title>Label {{ $trackingDisplay }}</title>
     <style>
-        @page { margin: 4pt; }
+        @page { margin: 18pt; }
         * { box-sizing: border-box; }
         html, body {
             margin: 0;
@@ -15,14 +15,14 @@
         }
         .page {
             width: 100%;
-            height: 568pt;
+            height: 540pt;
             page-break-inside: avoid;
             page-break-after: always;
         }
         .page:last-child { page-break-after: auto; }
         .frame {
             width: 100%;
-            height: 568pt;
+            height: 540pt;
             border-collapse: collapse;
             border: 3px solid #000;
             table-layout: fixed;
@@ -38,8 +38,7 @@
         .to-row { height: 124pt; }
         .awb-row { height: 75pt; }
         .route-row { height: 58pt; }
-        .scan-row { height: 129pt; }
-        .footer-row { height: 38pt; }
+        .scan-row { height: 183pt; }
         .logo { width: 80pt; height: auto; }
         .from-label, .to-label {
             font-size: 10.5pt;
@@ -103,13 +102,12 @@
             font-weight: 700;
             margin-top: 4pt;
         }
-        .footer-meta {
-            font-size: 9.5pt;
+        .scan-date {
+            font-size: 11pt;
             font-weight: 700;
             line-height: 1.15;
             text-align: center;
-            padding: 6pt !important;
-            vertical-align: middle !important;
+            margin-top: 8pt;
         }
     </style>
 </head>
@@ -158,11 +156,7 @@
                         <img class="scan-barcode" src="{{ $scanBarcodeUri ?? $barcodeUri }}" alt="scan barcode">
                     @endif
                     <div class="scan-awb">{{ $barcodeValue }} | {{ $labelNumber }}</div>
-                </td>
-            </tr>
-            <tr class="footer-row">
-                <td class="footer-meta" colspan="2">
-                    Invoice {{ $invoice }} | Delivery {{ $deliveryNumber }} | ETA {{ preg_replace('/^by\s+/i', '', $deliveryDate) }}
+                    <div class="scan-date">Delivery Date: {{ preg_replace('/^by\s+/i', '', $deliveryDate) }}</div>
                 </td>
             </tr>
         </table>

@@ -580,9 +580,26 @@ class ZionApiProxyController extends Controller
                 'selected_shipper' => $remote['selected_shipper'] ?? null,
                 'delivery_location' => $remote['delivery_location'] ?? null,
                 'deliveryEstimateDate' => $remote['deliveryEstimateDate']
+                    ?? $remote['deliveryDate']
+                    ?? $remote['delivery_estimate_date']
                     ?? $remote['delivery_date']
+                    ?? $remote['expected_delivery_date']
                     ?? $remote['expected_arrival_date']
+                    ?? $remote['estimated_delivery_date']
+                    ?? $remote['estimated_arrival_date']
+                    ?? $remote['eta']
                     ?? $remote['arrives_on']
+                    ?? null,
+                'account_number' => $remote['account_number']
+                    ?? $remote['accountNumber']
+                    ?? $remote['account_no']
+                    ?? $remote['accountNo']
+                    ?? $remote['customer_account']
+                    ?? $remote['customerAccount']
+                    ?? $remote['customer_account_number']
+                    ?? $remote['customerAccountNumber']
+                    ?? $remote['from_account']
+                    ?? $remote['fromAccount']
                     ?? null,
                 'from_name' => $remote['from_name'] ?? $remote['shipper_name'] ?? null,
                 'from_email' => $remote['from_email'] ?? $remote['shipper_email'] ?? $remote['customer_email'] ?? $remote['email'] ?? null,

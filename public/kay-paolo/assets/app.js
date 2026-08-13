@@ -1643,7 +1643,14 @@ document.addEventListener('DOMContentLoaded', () => {
       'rate',
       'service',
       'selected',
-      'selected_rate'
+      'selected_rate',
+      'delivery_info',
+      'delivery_details',
+      'shipment',
+      'shipping',
+      'data',
+      'shipping_data',
+      'shipment_data'
     ]);
     const query = new URLSearchParams(window.location.search);
     const queryTracking = query.get('id') || query.get('tracking_number') || query.get('tracking') || query.get('awb') || '';
@@ -1710,11 +1717,60 @@ document.addEventListener('DOMContentLoaded', () => {
       'delivery_by',
       'deliveryBy',
       'delivery_by_date',
-      'deliveryByDate'
+      'deliveryByDate',
+      'delivery_datetime',
+      'deliveryDateTime',
+      'estimatedDelivery',
+      'estimated_delivery',
+      'estimated_delivery_datetime',
+      'eta_datetime',
+      'etaDateTime',
+      'receive_date',
+      'receiveDate',
+      'received_date',
+      'receivedDate',
+      'available_date',
+      'availableDate'
     ])) || '';
     const deliveryDate = deliveryDateRaw
-      ? `by ${readableDate(deliveryDateRaw)}`
+      ? readableDate(deliveryDateRaw)
       : 'Pending';
+    const accountSources = documentFieldSources([storedUser(), payload, shipping, response, responseData], [
+      'account',
+      'customer',
+      'user',
+      'shipper',
+      'sender',
+      'billing',
+      'billing_account',
+      'account_data',
+      'account_details'
+    ]);
+    const accountNumber = firstDocumentFieldValue(documentFieldValues(accountSources, [
+      'account_number',
+      'accountNumber',
+      'account_no',
+      'accountNo',
+      'account_num',
+      'accountNum',
+      'customer_account',
+      'customerAccount',
+      'customer_account_number',
+      'customerAccountNumber',
+      'shipper_account',
+      'shipperAccount',
+      'from_account',
+      'fromAccount',
+      'user_account',
+      'userAccount',
+      'client_account',
+      'clientAccount',
+      'billing_account',
+      'billingAccount',
+      'acct',
+      'acct_no',
+      'acctNo'
+    ])) || '-';
     const paymentStatus = String(paymentType).toUpperCase().includes('COLLECT') || String(paymentType).toUpperCase().includes('DUE')
       ? 'Payment is Due'
       : String(paymentType).toUpperCase().includes('PAID')
@@ -1858,7 +1914,7 @@ document.addEventListener('DOMContentLoaded', () => {
         || '',
       documentNumber,
       tracking,
-      accountNumber: storedUser().account_number || shipping.account_number || payload.account_number || '-',
+      accountNumber,
       serviceSummary,
       deliveryDate,
       date: readableDate(response.created_at || responseData.created_at || shipping.created_at || new Date()),

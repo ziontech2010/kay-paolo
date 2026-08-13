@@ -312,7 +312,7 @@
                 <thead>
                     <tr>
                         <th style="width: 10%">No Pieces</th>
-                        <th style="width: 58%">Task Description</th>
+                        <th style="width: 58%">Package Description</th>
                         <th style="width: 10%; text-align: right">Weight</th>
                         <th style="width: 10%; text-align: right">Volume</th>
                         <th style="width: 12%; text-align: right">Dimension</th>

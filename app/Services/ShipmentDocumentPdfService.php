@@ -207,6 +207,9 @@ class ShipmentDocumentPdfService
             'delivery_details',
             'shipment',
             'shipping',
+            'data',
+            'shipping_data',
+            'shipment_data',
         ]);
 
         $invoice = $this->resolveInvoice($query);
@@ -450,6 +453,51 @@ class ShipmentDocumentPdfService
             'available_date',
             'availableDate',
         ])) ?: 'Pending';
+        $accountSources = $this->documentSources([
+            session('zion.user', []),
+            $payload,
+            $shipping,
+            $response,
+            $responseData,
+        ], [
+            'account',
+            'customer',
+            'user',
+            'shipper',
+            'sender',
+            'billing',
+            'billing_account',
+            'account_data',
+            'account_details',
+        ]);
+        $accountNumber = $this->firstNonEmptyString(array_merge([
+            session('zion.user.account_number'),
+            session('zion.user.accountNumber'),
+        ], $this->sourceValues($accountSources, [
+            'account_number',
+            'accountNumber',
+            'account_no',
+            'accountNo',
+            'account_num',
+            'accountNum',
+            'customer_account',
+            'customerAccount',
+            'customer_account_number',
+            'customerAccountNumber',
+            'shipper_account',
+            'shipperAccount',
+            'from_account',
+            'fromAccount',
+            'user_account',
+            'userAccount',
+            'client_account',
+            'clientAccount',
+            'billing_account',
+            'billingAccount',
+            'acct',
+            'acct_no',
+            'acctNo',
+        ]))) ?: '-';
 
         // Prefer shipper/consignee fields from shipping history when payload is empty.
         if ($shipperName === 'Kay Paolo Shipping' && !empty($shipping['shipper_name'])) {
@@ -514,10 +562,10 @@ class ShipmentDocumentPdfService
             'totalWeight' => $totalWeight,
             'items' => $items,
             'serviceSummary' => $serviceSummary !== '' ? $serviceSummary : 'Shipping Service',
-            'accountNumber' => (string) (session('zion.user.account_number') ?? $payload['account_number'] ?? $shipping['account_number'] ?? '-'),
+            'accountNumber' => $accountNumber,
             'createdAt' => $this->readableDate($created),
             'deliveryDate' => is_string($deliveryDate) && $deliveryDate !== 'Pending'
-                ? 'by '.$this->readableDate($deliveryDate)
+                ? $this->readableDate($deliveryDate)
                 : 'Pending',
             'paymentStatus' => str_contains(strtoupper($paymentType), 'COLLECT') || str_contains(strtoupper($paymentType), 'DUE')
                 ? 'Payment is Due'
@@ -639,6 +687,10 @@ class ShipmentDocumentPdfService
             'eta',
             'delivery_info',
             'delivery_details',
+            'data',
+            'account',
+            'customer',
+            'user',
         ]);
 
         return $this->firstPhoneString($this->sourceValues($sources, [
@@ -690,6 +742,18 @@ class ShipmentDocumentPdfService
                 'estimatedDelivery',
                 'estimated_delivery',
                 'eta_datetime',
+            ])) !== null
+            || $this->firstNonEmptyString($this->sourceValues($sources, [
+                'account_number',
+                'accountNumber',
+                'account_no',
+                'accountNo',
+                'customer_account',
+                'customerAccount',
+                'customer_account_number',
+                'customerAccountNumber',
+                'from_account',
+                'fromAccount',
             ])) !== null;
     }
 
