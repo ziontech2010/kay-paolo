@@ -9,7 +9,9 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Str;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class ZionApiProxyController extends Controller
@@ -238,7 +240,10 @@ class ZionApiProxyController extends Controller
             $retryResponse = $this->zion->postWeb('web-api/update-shipping-bocicot', $payload, $token);
 
             if (!$this->isRecoverableZionAccountNumberSchemaError($retryResponse)) {
-                $this->rememberShipmentContext($request, $retryResponse['data'] ?? [], $documentPayload);
+                $this->attachDocumentContextKey(
+                    $retryResponse,
+                    $this->rememberShipmentContext($request, $retryResponse['data'] ?? [], $documentPayload)
+                );
                 $this->attachShipmentEmailResult($request, $retryResponse, $documentPayload);
 
                 return $this->jsonResponse($retryResponse);
@@ -248,7 +253,10 @@ class ZionApiProxyController extends Controller
         }
 
         if ($response['ok'] ?? false) {
-            $this->rememberShipmentContext($request, $response['data'] ?? [], $documentPayload);
+            $this->attachDocumentContextKey(
+                $response,
+                $this->rememberShipmentContext($request, $response['data'] ?? [], $documentPayload)
+            );
             $this->attachShipmentEmailResult($request, $response, $documentPayload);
         }
 
@@ -261,30 +269,64 @@ class ZionApiProxyController extends Controller
             'response' => ['nullable', 'array'],
             'payload' => ['nullable', 'array'],
             'selected' => ['nullable', 'array'],
+            'context_key' => ['nullable', 'string', 'max:80'],
+            'document_context_key' => ['nullable', 'string', 'max:80'],
         ]);
 
-        if ($request->hasSession()) {
-            $request->session()->put('kay_paolo.last_shipment', [
-                'response' => $payload['response'] ?? [],
-                'payload' => $payload['payload'] ?? [],
-                'selected' => $payload['selected'] ?? [],
-            ]);
-        }
+        $contextKey = $this->storeShipmentContext(
+            $payload['response'] ?? [],
+            $payload['payload'] ?? [],
+            $payload['selected'] ?? [],
+            $payload['context_key'] ?? $payload['document_context_key'] ?? null
+        );
 
-        return response()->json(['status' => 'success']);
+        return response()->json(array_filter([
+            'status' => 'success',
+            'document_context_key' => $contextKey,
+        ]));
     }
 
-    private function rememberShipmentContext(Request $request, array $responseData, array $payload): void
+    private function rememberShipmentContext(Request $request, array $responseData, array $payload): ?string
     {
-        if (!$request->hasSession()) {
+        $contextKey = $this->storeShipmentContext($responseData, $payload, []);
+
+        if ($contextKey !== null && $request->hasSession()) {
+            $request->session()->put('kay_paolo.last_shipment_key', $contextKey);
+        }
+
+        return $contextKey;
+    }
+
+    private function storeShipmentContext(array $responseData, array $payload, array $selected = [], ?string $contextKey = null): ?string
+    {
+        $contextKey = $this->validShipmentContextKey($contextKey) ? (string) $contextKey : (string) Str::uuid();
+
+        try {
+            Cache::put($this->shipmentContextCacheKey($contextKey), [
+                'response' => $responseData,
+                'payload' => $payload,
+                'selected' => $selected,
+            ], now()->addHours(6));
+        } catch (\Throwable $exception) {
+            report($exception);
+
+            return null;
+        }
+
+        return $contextKey;
+    }
+
+    private function attachDocumentContextKey(array &$response, ?string $contextKey): void
+    {
+        if ($contextKey === null) {
             return;
         }
 
-        $request->session()->put('kay_paolo.last_shipment', [
-            'response' => $responseData,
-            'payload' => $payload,
-            'selected' => [],
-        ]);
+        if (!is_array($response['data'] ?? null)) {
+            $response['data'] = [];
+        }
+
+        $response['data']['document_context_key'] = $contextKey;
     }
 
     public function shippingHistory(Request $request): JsonResponse
@@ -550,7 +592,17 @@ class ZionApiProxyController extends Controller
 
     private function resolveShipmentContext(Request $request, array $query): array
     {
-        $sessionShipment = (array) session('kay_paolo.last_shipment', []);
+        $cachedShipment = $this->shipmentContextFromCache(
+            $query['context_key'] ?? $query['document_context_key'] ?? null
+        );
+
+        if ($cachedShipment === [] && $request->hasSession()) {
+            $cachedShipment = $this->shipmentContextFromCache(session('kay_paolo.last_shipment_key'));
+        }
+
+        $sessionShipment = $cachedShipment !== []
+            ? $cachedShipment
+            : (array) session('kay_paolo.last_shipment', []);
         $remote = $this->fetchShipmentRecord($request, $query);
 
         if (!$remote) {
@@ -644,6 +696,34 @@ class ZionApiProxyController extends Controller
                 'service' => $remote['selected_shipper'] ?? $remote['delivery_option'] ?? null,
             ], static fn ($value) => $value !== null && $value !== '')),
         ];
+    }
+
+    private function shipmentContextFromCache(mixed $contextKey): array
+    {
+        if (!$this->validShipmentContextKey($contextKey)) {
+            return [];
+        }
+
+        try {
+            $shipment = Cache::get($this->shipmentContextCacheKey((string) $contextKey), []);
+        } catch (\Throwable $exception) {
+            report($exception);
+
+            return [];
+        }
+
+        return is_array($shipment) ? $shipment : [];
+    }
+
+    private function validShipmentContextKey(mixed $contextKey): bool
+    {
+        return is_string($contextKey)
+            && preg_match('/^[A-Za-z0-9_-]{16,80}$/', $contextKey) === 1;
+    }
+
+    private function shipmentContextCacheKey(string $contextKey): string
+    {
+        return 'kay_paolo:shipment_context:'.$contextKey;
     }
 
     private function fetchShipmentRecord(Request $request, array $query): ?array

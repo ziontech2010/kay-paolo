@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 // use Illuminate\Foundation\Testing\RefreshDatabase;
 use App\Mail\ConfirmShipmentMail;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
@@ -940,6 +941,7 @@ class ExampleTest extends TestCase
         $invoice = '884433';
         @unlink(storage_path('app/public/receipts/receipt_'.$invoice.'.pdf'));
         @unlink(storage_path('app/public/label/label_'.$invoice.'.pdf'));
+        Cache::flush();
 
         Http::fake([
             '*/web-api/update-shipping-bocicot' => Http::response([
@@ -949,15 +951,8 @@ class ExampleTest extends TestCase
             ]),
         ]);
 
-        $this->withSession([
-            'zion.access_token' => 'fake-token',
-            'zion.user' => [
-                'account_number' => '9400',
-                'email' => 'sender@example.com',
-            ],
-        ])
-            ->withHeader('Authorization', 'Bearer fake-token')
-            ->postJson('/zion-api/shipping', [
+        $response = $this->withHeader('Authorization', 'Bearer fake-token')
+            ->postJson('/api/kay-paolo/shipping', [
                 'account_number' => '9400',
                 'from_account' => '9400',
                 'phone_or_account' => '9400',
@@ -996,8 +991,7 @@ class ExampleTest extends TestCase
             ])
             ->assertOk()
             ->assertJsonPath('status', 'success')
-            ->assertSessionHas('kay_paolo.last_shipment.payload.account_number', '9400')
-            ->assertSessionHas('kay_paolo.last_shipment.payload.deliveryEstimateDate', '2026-10-22');
+            ->assertJsonStructure(['document_context_key']);
 
         Http::assertSent(function (\Illuminate\Http\Client\Request $request) {
             $data = $request->data();
@@ -1009,7 +1003,13 @@ class ExampleTest extends TestCase
                 && ($data['deliveryEstimateDate'] ?? null) === '2026-10-22';
         });
 
-        $shipment = session('kay_paolo.last_shipment');
+        $contextKey = $response->json('document_context_key');
+        $this->assertNotEmpty($contextKey);
+
+        $shipment = Cache::get('kay_paolo:shipment_context:'.$contextKey);
+        $this->assertSame('9400', $shipment['payload']['account_number'] ?? null);
+        $this->assertSame('2026-10-22', $shipment['payload']['deliveryEstimateDate'] ?? null);
+
         $service = app(\App\Services\ShipmentDocumentPdfService::class);
         $reflection = new \ReflectionClass($service);
         $method = $reflection->getMethod('documentPayload');

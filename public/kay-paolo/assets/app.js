@@ -1425,11 +1425,20 @@ document.addEventListener('DOMContentLoaded', () => {
 
   async function syncShipmentDocumentContext(shipment) {
     try {
-      await postJson(route('storeShipmentDocumentContext', '/api/kay-paolo/store-shipment-document-context'), {
+      const saved = await postJson(route('storeShipmentDocumentContext', '/api/kay-paolo/store-shipment-document-context'), {
         response: shipment.response || {},
         payload: shipment.payload || {},
-        selected: shipment.selected || {}
+        selected: shipment.selected || {},
+        context_key: shipment.response?.document_context_key
+          || shipment.response?.data?.document_context_key
+          || shipment.payload?.document_context_key
+          || shipment.payload?.context_key
       }, { token: storedToken() });
+
+      if (saved?.document_context_key && shipment.response) {
+        shipment.response.document_context_key = saved.document_context_key;
+        window.localStorage.setItem(shipmentResponseKey, JSON.stringify(shipment));
+      }
     } catch (error) {}
   }
 
@@ -1441,6 +1450,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (data.shipmentId) params.set('shipment_id', data.shipmentId);
     if (data.documentNumber && data.documentNumber !== 'Pending') params.set('invoice', data.documentNumber);
     if (shipmentNo && shipmentNo !== 'Pending') params.set('id', shipmentNo);
+    if (data.documentContextKey) params.set('context_key', data.documentContextKey);
     link.href = params.toString() ? `${baseUrl}?${params}` : baseUrl;
   }
 
@@ -1938,6 +1948,7 @@ document.addEventListener('DOMContentLoaded', () => {
       accountNumber,
       serviceSummary,
       deliveryDate,
+      documentContextKey: response.document_context_key || responseData.document_context_key || payload.document_context_key || payload.context_key || '',
       date: readableDate(response.created_at || responseData.created_at || shipping.created_at || new Date()),
       status: response.status_name || response.status || response.message || responseData.status || shipping.status || 'Booked',
       paymentType,
@@ -3172,6 +3183,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (data.shipmentId) query.set('shipment_id', data.shipmentId);
     if (data.documentNumber && data.documentNumber !== 'Pending') query.set('invoice', data.documentNumber);
     if (shipmentNo && shipmentNo !== 'Pending') query.set('id', shipmentNo);
+    if (data.documentContextKey) query.set('context_key', data.documentContextKey);
     const queryString = query.toString();
     const labelUrl = `${route('shipmentLabel', '/shipment-label')}${queryString ? `?${queryString}` : ''}`;
     const receiptUrl = `${route('shipmentReceipt', '/shipment-receipt')}${queryString ? `?${queryString}` : ''}`;
