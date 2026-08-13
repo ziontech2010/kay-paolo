@@ -586,6 +586,7 @@ class ExampleTest extends TestCase
     public function test_email_shipment_primes_public_document_pdfs(): void
     {
         Mail::fake();
+        $this->configureShipmentConfirmationMailer();
 
         $invoice = '884422';
         $labelPath = storage_path('app/public/label/label_'.$invoice.'.pdf');
@@ -609,7 +610,8 @@ class ExampleTest extends TestCase
                 'consignee_contact' => '5095551212',
             ])
             ->assertOk()
-            ->assertJsonPath('status', 'success');
+            ->assertJsonPath('status', 'success')
+            ->assertJsonPath('mailer', 'zeptomail');
 
         Mail::assertSent(ConfirmShipmentMail::class);
         $this->assertFileExists($labelPath);
@@ -619,6 +621,57 @@ class ExampleTest extends TestCase
 
         @unlink($labelPath);
         @unlink($receiptPath);
+    }
+
+    public function test_email_shipment_reports_missing_delivery_mailer(): void
+    {
+        Mail::fake();
+        config([
+            'mail.default' => 'log',
+            'services.zeptomail.token' => null,
+        ]);
+
+        $this->withHeader('Authorization', 'Bearer test-token')
+            ->postJson('/api/kay-paolo/email-shipment', [
+                'email' => 'customer@example.com',
+                'invoice' => '884423',
+                'tracking_number' => 'HTB884423-1/1',
+            ])
+            ->assertStatus(502)
+            ->assertJsonPath('status', 'error')
+            ->assertJsonPath('message', 'Shipment confirmation email is not configured for delivery.');
+
+        Mail::assertNothingSent();
+    }
+
+    public function test_zeptomail_transport_posts_confirmation_email_to_provider(): void
+    {
+        config([
+            'mail.from.address' => 'info@kaypaoloshipping.com',
+            'mail.from.name' => 'Kay Paolo Shipping',
+            'services.zeptomail.host' => 'api.zeptomail.com',
+            'services.zeptomail.token' => 'test-token',
+        ]);
+
+        Http::fake([
+            'https://api.zeptomail.com/v1.1/email' => Http::response(['request_id' => 'req-123']),
+        ]);
+
+        Mail::mailer('zeptomail')->to('customer@example.com')->send(new ConfirmShipmentMail([
+            'shipmentNumber' => 'HTB101187-1/5',
+            'trackingNumber' => 'HTB101187-1/5',
+            'recipientName' => 'Therlande Louis Jean',
+        ]));
+
+        Http::assertSent(function (\Illuminate\Http\Client\Request $request) {
+            $data = $request->data();
+
+            return $request->url() === 'https://api.zeptomail.com/v1.1/email'
+                && ($data['from']['address'] ?? null) === 'info@kaypaoloshipping.com'
+                && ($data['to'][0]['email_address']['address'] ?? null) === 'customer@example.com'
+                && str_contains((string) ($data['subject'] ?? ''), 'HTB101187-1/5')
+                && str_contains((string) ($data['htmlbody'] ?? ''), 'Therlande Louis Jean');
+        });
     }
 
     public function test_receipt_pdf_includes_package_details_from_shipment_history(): void
@@ -806,6 +859,7 @@ class ExampleTest extends TestCase
     public function test_shipping_proxy_sanitizes_bocicot_payload_for_multiple_packages(): void
     {
         Mail::fake();
+        $this->configureShipmentConfirmationMailer();
 
         Http::fake([
             '*/web-api/update-shipping-bocicot' => Http::response(['status' => 'success']),
@@ -849,7 +903,8 @@ class ExampleTest extends TestCase
                 'include_in_receipt' => 1,
             ])
             ->assertOk()
-            ->assertJson(['status' => 'success']);
+            ->assertJson(['status' => 'success'])
+            ->assertJsonPath('confirmation_email.mailer', 'zeptomail');
 
         Http::assertSent(function (\Illuminate\Http\Client\Request $request) {
             $data = $request->data();
@@ -875,6 +930,7 @@ class ExampleTest extends TestCase
     public function test_shipping_creation_sends_confirmation_to_customer_email_alias(): void
     {
         Mail::fake();
+        $this->configureShipmentConfirmationMailer();
 
         Http::fake([
             '*/web-api/update-shipping-bocicot' => Http::response([
@@ -919,7 +975,8 @@ class ExampleTest extends TestCase
             ])
             ->assertOk()
             ->assertJsonPath('confirmation_email.status', 'success')
-            ->assertJsonPath('confirmation_email.email', 'customer@example.com');
+            ->assertJsonPath('confirmation_email.email', 'customer@example.com')
+            ->assertJsonPath('confirmation_email.mailer', 'zeptomail');
 
         Http::assertSent(function (\Illuminate\Http\Client\Request $request) {
             return str_contains($request->url(), '/web-api/update-shipping-bocicot')
@@ -940,6 +997,7 @@ class ExampleTest extends TestCase
     public function test_create_shipment_document_context_keeps_delivery_date_and_account_number(): void
     {
         Mail::fake();
+        $this->configureShipmentConfirmationMailer();
 
         $invoice = '884433';
         @unlink(storage_path('app/public/receipts/receipt_'.$invoice.'.pdf'));
@@ -994,7 +1052,8 @@ class ExampleTest extends TestCase
             ])
             ->assertOk()
             ->assertJsonPath('status', 'success')
-            ->assertJsonStructure(['document_context_key']);
+            ->assertJsonStructure(['document_context_key'])
+            ->assertJsonPath('confirmation_email.mailer', 'zeptomail');
 
         Http::assertSent(function (\Illuminate\Http\Client\Request $request) {
             $data = $request->data();
@@ -1124,5 +1183,10 @@ class ExampleTest extends TestCase
                 ->assertDontSee('receiptSummary', false)
                 ->assertDontSee('invoicePayload', false);
         }
+    }
+
+    private function configureShipmentConfirmationMailer(): void
+    {
+        config(['services.zeptomail.token' => 'test-zeptomail-token']);
     }
 }

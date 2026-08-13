@@ -405,6 +405,14 @@ class ZionApiProxyController extends Controller
             'id' => $validated['tracking_number'] ?? $validated['shipment_number'] ?? $validated['id'] ?? null,
         ], static fn ($value) => $value !== null && $value !== '');
 
+        $mailer = $this->shipmentConfirmationMailerName();
+        if ($mailer === null) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Shipment confirmation email is not configured for delivery.',
+            ], 502);
+        }
+
         $this->primeShipmentDocuments($query, [
             'response' => [
                 'shipment_id' => $validated['shipment_id'] ?? $validated['shipping_id'] ?? null,
@@ -431,7 +439,7 @@ class ZionApiProxyController extends Controller
         ]);
 
         try {
-            Mail::to($validated['email'])->send(new ConfirmShipmentMail([
+            Mail::mailer($mailer)->to($validated['email'])->send(new ConfirmShipmentMail([
                 'recipientName' => $validated['recipient_name'] ?? null,
                 'shipmentNumber' => (string) $shipmentNumber,
                 'trackingNumber' => (string) ($validated['tracking_number'] ?? $shipmentNumber),
@@ -465,6 +473,7 @@ class ZionApiProxyController extends Controller
             'message' => 'Shipment confirmation email sent.',
             'email' => $validated['email'],
             'shipment_number' => $shipmentNumber,
+            'mailer' => $mailer,
         ]);
     }
 
@@ -1273,6 +1282,15 @@ class ZionApiProxyController extends Controller
             'selected' => [],
         ]);
 
+        $mailer = $this->shipmentConfirmationMailerName();
+        if ($mailer === null) {
+            return [
+                'status' => 'error',
+                'email' => $email,
+                'message' => 'Shipment confirmation email is not configured for delivery.',
+            ];
+        }
+
         try {
             $shipperEmail = $this->firstEmail([
                 $payload['from_email'] ?? null,
@@ -1288,7 +1306,7 @@ class ZionApiProxyController extends Controller
                 $email,
             ]);
 
-            Mail::to($email)->send(new ConfirmShipmentMail([
+            Mail::mailer($mailer)->to($email)->send(new ConfirmShipmentMail([
                 'recipientName' => $payload['from_name'] ?? session('zion.user.name') ?? null,
                 'shipmentNumber' => $shipmentNumber,
                 'trackingNumber' => $shipmentNumber,
@@ -1328,7 +1346,25 @@ class ZionApiProxyController extends Controller
         return [
             'status' => 'success',
             'email' => $email,
+            'mailer' => $mailer,
         ];
+    }
+
+    private function shipmentConfirmationMailerName(): ?string
+    {
+        $zeptoToken = trim((string) config('services.zeptomail.token'));
+        if ($zeptoToken !== '') {
+            return 'zeptomail';
+        }
+
+        $defaultMailer = trim((string) config('mail.default', 'log'));
+        $normalizedMailer = strtolower($defaultMailer);
+
+        if ($defaultMailer === '' || in_array($normalizedMailer, ['log', 'array', 'zeptomail'], true)) {
+            return null;
+        }
+
+        return $defaultMailer;
     }
 
     private function primeShipmentDocuments(array $query, array $shipment): void
