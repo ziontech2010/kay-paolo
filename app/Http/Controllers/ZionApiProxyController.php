@@ -66,8 +66,8 @@ class ZionApiProxyController extends Controller
     public function fetchUserForQuote(Request $request): JsonResponse
     {
         return $this->forwardAuthenticatedWithFallback([
-            ['endpoint' => 'bocicot/fetch-user-for-quote'],
             ['endpoint' => 'web-api/fetch-user-for-quote-bocicot', 'web' => true],
+            ['endpoint' => 'bocicot/fetch-user-for-quote'],
             ['endpoint' => 'kay-paolo/fetch-user-for-quote'],
         ], $request);
     }
@@ -686,7 +686,7 @@ class ZionApiProxyController extends Controller
                 ? $this->zion->postWeb($endpoint, $payload, $token)
                 : $this->zion->post($endpoint, $payload, $token);
 
-            if ($lastResponse['ok']) {
+            if ($lastResponse['ok'] && !$this->shouldTryFallback($lastResponse)) {
                 return $lastResponse;
             }
 
@@ -1247,12 +1247,18 @@ class ZionApiProxyController extends Controller
     private function shouldTryFallback(array $response): bool
     {
         $status = (int) ($response['status'] ?? 0);
-        $message = strtolower((string) ($response['data']['message'] ?? ''));
+        $data = is_array($response['data'] ?? null) ? $response['data'] : [];
+        $message = strtolower((string) ($data['message'] ?? ''));
+        $error = strtolower((string) ($data['error'] ?? ''));
+        $appLocked = strtolower((string) ($data['app_locked'] ?? ''));
 
         return $status === 0
             || in_array($status, [404, 405], true)
             || $status >= 500
-            || str_contains($message, 'session store not set');
+            || str_contains($message, 'session store not set')
+            || str_contains($message, 'app is locked')
+            || ($error === 'true' && $appLocked === 'true')
+            || isset($data['html']);
     }
 
     private function normalizeCountries(array $payload): array

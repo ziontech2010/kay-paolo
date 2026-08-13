@@ -427,6 +427,72 @@ class ExampleTest extends TestCase
             ->assertJsonPath('options.0.value', 'COLLECT');
     }
 
+    public function test_fetch_user_for_quote_prefers_bocicot_web_endpoint(): void
+    {
+        Http::fake([
+            '*/web-api/fetch-user-for-quote-bocicot' => Http::response([
+                'status' => 'success',
+                'customer' => [
+                    'id' => 7020,
+                    'account_number' => '9400',
+                ],
+            ]),
+            '*/api/bocicot/fetch-user-for-quote' => Http::response([
+                'status' => 200,
+                'error' => 'true',
+                'message' => 'Your App is Locked!',
+                'app_locked' => 'true',
+            ]),
+        ]);
+
+        $this->withHeader('Authorization', 'Bearer fake-token')
+            ->postJson('/api/kay-paolo/fetch-user-for-quote', [
+                'phone_or_account' => '9400',
+                'customer' => '9400',
+            ])
+            ->assertOk()
+            ->assertJsonPath('customer.account_number', '9400');
+
+        Http::assertSent(function ($request) {
+            return str_contains($request->url(), '/web-api/fetch-user-for-quote-bocicot');
+        });
+
+        Http::assertNotSent(function ($request) {
+            return str_contains($request->url(), '/api/bocicot/fetch-user-for-quote');
+        });
+    }
+
+    public function test_fetch_user_for_quote_skips_locked_upstream_response(): void
+    {
+        Http::fake([
+            '*/web-api/fetch-user-for-quote-bocicot' => Http::response([
+                'message' => 'Session store not set on request.',
+            ], 500),
+            '*/api/bocicot/fetch-user-for-quote' => Http::response([
+                'status' => 200,
+                'error' => 'true',
+                'message' => 'Your App is Locked!',
+                'app_locked' => 'true',
+            ]),
+            '*/api/kay-paolo/fetch-user-for-quote' => Http::response([
+                'status' => 'success',
+                'customer' => [
+                    'id' => 7020,
+                    'account_number' => '9400',
+                ],
+            ]),
+        ]);
+
+        $this->withHeader('Authorization', 'Bearer fake-token')
+            ->postJson('/api/kay-paolo/fetch-user-for-quote', [
+                'phone_or_account' => '9400',
+                'customer' => '9400',
+            ])
+            ->assertOk()
+            ->assertJsonPath('status', 'success')
+            ->assertJsonPath('customer.account_number', '9400');
+    }
+
     public function test_flat_rates_proxy_falls_back_when_bocicot_returns_server_error(): void
     {
         Http::fake([
