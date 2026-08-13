@@ -589,8 +589,11 @@ class ShipmentDocumentPdfService
             'accountNumber' => $accountNumber,
             'createdAt' => $this->readableDate($created),
             'deliveryDate' => is_string($deliveryDate) && $deliveryDate !== 'Pending'
-                ? $this->readableDate($deliveryDate)
+                ? $this->readableDateOnly($deliveryDate)
                 : 'Pending',
+            'labelDeliveryDate' => is_string($deliveryDate) && $deliveryDate !== 'Pending'
+                ? $this->labelDate($deliveryDate)
+                : '',
             'paymentStatus' => str_contains(strtoupper($paymentType), 'COLLECT') || str_contains(strtoupper($paymentType), 'DUE')
                 ? 'Payment is Due'
                 : (str_contains(strtoupper($paymentType), 'PAID') ? 'Paid' : $paymentType),
@@ -983,12 +986,27 @@ class ShipmentDocumentPdfService
 
     private function readableDate(mixed $value): string
     {
+        return $this->formatDate($value, 'M d, Y h:i a');
+    }
+
+    private function readableDateOnly(mixed $value): string
+    {
+        return $this->formatDate($value, 'M d, Y');
+    }
+
+    private function labelDate(mixed $value): string
+    {
+        return strtoupper($this->formatDate($value, 'M d'));
+    }
+
+    private function formatDate(mixed $value, string $format): string
+    {
         if (! $value instanceof \DateTimeInterface) {
             $value = trim(preg_replace('/^(delivery\s*date:|arrives\s+on|by)\s*/i', '', (string) $value) ?? '');
         }
 
         try {
-            return \Illuminate\Support\Carbon::parse($value)->format('M d, Y h:i a');
+            return \Illuminate\Support\Carbon::parse($value)->format($format);
         } catch (\Throwable) {
             return (string) $value;
         }

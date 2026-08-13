@@ -151,7 +151,10 @@
                         <img class="scan-barcode" src="{{ $scanBarcodeUri ?? $barcodeUri }}" alt="scan barcode">
                     @endif
                     @php
-                        $scanDate = trim(preg_replace('/^(delivery\s*date:|arrives\s+on|by)\s*/i', '', (string) $deliveryDate));
+                        $scanDate = trim((string) ($labelDeliveryDate ?? ''));
+                        if ($scanDate === '') {
+                            $scanDate = trim(preg_replace('/^(delivery\s*date:|arrives\s+on|by)\s*/i', '', (string) $deliveryDate));
+                        }
                     @endphp
                     @if ($scanDate !== '' && strcasecmp($scanDate, 'Pending') !== 0)
                         <div class="scan-date">{{ $scanDate }}</div>

@@ -697,7 +697,8 @@ class ExampleTest extends TestCase
         $this->assertSame('3051234567', $documentPayload['shipperPhone']);
         $this->assertSame('5099876543', $documentPayload['consigneePhone']);
         $this->assertSame('ACCT-479029', $documentPayload['accountNumber']);
-        $this->assertStringContainsString('Aug 24, 2026', $documentPayload['deliveryDate']);
+        $this->assertSame('Aug 24, 2026', $documentPayload['deliveryDate']);
+        $this->assertSame('AUG 24', $documentPayload['labelDeliveryDate']);
 
         $this->withSession(['zion.access_token' => 'test-token'])
             ->get('/shipment-label?invoice=479029&id=HTS479029-1%2F1')
@@ -708,7 +709,9 @@ class ExampleTest extends TestCase
         $labelPdf = (string) file_get_contents($labelPath);
         $this->assertStringStartsWith('%PDF', $labelPdf);
         $labelHtml = view('documents.pdf.label', $documentPayload)->render();
-        $this->assertStringContainsString('Aug 24, 2026', $labelHtml);
+        $this->assertStringContainsString('AUG 24', $labelHtml);
+        $this->assertStringNotContainsString('Aug 24, 2026', $labelHtml);
+        $this->assertStringNotContainsString('11:59', $labelHtml);
         $this->assertStringNotContainsString('Delivery Date:', $labelHtml);
         $this->assertStringNotContainsString($documentPayload['barcodeValue'].' | ', $labelHtml);
         $this->assertStringNotContainsString('Invoice 479029', $labelHtml);
@@ -960,7 +963,7 @@ class ExampleTest extends TestCase
                 'quote_id' => 24745,
                 'partner' => 'zion_products',
                 'selected_shipper' => 'Regular Air',
-                'deliveryEstimateDate' => '2026-10-22',
+                'deliveryEstimateDate' => '2026-10-22 00:00:00',
                 'from_name' => 'Kay Sender',
                 'from_email' => 'sender@example.com',
                 'from_phone' => '3055551212',
@@ -1000,7 +1003,7 @@ class ExampleTest extends TestCase
                 && ! array_key_exists('account_number', $data)
                 && ! array_key_exists('from_account', $data)
                 && ! array_key_exists('phone_or_account', $data)
-                && ($data['deliveryEstimateDate'] ?? null) === '2026-10-22';
+                && ($data['deliveryEstimateDate'] ?? null) === '2026-10-22 00:00:00';
         });
 
         $contextKey = $response->json('document_context_key');
@@ -1008,7 +1011,7 @@ class ExampleTest extends TestCase
 
         $shipment = Cache::get('kay_paolo:shipment_context:'.$contextKey);
         $this->assertSame('9400', $shipment['payload']['account_number'] ?? null);
-        $this->assertSame('2026-10-22', $shipment['payload']['deliveryEstimateDate'] ?? null);
+        $this->assertSame('2026-10-22 00:00:00', $shipment['payload']['deliveryEstimateDate'] ?? null);
 
         $service = app(\App\Services\ShipmentDocumentPdfService::class);
         $reflection = new \ReflectionClass($service);
@@ -1020,10 +1023,13 @@ class ExampleTest extends TestCase
         ], $shipment);
 
         $this->assertSame('9400', $documentPayload['accountNumber']);
-        $this->assertStringContainsString('Oct 22, 2026', $documentPayload['deliveryDate']);
+        $this->assertSame('Oct 22, 2026', $documentPayload['deliveryDate']);
+        $this->assertSame('OCT 22', $documentPayload['labelDeliveryDate']);
 
         $labelHtml = view('documents.pdf.label', $documentPayload)->render();
-        $this->assertStringContainsString('Oct 22, 2026', $labelHtml);
+        $this->assertStringContainsString('OCT 22', $labelHtml);
+        $this->assertStringNotContainsString('Oct 22, 2026', $labelHtml);
+        $this->assertStringNotContainsString('12:00', $labelHtml);
         $this->assertStringNotContainsString('Delivery Date:', $labelHtml);
         $this->assertStringNotContainsString($documentPayload['barcodeValue'].' | ', $labelHtml);
 
