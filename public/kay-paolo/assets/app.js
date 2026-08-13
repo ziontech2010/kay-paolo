@@ -1316,8 +1316,9 @@ document.addEventListener('DOMContentLoaded', () => {
         const mergedPayload = await ensureConsigneeForShipment(mergeShipmentFormPayload(pending.payload || {}));
         const payload = buildBocicotShipmentPayload(mergedPayload);
         const response = await postJson(route('shipping', '/api/kay-paolo/shipping'), payload);
-        window.localStorage.setItem(shipmentResponseKey, JSON.stringify({ response, payload, selected: pending.card || {} }));
-        await queueShipmentEmailNotifications(response, payload, pending.card || {});
+        const documentPayload = { ...mergedPayload, ...payload };
+        window.localStorage.setItem(shipmentResponseKey, JSON.stringify({ response, payload: documentPayload, selected: pending.card || {} }));
+        await queueShipmentEmailNotifications(response, documentPayload, pending.card || {});
         window.location.href = route('shipmentConfirmation', '/shipment-confirmation');
       } catch (error) {
         showError(result, error.message);
@@ -1694,7 +1695,7 @@ document.addEventListener('DOMContentLoaded', () => {
       || shipping.selected_shipper
       || 'Shipping Service';
     const serviceSummary = [deliveryOption, deliveryLocation].filter(Boolean).join(' | ') || 'Shipping Service';
-    const deliveryDateRaw = firstDocumentFieldValue(documentFieldValues(deliverySources, [
+    const deliveryDateRaw = firstUsefulDocumentFieldValue(documentFieldValues(deliverySources, [
       'deliveryEstimateDate',
       'delivery_estimate_date',
       'deliveryDate',
@@ -1716,15 +1717,26 @@ document.addEventListener('DOMContentLoaded', () => {
       'etaDate',
       'delivery_by',
       'deliveryBy',
+      'delivered_by',
+      'deliveredBy',
+      'delivery_time',
+      'deliveryTime',
+      'deliver_by',
+      'deliverBy',
       'delivery_by_date',
       'deliveryByDate',
       'delivery_datetime',
       'deliveryDateTime',
       'estimatedDelivery',
       'estimated_delivery',
+      'expectedDelivery',
+      'expected_delivery',
       'estimated_delivery_datetime',
       'eta_datetime',
       'etaDateTime',
+      'commitment',
+      'transit_time',
+      'transitTime',
       'receive_date',
       'receiveDate',
       'received_date',
@@ -1746,7 +1758,7 @@ document.addEventListener('DOMContentLoaded', () => {
       'account_data',
       'account_details'
     ]);
-    const accountNumber = firstDocumentFieldValue(documentFieldValues(accountSources, [
+    const accountNumber = firstUsefulDocumentFieldValue(documentFieldValues(accountSources, [
       'account_number',
       'accountNumber',
       'account_no',
@@ -1761,6 +1773,9 @@ document.addEventListener('DOMContentLoaded', () => {
       'shipperAccount',
       'from_account',
       'fromAccount',
+      'phone_or_account',
+      'phoneOrAccount',
+      'lookup',
       'user_account',
       'userAccount',
       'client_account',
@@ -1769,7 +1784,13 @@ document.addEventListener('DOMContentLoaded', () => {
       'billingAccount',
       'acct',
       'acct_no',
-      'acctNo'
+      'acctNo',
+      'customer_id',
+      'customerId',
+      'quote_user_id',
+      'quoteUserId',
+      'user_id',
+      'userId'
     ])) || '-';
     const paymentStatus = String(paymentType).toUpperCase().includes('COLLECT') || String(paymentType).toUpperCase().includes('DUE')
       ? 'Payment is Due'
@@ -2035,8 +2056,11 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function readableDate(dateValue) {
-    const date = dateValue instanceof Date ? dateValue : new Date(dateValue);
-    if (Number.isNaN(date.getTime())) return String(dateValue || '');
+    const normalized = dateValue instanceof Date
+      ? dateValue
+      : String(dateValue || '').replace(/^(delivery\s*date:|arrives\s+on|by)\s*/i, '').trim();
+    const date = normalized instanceof Date ? normalized : new Date(normalized);
+    if (Number.isNaN(date.getTime())) return String(normalized || '');
 
     return date.toLocaleDateString(undefined, {
       year: 'numeric',
@@ -2991,6 +3015,8 @@ document.addEventListener('DOMContentLoaded', () => {
       from_name: payload.from_name || undefined,
       from_email: payload.from_email || undefined,
       from_phone: payload.from_phone || undefined,
+      from_account: payload.from_account || payload.account_number || payload.phone_or_account || undefined,
+      account_number: payload.account_number || payload.from_account || payload.phone_or_account || undefined,
       from_country_name: payload.from_country_name || undefined,
       from_country: payload.from_country || countryCode(payload.from_country_name),
       from_address: payload.from_address || undefined,
@@ -3252,6 +3278,18 @@ document.addEventListener('DOMContentLoaded', () => {
       if (item === undefined || item === null || typeof item === 'object') continue;
       const value = String(item).trim();
       if (value) return value;
+    }
+
+    return '';
+  }
+
+  function firstUsefulDocumentFieldValue(values) {
+    for (const item of values) {
+      if (item === undefined || item === null || typeof item === 'object') continue;
+      const value = String(item).trim();
+      if (!value) continue;
+      if (['pending', '-', 'n/a', 'na', 'none', 'null'].includes(value.toLowerCase())) continue;
+      return value;
     }
 
     return '';
@@ -3628,9 +3666,24 @@ document.addEventListener('DOMContentLoaded', () => {
       'eta',
       'deliveryEstimateDate',
       'delivery_estimate_date',
+      'deliveryDate',
+      'delivery_date',
       'expected_arrival_date',
+      'expectedArrivalDate',
+      'expected_delivery_date',
+      'expectedDeliveryDate',
       'estimated_delivery_date',
-      'commitment'
+      'estimatedDeliveryDate',
+      'arrivesOn',
+      'delivery_by_date',
+      'deliveryByDate',
+      'delivered_by',
+      'deliveredBy',
+      'delivery_time',
+      'deliveryTime',
+      'commitment',
+      'transit_time',
+      'transitTime'
     ]) || '';
   }
 

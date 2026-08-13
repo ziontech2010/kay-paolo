@@ -227,7 +227,7 @@ class ZionApiProxyController extends Controller
 
         $rawPayload = $request->except('_token');
         $payload = $this->sanitizeShipmentPayload($rawPayload);
-        $emailPayload = array_merge($rawPayload, $payload);
+        $documentPayload = array_merge($rawPayload, $payload);
         $response = $this->postWithFallback([
             ['endpoint' => 'web-api/update-shipping-bocicot', 'web' => true],
             ['endpoint' => 'bocicot/update-shipping'],
@@ -238,8 +238,8 @@ class ZionApiProxyController extends Controller
             $retryResponse = $this->zion->postWeb('web-api/update-shipping-bocicot', $payload, $token);
 
             if (!$this->isRecoverableZionAccountNumberSchemaError($retryResponse)) {
-                $this->rememberShipmentContext($request, $retryResponse['data'] ?? [], $payload);
-                $this->attachShipmentEmailResult($request, $retryResponse, $emailPayload);
+                $this->rememberShipmentContext($request, $retryResponse['data'] ?? [], $documentPayload);
+                $this->attachShipmentEmailResult($request, $retryResponse, $documentPayload);
 
                 return $this->jsonResponse($retryResponse);
             }
@@ -248,8 +248,8 @@ class ZionApiProxyController extends Controller
         }
 
         if ($response['ok'] ?? false) {
-            $this->rememberShipmentContext($request, $response['data'] ?? [], $payload);
-            $this->attachShipmentEmailResult($request, $response, $emailPayload);
+            $this->rememberShipmentContext($request, $response['data'] ?? [], $documentPayload);
+            $this->attachShipmentEmailResult($request, $response, $documentPayload);
         }
 
         return $this->jsonResponse($response);
@@ -559,6 +559,7 @@ class ZionApiProxyController extends Controller
 
         $sessionPayload = is_array($sessionShipment['payload'] ?? null) ? $sessionShipment['payload'] : [];
         $sessionSelected = is_array($sessionShipment['selected'] ?? null) ? $sessionShipment['selected'] : [];
+        $remotePayload = array_filter($remote, static fn ($value) => $value !== null && $value !== '' && $value !== []);
 
         $remotePackages = $remote['packages'] ?? $remote['package'] ?? null;
         if (is_string($remotePackages)) {
@@ -573,7 +574,7 @@ class ZionApiProxyController extends Controller
 
         return [
             'response' => $remote,
-            'payload' => array_merge($sessionPayload, $remote, array_filter([
+            'payload' => array_merge($sessionPayload, $remotePayload, array_filter([
                 'package_description' => $remote['package_description'] ?? $remote['description'] ?? null,
                 'package_count' => $remote['package_count'] ?? null,
                 'dimensions' => is_array($remoteDimensions) && $remoteDimensions !== [] ? $remoteDimensions : null,
@@ -591,6 +592,10 @@ class ZionApiProxyController extends Controller
                     ?? $remote['estimated_arrival_date']
                     ?? $remote['eta']
                     ?? $remote['arrives_on']
+                    ?? $remote['delivered_by']
+                    ?? $remote['delivery_time']
+                    ?? $remote['commitment']
+                    ?? $remote['transit_time']
                     ?? null,
                 'account_number' => $remote['account_number']
                     ?? $remote['accountNumber']
@@ -602,6 +607,12 @@ class ZionApiProxyController extends Controller
                     ?? $remote['customerAccountNumber']
                     ?? $remote['from_account']
                     ?? $remote['fromAccount']
+                    ?? $remote['phone_or_account']
+                    ?? $remote['phoneOrAccount']
+                    ?? $remote['customer_id']
+                    ?? $remote['customerId']
+                    ?? $remote['quote_user_id']
+                    ?? $remote['quoteUserId']
                     ?? null,
                 'from_name' => $remote['from_name'] ?? $remote['shipper_name'] ?? null,
                 'from_email' => $remote['from_email'] ?? $remote['shipper_email'] ?? $remote['customer_email'] ?? $remote['email'] ?? null,
@@ -629,7 +640,7 @@ class ZionApiProxyController extends Controller
                 'total' => $remote['grand_total'] ?? $remote['final_total'] ?? $remote['total'] ?? null,
                 'insurance' => $remote['insurance'] ?? null,
                 'home_delivery' => $remote['home_delivery'] ?? $remote['home_delivery_fee'] ?? $remote['delivery_fee'] ?? $remote['delivery'] ?? null,
-                'eta' => $remote['deliveryEstimateDate'] ?? $remote['delivery_estimate_date'] ?? $remote['delivery_date'] ?? $remote['expected_arrival_date'] ?? $remote['estimated_delivery_date'] ?? $remote['eta'] ?? $remote['arrives_on'] ?? null,
+                'eta' => $remote['deliveryEstimateDate'] ?? $remote['delivery_estimate_date'] ?? $remote['delivery_date'] ?? $remote['expected_arrival_date'] ?? $remote['estimated_delivery_date'] ?? $remote['eta'] ?? $remote['arrives_on'] ?? $remote['delivered_by'] ?? $remote['delivery_time'] ?? $remote['commitment'] ?? $remote['transit_time'] ?? null,
                 'service' => $remote['selected_shipper'] ?? $remote['delivery_option'] ?? null,
             ], static fn ($value) => $value !== null && $value !== '')),
         ];

@@ -193,15 +193,15 @@
             countries: @json(route('api.kay-paolo.countries')),
             paymentOptions: @json(route('api.kay-paolo.payment-options')),
             quote: @json(route('api.kay-paolo.quote')),
-            shipping: @json(route('api.kay-paolo.shipping')),
-            storeShipmentDocumentContext: @json(route('api.kay-paolo.store-shipment-document-context')),
+            shipping: @json(route('zion-api.shipping')),
+            storeShipmentDocumentContext: @json(route('zion-api.store-shipment-document-context')),
             tracking: @json(route('api.kay-paolo.validate-tracking')),
             fetchUserForQuote: @json(route('api.kay-paolo.fetch-user-for-quote')),
             consigneeList: @json(route('api.kay-paolo.consignee-list')),
             flatRates: @json(route('api.kay-paolo.flat-rates')),
             saveConsignee: @json(route('api.kay-paolo.save-consignee')),
             shippingHistory: @json(route('api.kay-paolo.shipping-history')),
-            emailShipment: @json(route('api.kay-paolo.email-shipment')),
+            emailShipment: @json(route('zion-api.email-shipment')),
             voidShipment: @json(route('api.kay-paolo.void-shipping'))
         },
         assets: {

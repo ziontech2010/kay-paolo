@@ -97,11 +97,6 @@
             display: block;
             margin: 0 auto;
         }
-        .scan-awb {
-            font-size: 12pt;
-            font-weight: 700;
-            margin-top: 4pt;
-        }
         .scan-date {
             font-size: 11pt;
             font-weight: 700;
@@ -155,8 +150,12 @@
                     @if (($scanBarcodeUri ?? $barcodeUri) !== '')
                         <img class="scan-barcode" src="{{ $scanBarcodeUri ?? $barcodeUri }}" alt="scan barcode">
                     @endif
-                    <div class="scan-awb">{{ $barcodeValue }} | {{ $labelNumber }}</div>
-                    <div class="scan-date">Delivery Date: {{ preg_replace('/^by\s+/i', '', $deliveryDate) }}</div>
+                    @php
+                        $scanDate = trim(preg_replace('/^(delivery\s*date:|arrives\s+on|by)\s*/i', '', (string) $deliveryDate));
+                    @endphp
+                    @if ($scanDate !== '' && strcasecmp($scanDate, 'Pending') !== 0)
+                        <div class="scan-date">{{ $scanDate }}</div>
+                    @endif
                 </td>
             </tr>
         </table>

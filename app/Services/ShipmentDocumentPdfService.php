@@ -205,6 +205,7 @@ class ShipmentDocumentPdfService
             'selected_rate',
             'delivery_info',
             'delivery_details',
+            'delivery_data',
             'shipment',
             'shipping',
             'data',
@@ -415,7 +416,7 @@ class ShipmentDocumentPdfService
         $deliveryLocation = (string) ($payload['delivery_location'] ?? $shipping['delivery_location'] ?? '');
         $serviceSummary = trim($deliveryOption.($deliveryLocation !== '' ? ' | '.$deliveryLocation : ''));
         $created = $response['created_at'] ?? $shipping['created_at'] ?? $responseData['created_at'] ?? now()->toDateTimeString();
-        $deliveryDate = $this->firstNonEmptyString($this->sourceValues($deliverySources, [
+        $deliveryDate = $this->firstUsefulDocumentString($this->sourceValues($deliverySources, [
             'deliveryEstimateDate',
             'delivery_estimate_date',
             'deliveryDate',
@@ -437,15 +438,26 @@ class ShipmentDocumentPdfService
             'etaDate',
             'delivery_by',
             'deliveryBy',
+            'delivered_by',
+            'deliveredBy',
+            'delivery_time',
+            'deliveryTime',
+            'deliver_by',
+            'deliverBy',
             'delivery_by_date',
             'deliveryByDate',
             'delivery_datetime',
             'deliveryDateTime',
             'estimatedDelivery',
             'estimated_delivery',
+            'expectedDelivery',
+            'expected_delivery',
             'estimated_delivery_datetime',
             'eta_datetime',
             'etaDateTime',
+            'commitment',
+            'transit_time',
+            'transitTime',
             'receive_date',
             'receiveDate',
             'received_date',
@@ -469,8 +481,11 @@ class ShipmentDocumentPdfService
             'billing_account',
             'account_data',
             'account_details',
+            'quote_user',
+            'quoteUser',
+            'client',
         ]);
-        $accountNumber = $this->firstNonEmptyString(array_merge([
+        $accountNumber = $this->firstUsefulDocumentString(array_merge([
             session('zion.user.account_number'),
             session('zion.user.accountNumber'),
         ], $this->sourceValues($accountSources, [
@@ -488,6 +503,9 @@ class ShipmentDocumentPdfService
             'shipperAccount',
             'from_account',
             'fromAccount',
+            'phone_or_account',
+            'phoneOrAccount',
+            'lookup',
             'user_account',
             'userAccount',
             'client_account',
@@ -497,6 +515,12 @@ class ShipmentDocumentPdfService
             'acct',
             'acct_no',
             'acctNo',
+            'customer_id',
+            'customerId',
+            'quote_user_id',
+            'quoteUserId',
+            'user_id',
+            'userId',
         ]))) ?: '-';
 
         // Prefer shipper/consignee fields from shipping history when payload is empty.
@@ -687,10 +711,13 @@ class ShipmentDocumentPdfService
             'eta',
             'delivery_info',
             'delivery_details',
+            'delivery_data',
             'data',
             'account',
             'customer',
             'user',
+            'quote_user',
+            'client',
         ]);
 
         return $this->firstPhoneString($this->sourceValues($sources, [
@@ -741,6 +768,10 @@ class ShipmentDocumentPdfService
                 'deliveryDateTime',
                 'estimatedDelivery',
                 'estimated_delivery',
+                'delivered_by',
+                'delivery_time',
+                'commitment',
+                'transit_time',
                 'eta_datetime',
             ])) !== null
             || $this->firstNonEmptyString($this->sourceValues($sources, [
@@ -754,6 +785,15 @@ class ShipmentDocumentPdfService
                 'customerAccountNumber',
                 'from_account',
                 'fromAccount',
+                'phone_or_account',
+                'phoneOrAccount',
+                'lookup',
+                'customer_id',
+                'customerId',
+                'quote_user_id',
+                'quoteUserId',
+                'user_id',
+                'userId',
             ])) !== null;
     }
 
@@ -846,6 +886,28 @@ class ShipmentDocumentPdfService
         return null;
     }
 
+    private function firstUsefulDocumentString(array $candidates): ?string
+    {
+        foreach ($candidates as $candidate) {
+            if ($candidate === null || is_array($candidate)) {
+                continue;
+            }
+
+            $value = trim((string) $candidate);
+            if ($value === '') {
+                continue;
+            }
+
+            if (in_array(strtolower($value), ['pending', '-', 'n/a', 'na', 'none', 'null'], true)) {
+                continue;
+            }
+
+            return $value;
+        }
+
+        return null;
+    }
+
     private function firstPhoneString(array $candidates): ?string
     {
         foreach ($candidates as $candidate) {
@@ -921,6 +983,10 @@ class ShipmentDocumentPdfService
 
     private function readableDate(mixed $value): string
     {
+        if (! $value instanceof \DateTimeInterface) {
+            $value = trim(preg_replace('/^(delivery\s*date:|arrives\s+on|by)\s*/i', '', (string) $value) ?? '');
+        }
+
         try {
             return \Illuminate\Support\Carbon::parse($value)->format('M d, Y h:i a');
         } catch (\Throwable) {

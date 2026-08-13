@@ -707,7 +707,9 @@ class ExampleTest extends TestCase
         $labelPdf = (string) file_get_contents($labelPath);
         $this->assertStringStartsWith('%PDF', $labelPdf);
         $labelHtml = view('documents.pdf.label', $documentPayload)->render();
-        $this->assertStringContainsString('Delivery Date:', $labelHtml);
+        $this->assertStringContainsString('Aug 24, 2026', $labelHtml);
+        $this->assertStringNotContainsString('Delivery Date:', $labelHtml);
+        $this->assertStringNotContainsString($documentPayload['barcodeValue'].' | ', $labelHtml);
         $this->assertStringNotContainsString('Invoice 479029', $labelHtml);
         $this->assertStringNotContainsString('Delivery DLV479029', $labelHtml);
         $receiptTemplates = file_get_contents(resource_path('views/documents/pdf/receipt.blade.php'))
@@ -929,6 +931,104 @@ class ExampleTest extends TestCase
                 && ($mail->shipment['recipientName'] ?? null) === 'Kay Customer'
                 && ($mail->shipment['shipperContact'] ?? null) === '3055551212 / customer@example.com';
         });
+    }
+
+    public function test_create_shipment_document_context_keeps_delivery_date_and_account_number(): void
+    {
+        Mail::fake();
+
+        $invoice = '884433';
+        @unlink(storage_path('app/public/receipts/receipt_'.$invoice.'.pdf'));
+        @unlink(storage_path('app/public/label/label_'.$invoice.'.pdf'));
+
+        Http::fake([
+            '*/web-api/update-shipping-bocicot' => Http::response([
+                'status' => 'success',
+                'invoice_num' => $invoice,
+                'tracking_number' => 'HTB'.$invoice.'-1/1',
+            ]),
+        ]);
+
+        $this->withSession([
+            'zion.access_token' => 'fake-token',
+            'zion.user' => [
+                'account_number' => '9400',
+                'email' => 'sender@example.com',
+            ],
+        ])
+            ->withHeader('Authorization', 'Bearer fake-token')
+            ->postJson('/zion-api/shipping', [
+                'account_number' => '9400',
+                'from_account' => '9400',
+                'phone_or_account' => '9400',
+                'user_id' => 7020,
+                'quote_id' => 24745,
+                'partner' => 'zion_products',
+                'selected_shipper' => 'Regular Air',
+                'deliveryEstimateDate' => '2026-10-22',
+                'from_name' => 'Kay Sender',
+                'from_email' => 'sender@example.com',
+                'from_phone' => '3055551212',
+                'from_country' => 'US',
+                'from_address' => '1117 NE 163rd St.',
+                'from_zip' => '33162',
+                'from_city' => 'North Miami Beach',
+                'from_state' => 'FL',
+                'consignee_id' => 99,
+                'to_name' => 'Kay Receiver',
+                'to_phone_1' => '5095551212',
+                'to_country' => 'HT',
+                'to_address' => '10 Rue Test',
+                'to_zip' => '6110',
+                'to_city' => 'Port-au-Prince',
+                'to_state' => 'Ouest',
+                'package_count' => 1,
+                'dimensions' => [
+                    'package_count_ind' => [1],
+                    'weight' => [25],
+                    'length' => [41],
+                    'width' => [12],
+                    'height' => [16],
+                ],
+                'total_value' => 100,
+                'delivery_location' => 'Pickup in Office',
+                'payment_type' => 'PAID AT AGENT',
+            ])
+            ->assertOk()
+            ->assertJsonPath('status', 'success')
+            ->assertSessionHas('kay_paolo.last_shipment.payload.account_number', '9400')
+            ->assertSessionHas('kay_paolo.last_shipment.payload.deliveryEstimateDate', '2026-10-22');
+
+        Http::assertSent(function (\Illuminate\Http\Client\Request $request) {
+            $data = $request->data();
+
+            return str_contains($request->url(), '/web-api/update-shipping-bocicot')
+                && ! array_key_exists('account_number', $data)
+                && ! array_key_exists('from_account', $data)
+                && ! array_key_exists('phone_or_account', $data)
+                && ($data['deliveryEstimateDate'] ?? null) === '2026-10-22';
+        });
+
+        $shipment = session('kay_paolo.last_shipment');
+        $service = app(\App\Services\ShipmentDocumentPdfService::class);
+        $reflection = new \ReflectionClass($service);
+        $method = $reflection->getMethod('documentPayload');
+        $method->setAccessible(true);
+        $documentPayload = $method->invoke($service, [
+            'invoice' => $invoice,
+            'id' => 'HTB'.$invoice.'-1/1',
+        ], $shipment);
+
+        $this->assertSame('9400', $documentPayload['accountNumber']);
+        $this->assertStringContainsString('Oct 22, 2026', $documentPayload['deliveryDate']);
+
+        $labelHtml = view('documents.pdf.label', $documentPayload)->render();
+        $this->assertStringContainsString('Oct 22, 2026', $labelHtml);
+        $this->assertStringNotContainsString('Delivery Date:', $labelHtml);
+        $this->assertStringNotContainsString($documentPayload['barcodeValue'].' | ', $labelHtml);
+
+        @unlink(storage_path('app/public/receipts/receipt_'.$invoice.'.pdf'));
+        @unlink(storage_path('app/public/label/label_'.$invoice.'.pdf'));
     }
 
     public function test_shipping_proxy_recovers_from_zion_account_number_schema_error(): void
