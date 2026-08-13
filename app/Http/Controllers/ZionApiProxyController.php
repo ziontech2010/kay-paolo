@@ -361,6 +361,31 @@ class ZionApiProxyController extends Controller
             'id' => $validated['tracking_number'] ?? $validated['shipment_number'] ?? $validated['id'] ?? null,
         ], static fn ($value) => $value !== null && $value !== '');
 
+        $this->primeShipmentDocuments($query, [
+            'response' => [
+                'shipment_id' => $validated['shipment_id'] ?? $validated['shipping_id'] ?? null,
+                'invoice_num' => $validated['invoice'] ?? null,
+                'tracking_number' => $validated['tracking_number'] ?? $validated['shipment_number'] ?? null,
+                'created_at' => $validated['created_at'] ?? null,
+                'selected_shipper' => $validated['service_name'] ?? null,
+                'package_count' => $validated['package_count'] ?? null,
+            ],
+            'payload' => [
+                'from_name' => $validated['shipper_name'] ?? null,
+                'from_address' => $validated['shipper_address'] ?? null,
+                'from_phone' => $validated['shipper_contact'] ?? null,
+                'from_email' => $validated['shipper_contact'] ?? null,
+                'to_name' => $validated['consignee_name'] ?? null,
+                'consignee_name' => $validated['consignee_name'] ?? null,
+                'to_address' => $validated['consignee_address'] ?? null,
+                'to_phone_1' => $validated['consignee_contact'] ?? null,
+                'consignee_phone' => $validated['consignee_contact'] ?? null,
+                'delivery_option' => $validated['service_name'] ?? null,
+                'package_count' => $validated['package_count'] ?? null,
+            ],
+            'selected' => [],
+        ]);
+
         try {
             Mail::to($validated['email'])->send(new ConfirmShipmentMail([
                 'recipientName' => $validated['recipient_name'] ?? null,
@@ -423,13 +448,26 @@ class ZionApiProxyController extends Controller
     {
         $query = $request->query();
         $invoice = $this->documents->resolveInvoice($query);
-        $query['regen'] = '1';
+        $existingPath = $type === 'label'
+            ? ($invoice !== '' ? $this->documents->labelPath($invoice) : '')
+            : ($invoice !== '' ? $this->documents->receiptPath($invoice) : '');
 
         try {
             $shipment = $this->resolveShipmentContext($request, $query);
-            $path = $type === 'label'
-                ? $this->documents->ensureLabelPdf($query, $shipment)
-                : $this->documents->ensureReceiptPdf($query, $shipment);
+            $hasDocumentDetails = $this->documents->shipmentHasPackageDetails($shipment)
+                || $this->documents->shipmentHasDocumentDetails($shipment);
+
+            if (!$hasDocumentDetails && $existingPath !== '' && is_file($existingPath) && filesize($existingPath) > 4) {
+                $path = $existingPath;
+            } else {
+                if ($hasDocumentDetails) {
+                    $query['regen'] = '1';
+                }
+
+                $path = $type === 'label'
+                    ? $this->documents->ensureLabelPdf($query, $shipment)
+                    : $this->documents->ensureReceiptPdf($query, $shipment);
+            }
         } catch (\Throwable $exception) {
             report($exception);
 
@@ -471,24 +509,29 @@ class ZionApiProxyController extends Controller
 
         $prefix = $directory === 'label' ? 'label' : 'receipt';
         $invoice = $this->documents->invoiceFromFilename($safeName, $prefix);
+        $path = storage_path('app/public/'.$directory.'/'.$safeName);
         if ($invoice !== '') {
             try {
                 $query = ['invoice' => $invoice];
                 $shipment = $this->resolveShipmentContext(request(), $query);
-                if ($this->documents->shipmentHasPackageDetails($shipment) || $this->documents->shipmentHasDocumentDetails($shipment)) {
+                $hasDocumentDetails = $this->documents->shipmentHasPackageDetails($shipment)
+                    || $this->documents->shipmentHasDocumentDetails($shipment);
+
+                if ($hasDocumentDetails) {
                     $query['regen'] = '1';
                 }
-                if ($directory === 'label') {
-                    $this->documents->ensureLabelPdf($query, $shipment);
-                } else {
-                    $this->documents->ensureReceiptPdf($query, $shipment);
+                if ($hasDocumentDetails || !is_file($path)) {
+                    if ($directory === 'label') {
+                        $this->documents->ensureLabelPdf($query, $shipment);
+                    } else {
+                        $this->documents->ensureReceiptPdf($query, $shipment);
+                    }
                 }
             } catch (\Throwable $exception) {
                 report($exception);
             }
         }
 
-        $path = storage_path('app/public/'.$directory.'/'.$safeName);
         if (!is_file($path)) {
             return response()->json([
                 'status' => 'error',
@@ -1089,6 +1132,12 @@ class ZionApiProxyController extends Controller
             'id' => $shipmentNumber !== 'Pending' ? $shipmentNumber : null,
         ], static fn ($value) => $value !== null && $value !== '');
 
+        $this->primeShipmentDocuments($query, [
+            'response' => $responseData,
+            'payload' => $payload,
+            'selected' => [],
+        ]);
+
         try {
             Mail::to($email)->send(new ConfirmShipmentMail([
                 'recipientName' => $payload['from_name'] ?? session('zion.user.name') ?? null,
@@ -1131,6 +1180,24 @@ class ZionApiProxyController extends Controller
             'status' => 'success',
             'email' => $email,
         ];
+    }
+
+    private function primeShipmentDocuments(array $query, array $shipment): void
+    {
+        if ($this->documents->resolveInvoice($query) === '' && empty($query['id'])) {
+            return;
+        }
+
+        try {
+            if ($this->documents->shipmentHasPackageDetails($shipment) || $this->documents->shipmentHasDocumentDetails($shipment)) {
+                $query['regen'] = '1';
+            }
+
+            $this->documents->ensureLabelPdf($query, $shipment);
+            $this->documents->ensureReceiptPdf($query, $shipment);
+        } catch (\Throwable $exception) {
+            report($exception);
+        }
     }
 
     private function firstEmail(array $values): ?string

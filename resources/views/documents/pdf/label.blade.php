@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <title>Label {{ $trackingDisplay }}</title>
     <style>
-        @page { margin: 10px; }
+        @page { margin: 4pt; }
         * { box-sizing: border-box; }
         html, body {
             margin: 0;
@@ -15,41 +15,49 @@
         }
         .page {
             width: 100%;
+            height: 568pt;
             page-break-inside: avoid;
             page-break-after: always;
         }
         .page:last-child { page-break-after: auto; }
         .frame {
             width: 100%;
+            height: 568pt;
             border-collapse: collapse;
             border: 3px solid #000;
             table-layout: fixed;
         }
         .frame td {
             vertical-align: top;
-            padding: 5px 7px;
+            padding: 6pt 8pt;
             border: 0;
         }
         .row-border { border-bottom: 2px solid #000 !important; }
         .col-border { border-right: 2px solid #000 !important; }
-        .logo { width: 84px; height: auto; }
+        .top-row { height: 100pt; }
+        .to-row { height: 124pt; }
+        .awb-row { height: 75pt; }
+        .route-row { height: 58pt; }
+        .scan-row { height: 129pt; }
+        .footer-row { height: 38pt; }
+        .logo { width: 80pt; height: auto; }
         .from-label, .to-label {
-            font-size: 12px;
+            font-size: 10.5pt;
             font-weight: 700;
             text-transform: uppercase;
-            margin-bottom: 2px;
+            margin-bottom: 2pt;
         }
-        .from-name { font-size: 13px; font-weight: 700; line-height: 1.15; }
-        .from-meta { font-size: 12px; line-height: 1.2; margin-top: 1px; }
-        .weight { font-size: 12px; font-weight: 700; margin-top: 4px; }
-        .to-name { font-size: 20px; font-weight: 700; line-height: 1.1; }
-        .to-addr { font-size: 14px; font-weight: 700; line-height: 1.15; margin-top: 2px; white-space: pre-line; }
-        .to-phone { font-size: 14px; font-weight: 700; margin-top: 3px; }
+        .from-name { font-size: 13pt; font-weight: 700; line-height: 1.12; }
+        .from-meta { font-size: 10.5pt; line-height: 1.15; margin-top: 1pt; }
+        .weight { font-size: 11pt; font-weight: 700; margin-top: 4pt; }
+        .to-name { font-size: 22pt; font-weight: 700; line-height: 1.03; }
+        .to-addr { font-size: 14.5pt; font-weight: 700; line-height: 1.08; margin-top: 4pt; white-space: pre-line; }
+        .to-phone { font-size: 15.5pt; font-weight: 700; margin-top: 5pt; }
         .awb {
-            font-size: 32px;
+            font-size: 32pt;
             font-weight: 700;
             text-align: center;
-            padding: 6px 3px !important;
+            padding: 6pt 4pt !important;
             letter-spacing: 0.3px;
             line-height: 1;
             word-break: break-word;
@@ -57,49 +65,50 @@
         }
         .status-cell {
             width: 34%;
-            font-size: 22px;
+            font-size: 22pt;
             font-weight: 700;
             text-align: center;
             vertical-align: middle !important;
-            padding: 6px 4px !important;
+            padding: 6pt 4pt !important;
         }
         .dest-cell {
             width: 66%;
-            font-size: 18px;
+            font-size: 21pt;
             font-weight: 700;
             text-align: center;
             vertical-align: middle !important;
-            padding: 6px 4px !important;
+            padding: 6pt 4pt !important;
             line-height: 1.1;
         }
         .scan-wrap {
             text-align: center;
-            padding: 5px 5px 3px !important;
+            padding: 8pt 6pt 5pt !important;
             vertical-align: middle !important;
         }
         .scan-title {
-            font-size: 10px;
+            font-size: 10.5pt;
             font-weight: 700;
             letter-spacing: 1px;
             text-transform: uppercase;
-            margin-bottom: 3px;
+            margin-bottom: 4pt;
         }
         .scan-barcode {
             width: 92%;
-            height: 64px;
+            height: 62pt;
             display: block;
             margin: 0 auto;
         }
         .scan-awb {
-            font-size: 12px;
+            font-size: 12pt;
             font-weight: 700;
-            margin-top: 3px;
+            margin-top: 4pt;
         }
         .footer-meta {
-            font-size: 11px;
+            font-size: 9.5pt;
             font-weight: 700;
+            line-height: 1.15;
             text-align: center;
-            padding: 5px 6px !important;
+            padding: 6pt !important;
             vertical-align: middle !important;
         }
     </style>
@@ -108,8 +117,8 @@
 @foreach ($labels as $labelNumber)
     <div class="page">
         <table class="frame">
-            <tr>
-                <td class="row-border col-border" style="width: 38%; text-align: center; vertical-align: middle !important; padding: 6px;">
+            <tr class="top-row">
+                <td class="row-border col-border" style="width: 38%; text-align: center; vertical-align: middle !important; padding: 6pt;">
                     @if (is_file($logoPath))
                         <img class="logo" src="{{ $logoPath }}" alt="Kay Paolo Shipping">
                     @else
@@ -127,22 +136,22 @@
                     <div class="weight">{{ $weightDim }}</div>
                 </td>
             </tr>
-            <tr>
-                <td class="row-border" colspan="2" style="padding: 5px 7px">
+            <tr class="to-row">
+                <td class="row-border" colspan="2" style="padding: 8pt 9pt">
                     <div class="to-label">To</div>
                     <div class="to-name">{{ $consigneeName }}</div>
                     <div class="to-addr">{{ \Illuminate\Support\Str::limit(preg_replace("/\n{2,}/", "\n", trim($consigneeAddress)), 110, '') }}</div>
                     <div class="to-phone">{{ $consigneePhone }}</div>
                 </td>
             </tr>
-            <tr>
+            <tr class="awb-row">
                 <td class="row-border awb" colspan="2">{{ $labelNumber }}</td>
             </tr>
-            <tr>
+            <tr class="route-row">
                 <td class="row-border col-border status-cell">{{ $chargeStatus }}</td>
                 <td class="row-border dest-cell">{{ $destination }}</td>
             </tr>
-            <tr>
+            <tr class="scan-row">
                 <td class="row-border scan-wrap" colspan="2">
                     <div class="scan-title">Scan Code</div>
                     @if (($scanBarcodeUri ?? $barcodeUri) !== '')
@@ -151,9 +160,9 @@
                     <div class="scan-awb">{{ $barcodeValue }} | {{ $labelNumber }}</div>
                 </td>
             </tr>
-            <tr>
+            <tr class="footer-row">
                 <td class="footer-meta" colspan="2">
-                    Invoice {{ $invoice }} | Delivery {{ $deliveryNumber }} | ETA {{ $deliveryDate }}
+                    Invoice {{ $invoice }} | Delivery {{ $deliveryNumber }} | ETA {{ preg_replace('/^by\s+/i', '', $deliveryDate) }}
                 </td>
             </tr>
         </table>

@@ -556,6 +556,70 @@ class ExampleTest extends TestCase
         @unlink(storage_path('app/public/receipts/receipt_373988.pdf'));
     }
 
+    public function test_public_label_links_do_not_overwrite_existing_pdf_without_context(): void
+    {
+        Http::fake();
+
+        $invoice = '884411';
+        $path = storage_path('app/public/label/label_'.$invoice.'.pdf');
+        if (!is_dir(dirname($path))) {
+            mkdir(dirname($path), 0775, true);
+        }
+        $original = "%PDF-1.4\nDynamic Consignee Phone 5099876543\n%%EOF";
+        file_put_contents($path, $original);
+
+        $this->get('/shipment-label?invoice='.$invoice.'&id=HTB'.$invoice.'-1%2F1')
+            ->assertRedirect('/label/label_'.$invoice.'.pdf');
+
+        $this->assertSame($original, (string) file_get_contents($path));
+
+        $this->get('/label/label_'.$invoice.'.pdf')
+            ->assertOk()
+            ->assertHeader('content-type', 'application/pdf');
+
+        $this->assertSame($original, (string) file_get_contents($path));
+
+        @unlink($path);
+    }
+
+    public function test_email_shipment_primes_public_document_pdfs(): void
+    {
+        Mail::fake();
+
+        $invoice = '884422';
+        $labelPath = storage_path('app/public/label/label_'.$invoice.'.pdf');
+        $receiptPath = storage_path('app/public/receipts/receipt_'.$invoice.'.pdf');
+        @unlink($labelPath);
+        @unlink($receiptPath);
+
+        $this->withHeader('Authorization', 'Bearer test-token')
+            ->postJson('/api/kay-paolo/email-shipment', [
+                'email' => 'customer@example.com',
+                'invoice' => $invoice,
+                'tracking_number' => 'HTB'.$invoice.'-1/1',
+                'package_count' => 1,
+                'service_name' => 'Economical Air',
+                'created_at' => '2026-08-13 09:00:00',
+                'shipper_name' => 'Dynamic Shipper',
+                'shipper_address' => '100 Main St',
+                'shipper_contact' => '3055551212 / dynamic-shipper@example.com',
+                'consignee_name' => 'Dynamic Consignee',
+                'consignee_address' => '12 Rue Test',
+                'consignee_contact' => '5095551212',
+            ])
+            ->assertOk()
+            ->assertJsonPath('status', 'success');
+
+        Mail::assertSent(ConfirmShipmentMail::class);
+        $this->assertFileExists($labelPath);
+        $this->assertFileExists($receiptPath);
+        $this->assertStringStartsWith('%PDF', (string) file_get_contents($labelPath));
+        $this->assertStringStartsWith('%PDF', (string) file_get_contents($receiptPath));
+
+        @unlink($labelPath);
+        @unlink($receiptPath);
+    }
+
     public function test_receipt_pdf_includes_package_details_from_shipment_history(): void
     {
         $historyRow = [
