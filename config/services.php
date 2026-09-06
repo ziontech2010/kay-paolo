@@ -36,8 +36,8 @@ return [
     ],
 
     'zion_shipping' => [
-        'api_url' => env('ZION_SHIPPING_API_URL', 'https://dev.zionshipping.com/'),
-        'web_url' => env('ZION_SHIPPING_WEB_URL', env('ZION_SHIPPING_API_URL', 'https://dev.zionshipping.com/')),
+        'api_url' => env('ZION_SHIPPING_API_URL', 'https://www.zionshipping.com/'),
+        'web_url' => env('ZION_SHIPPING_WEB_URL', env('ZION_SHIPPING_API_URL', 'https://www.zionshipping.com/')),
         'timeout' => env('ZION_SHIPPING_API_TIMEOUT', 45),
     ],
 

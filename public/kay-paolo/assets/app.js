@@ -78,7 +78,7 @@ document.addEventListener('DOMContentLoaded', () => {
     window.localStorage.setItem(tokenKey, config.sessionToken);
   }
 
-  if (!Object.keys(storedUser()).length && config.sessionUser && Object.keys(config.sessionUser).length) {
+  if (config.sessionUser && Object.keys(config.sessionUser).length) {
     window.localStorage.setItem(userKey, JSON.stringify(config.sessionUser));
   }
 
@@ -591,6 +591,13 @@ document.addEventListener('DOMContentLoaded', () => {
       setText('dashboardRoleId', user.role_id || '-');
       setText('dashboardEmail', user.email || '-');
       setText('dashboardAccount', user.account_number || user.id || '-');
+      setValue('profileName', user.name);
+      setValue('profileEmail', user.email);
+      setValue('profilePhone', user.phone || user.mobile);
+      setValue('profileAddress', user.shipper_address || user.address);
+      setValue('profileCity', user.shipper_city || user.city);
+      setValue('profileState', user.shipper_state || user.state);
+      setValue('profileZip', user.shipper_zip || user.zip);
       const adminAccess = document.getElementById('dashboardAdminAccess');
       if (adminAccess) adminAccess.hidden = !isAdminRole(user.role_id);
       const adminAction = document.getElementById('dashboardAdminAction');
@@ -4046,12 +4053,12 @@ document.addEventListener('DOMContentLoaded', () => {
     if (/^(https?:)?\/\//i.test(raw) || raw.startsWith('data:')) return raw;
     if (raw.startsWith('/')) return raw;
 
-    const base = config.zionWebUrl || 'https://dev.zionshipping.com/';
+    const base = config.zionWebUrl || 'https://www.zionshipping.com/';
     return `${base.replace(/\/+$/, '')}/${raw.replace(/^\/+/, '')}`;
   }
 
   function zionWebUrl(path) {
-    const base = config.zionWebUrl || 'https://dev.zionshipping.com/';
+    const base = config.zionWebUrl || 'https://www.zionshipping.com/';
     return `${base.replace(/\/+$/, '')}/${String(path || '').replace(/^\/+/, '')}`;
   }
 

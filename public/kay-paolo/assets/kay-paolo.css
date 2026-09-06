@@ -156,6 +156,19 @@
     gap: 18px;
 }
 
+.dashboard-profile-stack {
+    display: grid;
+    gap: 18px;
+}
+
+.account-profile-form h3 {
+    color: var(--navy-900);
+    font-family: "Inter", sans-serif;
+    font-size: 18px;
+    font-weight: 800;
+    margin: 0 0 16px;
+}
+
 .action-card {
     color: inherit;
 }

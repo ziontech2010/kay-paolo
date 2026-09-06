@@ -19,6 +19,7 @@ Route::post('/login', [ZionSessionController::class, 'login'])->name('login.subm
 Route::post('/logout', [ZionSessionController::class, 'logout'])->name('logout');
 Route::get('/dashboard', [ZionSessionController::class, 'dashboard'])->name('dashboard');
 Route::get('/account', [ZionSessionController::class, 'dashboard'])->name('account');
+Route::post('/account/profile', [ZionSessionController::class, 'updateProfile'])->name('account.profile.update');
 
 Route::get('/quote', fn () => view('pages.quote'))->name('quote');
 Route::get('/quote-details', fn () => view('pages.quote-details'))->name('quote.details');

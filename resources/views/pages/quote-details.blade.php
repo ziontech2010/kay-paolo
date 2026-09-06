@@ -77,15 +77,15 @@
                         <div class="form-row-3">
                             <div class="field">
                                 <label>Name</label>
-                                <input type="text" id="from_name" value="{{ $shipperName }}" readonly style="background: #f8fafc; font-weight: 600; color: #334155">
+                                <input type="text" id="from_name" value="{{ $shipperName }}" style="font-weight: 600">
                             </div>
                             <div class="field">
                                 <label>Email</label>
-                                <input type="email" id="from_email" value="{{ $shipperEmail }}" readonly style="background: #f8fafc; font-weight: 600; color: #334155">
+                                <input type="email" id="from_email" value="{{ $shipperEmail }}" style="font-weight: 600">
                             </div>
                             <div class="field">
                                 <label>Phone</label>
-                                <input type="text" id="from_phone" value="{{ $shipperPhone }}" readonly style="background: #f8fafc; font-weight: 600; color: #334155">
+                                <input type="text" id="from_phone" value="{{ $shipperPhone }}" style="font-weight: 600">
                             </div>
                         </div>
                         <input type="hidden" id="from_account" value="{{ $shipperAccount }}">

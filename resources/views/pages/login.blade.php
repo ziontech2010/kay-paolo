@@ -47,12 +47,12 @@
                 </div>
                 <div class="login-row-between">
                     <label style="display: flex; align-items: center; gap: 8px"><input type="checkbox" style="width: auto"> Remember me</label>
-                    <a href="{{ route('contact') }}">Need help?</a>
+                    <a href="{{ route('contact', ['subject' => 'Security / Password']) }}">Need help?</a>
                 </div>
                 <button type="submit" class="btn btn-navy btn-block">Login</button>
             </form>
 
-            <p class="login-foot">Do not have an account? <a href="{{ route('contact') }}">Contact us to get set up</a></p>
+            <p class="login-foot">Do not have an account? <a href="{{ route('contact', ['subject' => 'Account Access']) }}">Contact us to get set up</a></p>
         </div>
     </div>
 </section>

@@ -71,7 +71,8 @@
                     <div class="dropdown">
                         <a href="{{ route('quote') }}">Create a Shipment</a>
                         <a href="{{ route('quote') }}">Get Quote</a>
-                        <a href="{{ route('shipment-history') }}">Shipment History</a>
+                        <a href="{{ route('shipment-history') }}">Pickup List / Shipment History</a>
+                        <a href="{{ route('shipment-history') }}">Invoices &amp; Receipts</a>
                     </div>
                 </li>
                 <li class="has-dd">

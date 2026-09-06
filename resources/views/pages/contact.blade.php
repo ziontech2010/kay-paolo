@@ -1,5 +1,19 @@
 @extends('layouts.site')
 
+@php
+    $selectedSubject = request('subject', 'General Inquiry');
+    $subjects = [
+        'General Inquiry',
+        'Account Access',
+        'Security / Password',
+        'Profile Update',
+        'Pricing',
+        'Get A Quote',
+        'Existing Shipment',
+        'Partnership',
+    ];
+@endphp
+
 @section('title', 'Contact | Kay Paolo Shipping')
 
 @section('banner')
@@ -46,10 +60,9 @@
                 <div class="field">
                     <label for="cSubject">Subject</label>
                     <select id="cSubject">
-                        <option>General Inquiry</option>
-                        <option>Get A Quote</option>
-                        <option>Existing Shipment</option>
-                        <option>Partnership</option>
+                        @foreach ($subjects as $subject)
+                            <option @selected($selectedSubject === $subject)>{{ $subject }}</option>
+                        @endforeach
                     </select>
                 </div>
                 <div class="field"><label for="cMsg">Message</label><textarea id="cMsg" required placeholder="Tell us about your shipment - origin, destination, and approximate weight."></textarea></div>

@@ -25,7 +25,12 @@ class ZionSessionController extends Controller
             return $value !== null && $value !== '';
         });
 
-        $response = $zion->post('kay-paolo/login', $payload);
+        $response = $zion->post('bocicot/login', $payload);
+
+        if (!$response['ok'] && $this->shouldTryFallback($response)) {
+            $response = $zion->post('kay-paolo/login', $payload);
+        }
+
         $data = $response['data'] ?? [];
         $failed = !$response['ok']
             || (($data['error'] ?? 'false') === 'true')
@@ -61,6 +66,43 @@ class ZionSessionController extends Controller
         return redirect()->route('home');
     }
 
+    public function updateProfile(Request $request): RedirectResponse
+    {
+        if (!$request->hasSession() || !session('zion.access_token')) {
+            return redirect()->route('login', ['redirect' => route('account', absolute: false)]);
+        }
+
+        $validated = $request->validate([
+            'name' => ['required', 'string', 'max:160'],
+            'email' => ['required', 'email', 'max:180'],
+            'phone' => ['nullable', 'string', 'max:40'],
+            'address' => ['nullable', 'string', 'max:255'],
+            'city' => ['nullable', 'string', 'max:120'],
+            'state' => ['nullable', 'string', 'max:80'],
+            'zip' => ['nullable', 'string', 'max:40'],
+        ]);
+
+        $user = session('zion.user', []);
+        $user['name'] = $validated['name'];
+        $user['email'] = $validated['email'];
+        $user['phone'] = $validated['phone'] ?? '';
+        $user['mobile'] = $validated['phone'] ?? '';
+        $user['address'] = $validated['address'] ?? '';
+        $user['shipper_address'] = $validated['address'] ?? '';
+        $user['city'] = $validated['city'] ?? '';
+        $user['shipper_city'] = $validated['city'] ?? '';
+        $user['state'] = $validated['state'] ?? '';
+        $user['shipper_state'] = $validated['state'] ?? '';
+        $user['zip'] = $validated['zip'] ?? '';
+        $user['shipper_zip'] = $validated['zip'] ?? '';
+
+        $request->session()->put('zion.user', $user);
+
+        return redirect()
+            ->route('account')
+            ->with('profile_status', 'Profile contact details updated for this Kay Paolo session.');
+    }
+
     public function logout(Request $request): RedirectResponse
     {
         if ($request->hasSession()) {
@@ -75,5 +117,22 @@ class ZionSessionController extends Controller
         return view('pages.dashboard', [
             'zionUser' => session('zion.user', []),
         ]);
+    }
+
+    private function shouldTryFallback(array $response): bool
+    {
+        $status = (int) ($response['status'] ?? 0);
+        $data = is_array($response['data'] ?? null) ? $response['data'] : [];
+        $message = strtolower((string) ($data['message'] ?? ''));
+        $error = strtolower((string) ($data['error'] ?? ''));
+        $appLocked = strtolower((string) ($data['app_locked'] ?? ''));
+
+        return $status === 0
+            || in_array($status, [404, 405], true)
+            || $status >= 500
+            || str_contains($message, 'session store not set')
+            || str_contains($message, 'app is locked')
+            || ($error === 'true' && $appLocked === 'true')
+            || isset($data['html']);
     }
 }
