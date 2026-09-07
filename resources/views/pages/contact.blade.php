@@ -2,6 +2,8 @@
 
 @php
     $selectedSubject = request('subject', 'General Inquiry');
+    $isPasswordSubject = $selectedSubject === 'Security / Password';
+    $agentEmail = old('email', session('zion.user.email', ''));
     $subjects = [
         'General Inquiry',
         'Account Access',
@@ -29,9 +31,9 @@
 <section class="page-follows-banner">
     <div class="wrap">
         <div class="section-head">
-            <div class="eyebrow">Get In Touch</div>
-            <h2>Get in touch with us</h2>
-            <p>Reach out to our experts for a seamless shipping experience across the globe.</p>
+            <div class="eyebrow">{{ $isPasswordSubject ? 'Security' : 'Get In Touch' }}</div>
+            <h2>{{ $isPasswordSubject ? 'Update agent password' : 'Get in touch with us' }}</h2>
+            <p>{{ $isPasswordSubject ? 'Use the agent email, current password, and a new password.' : 'Reach out to our experts for a seamless shipping experience across the globe.' }}</p>
         </div>
 
         <div class="contact-grid">
@@ -52,28 +54,63 @@
                 </div>
             </div>
 
-            <form class="contact-form" id="contactForm">
-                <div class="form-row">
-                    <div class="field"><label for="cName">Your Name</label><input type="text" id="cName" placeholder="Enter your name" required></div>
-                    <div class="field"><label for="cEmail">Your Email</label><input type="email" id="cEmail" placeholder="Enter your email" required></div>
-                </div>
-                <div class="field">
-                    <label for="cSubject">Subject</label>
-                    <select id="cSubject">
-                        @foreach ($subjects as $subject)
-                            <option @selected($selectedSubject === $subject)>{{ $subject }}</option>
-                        @endforeach
-                    </select>
-                </div>
-                <div class="field"><label for="cMsg">Message</label><textarea id="cMsg" required placeholder="Tell us about your shipment - origin, destination, and approximate weight."></textarea></div>
-                <button type="submit" class="btn btn-gold">Send Message</button>
-            </form>
+            @if ($isPasswordSubject)
+                <form class="contact-form" method="POST" action="{{ route('account.password.update') }}" id="passwordForm" autocomplete="off">
+                    @csrf
+
+                    @if (session('password_status'))
+                        <div class="api-alert success">{{ session('password_status') }}</div>
+                    @endif
+
+                    @if ($errors->any())
+                        <div class="api-alert error">{{ $errors->first() }}</div>
+                    @endif
+
+                    <div class="field">
+                        <label for="agentEmail">Agent Email</label>
+                        <input id="agentEmail" name="email" type="email" value="{{ $agentEmail }}" placeholder="Enter agent email" @if (session('zion.access_token')) readonly @else required @endif autocomplete="username">
+                    </div>
+                    <div class="field">
+                        <label for="currentPassword">Current Password</label>
+                        <input id="currentPassword" name="current_password" type="password" required autocomplete="current-password">
+                    </div>
+                    <div class="form-row">
+                        <div class="field">
+                            <label for="newPassword">New Password</label>
+                            <input id="newPassword" name="password" type="password" required minlength="8" autocomplete="new-password">
+                        </div>
+                        <div class="field">
+                            <label for="newPasswordConfirmation">Confirm New Password</label>
+                            <input id="newPasswordConfirmation" name="password_confirmation" type="password" required minlength="8" autocomplete="new-password">
+                        </div>
+                    </div>
+                    <button type="submit" class="btn btn-gold">Update Password</button>
+                </form>
+            @else
+                <form class="contact-form" id="contactForm">
+                    <div class="form-row">
+                        <div class="field"><label for="cName">Your Name</label><input type="text" id="cName" placeholder="Enter your name" required></div>
+                        <div class="field"><label for="cEmail">Your Email</label><input type="email" id="cEmail" placeholder="Enter your email" required></div>
+                    </div>
+                    <div class="field">
+                        <label for="cSubject">Subject</label>
+                        <select id="cSubject">
+                            @foreach ($subjects as $subject)
+                                <option @selected($selectedSubject === $subject)>{{ $subject }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div class="field"><label for="cMsg">Message</label><textarea id="cMsg" required placeholder="Tell us about your shipment - origin, destination, and approximate weight."></textarea></div>
+                    <button type="submit" class="btn btn-gold">Send Message</button>
+                </form>
+            @endif
         </div>
     </div>
 </section>
 @endsection
 
 @push('modals')
+@unless ($isPasswordSubject)
 <div class="confirm-overlay" id="confirmOverlay" role="dialog" aria-modal="true" aria-labelledby="confirmTitle">
     <div class="confirm-card">
         <div class="confirm-icon">
@@ -85,4 +122,5 @@
         <button class="btn-confirm-close" id="confirmClose">Got It</button>
     </div>
 </div>
+@endunless
 @endpush

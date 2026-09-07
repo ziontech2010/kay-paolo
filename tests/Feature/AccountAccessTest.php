@@ -67,6 +67,86 @@ class AccountAccessTest extends TestCase
             ->assertSee('Security &amp; Password', false);
     }
 
+    public function test_security_password_contact_url_shows_password_form(): void
+    {
+        $this->get('/contact?subject=Security%20%2F%20Password')
+            ->assertOk()
+            ->assertSee('id="passwordForm"', false)
+            ->assertSee('name="current_password"', false)
+            ->assertSee('name="password_confirmation"', false)
+            ->assertSee('Update Password', false)
+            ->assertDontSee('id="contactForm"', false);
+    }
+
+    public function test_logged_in_agent_can_submit_password_update(): void
+    {
+        Http::fake([
+            '*/web-api/update-password-bocicot' => Http::response([
+                'message' => 'Not Found',
+            ], 404),
+            '*/web-api/change-password-bocicot' => Http::response([
+                'message' => 'Not Found',
+            ], 404),
+            '*/api/bocicot/update-password' => Http::response([
+                'status' => 'success',
+                'message' => 'Password updated.',
+            ]),
+        ]);
+
+        $this->withSession($this->zionSession())
+            ->post('/account/password', [
+                'current_password' => 'old-password',
+                'password' => 'new-secure-password',
+                'password_confirmation' => 'new-secure-password',
+            ])
+            ->assertRedirect(route('contact', ['subject' => 'Security / Password']))
+            ->assertSessionHas('password_status', 'Password updated.');
+
+        Http::assertSent(function (\Illuminate\Http\Client\Request $request) {
+            $data = $request->data();
+
+            return str_contains($request->url(), '/api/bocicot/update-password')
+                && $request->hasHeader('Authorization', 'Bearer session-token')
+                && ($data['email'] ?? null) === 'test@example.com'
+                && ($data['current_password'] ?? null) === 'old-password'
+                && ($data['new_password'] ?? null) === 'new-secure-password'
+                && ($data['password_confirmation'] ?? null) === 'new-secure-password';
+        });
+    }
+
+    public function test_password_update_without_session_verifies_agent_credentials_first(): void
+    {
+        Http::fake([
+            '*/api/bocicot/login' => Http::response([
+                'message' => 'Logged in Successfully',
+                'error' => 'false',
+                'token_type' => 'Bearer',
+                'access_token' => 'fresh-token',
+                'user' => [
+                    'id' => 12,
+                    'name' => 'Fresh Agent',
+                    'email' => 'fresh@example.com',
+                    'role_id' => 2,
+                    'role' => ['name' => 'Agent'],
+                ],
+            ]),
+            '*/web-api/update-password-bocicot' => Http::response([
+                'status' => 'success',
+                'message' => 'Password updated.',
+            ]),
+        ]);
+
+        $this->post('/account/password', [
+            'email' => 'fresh@example.com',
+            'current_password' => 'old-password',
+            'password' => 'new-secure-password',
+            'password_confirmation' => 'new-secure-password',
+        ])
+            ->assertRedirect(route('contact', ['subject' => 'Security / Password']))
+            ->assertSessionHas('zion.access_token', 'fresh-token')
+            ->assertSessionHas('password_status', 'Password updated.');
+    }
+
     public function test_quote_shipper_contact_fields_are_editable(): void
     {
         $html = $this->withSession($this->zionSession())

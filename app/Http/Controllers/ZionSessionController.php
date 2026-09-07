@@ -25,16 +25,9 @@ class ZionSessionController extends Controller
             return $value !== null && $value !== '';
         });
 
-        $response = $zion->post('bocicot/login', $payload);
-
-        if (!$response['ok'] && $this->shouldTryFallback($response)) {
-            $response = $zion->post('kay-paolo/login', $payload);
-        }
-
+        $response = $this->attemptLogin($zion, $payload);
         $data = $response['data'] ?? [];
-        $failed = !$response['ok']
-            || (($data['error'] ?? 'false') === 'true')
-            || empty($data['access_token']);
+        $failed = !$this->loginSucceeded($response);
 
         if ($failed) {
             $message = $data['message'] ?? 'Unable to log in to Kay Paolo.';
@@ -103,6 +96,62 @@ class ZionSessionController extends Controller
             ->with('profile_status', 'Profile contact details updated for this Kay Paolo session.');
     }
 
+    public function updatePassword(Request $request, ZionShippingApi $zion): RedirectResponse
+    {
+        $hasToken = (bool) session('zion.access_token');
+        $validated = $request->validate([
+            'email' => [$hasToken ? 'nullable' : 'required', 'email', 'max:180'],
+            'current_password' => ['required', 'string', 'max:255'],
+            'password' => ['required', 'string', 'min:8', 'max:255', 'confirmed', 'different:current_password'],
+        ]);
+
+        $token = session('zion.access_token');
+
+        if (!$token) {
+            $loginResponse = $this->attemptLogin($zion, [
+                'email' => $validated['email'],
+                'password' => $validated['current_password'],
+            ]);
+
+            if (!$this->loginSucceeded($loginResponse)) {
+                return back()
+                    ->withInput($request->only('email'))
+                    ->withErrors(['email' => $loginResponse['data']['message'] ?? 'Unable to verify the current agent credentials.']);
+            }
+
+            $loginData = $loginResponse['data'];
+            $request->session()->regenerate();
+            $request->session()->put([
+                'zion.access_token' => $loginData['access_token'],
+                'zion.token_type' => $loginData['token_type'] ?? 'Bearer',
+                'zion.user' => $loginData['user'] ?? [],
+            ]);
+
+            $token = $loginData['access_token'];
+        }
+
+        $response = $this->postWithFallback($zion, [
+            ['endpoint' => 'web-api/update-password-bocicot', 'web' => true],
+            ['endpoint' => 'web-api/change-password-bocicot', 'web' => true],
+            ['endpoint' => 'bocicot/update-password'],
+            ['endpoint' => 'bocicot/change-password'],
+            ['endpoint' => 'kay-paolo/update-password'],
+            ['endpoint' => 'kay-paolo/change-password'],
+            ['endpoint' => 'update-password'],
+            ['endpoint' => 'change-password'],
+        ], $this->passwordUpdatePayload($validated), $token);
+
+        if ($this->passwordUpdateFailed($response)) {
+            return back()
+                ->withInput($request->only('email'))
+                ->withErrors(['password' => $this->passwordUpdateMessage($response)]);
+        }
+
+        return redirect()
+            ->route('contact', ['subject' => 'Security / Password'])
+            ->with('password_status', $response['data']['message'] ?? 'Password updated successfully.');
+    }
+
     public function logout(Request $request): RedirectResponse
     {
         if ($request->hasSession()) {
@@ -117,6 +166,101 @@ class ZionSessionController extends Controller
         return view('pages.dashboard', [
             'zionUser' => session('zion.user', []),
         ]);
+    }
+
+    private function attemptLogin(ZionShippingApi $zion, array $payload): array
+    {
+        $response = $zion->post('bocicot/login', $payload);
+
+        if (!$response['ok'] && $this->shouldTryFallback($response)) {
+            $response = $zion->post('kay-paolo/login', $payload);
+        }
+
+        return $response;
+    }
+
+    private function loginSucceeded(array $response): bool
+    {
+        $data = $response['data'] ?? [];
+
+        return ($response['ok'] ?? false)
+            && (($data['error'] ?? 'false') !== 'true')
+            && !empty($data['access_token']);
+    }
+
+    private function postWithFallback(ZionShippingApi $zion, array $targets, array $payload, ?string $token = null): array
+    {
+        $lastResponse = null;
+
+        foreach ($targets as $target) {
+            $lastResponse = !empty($target['web'])
+                ? $zion->postWeb($target['endpoint'], $payload, $token)
+                : $zion->post($target['endpoint'], $payload, $token);
+
+            if (($lastResponse['ok'] ?? false) && !$this->passwordUpdateFailed($lastResponse)) {
+                return $lastResponse;
+            }
+
+            if (!$this->shouldTryFallback($lastResponse)) {
+                return $lastResponse;
+            }
+        }
+
+        return $lastResponse ?? [
+            'ok' => false,
+            'status' => 502,
+            'data' => [
+                'status' => 'error',
+                'message' => 'Unable to reach the shipping API.',
+            ],
+        ];
+    }
+
+    private function passwordUpdatePayload(array $validated): array
+    {
+        $user = session('zion.user', []);
+        $email = $validated['email'] ?? $user['email'] ?? null;
+        $currentPassword = $validated['current_password'];
+        $newPassword = $validated['password'];
+        $confirmedPassword = $validated['password_confirmation'] ?? $newPassword;
+
+        return array_filter([
+            'email' => $email,
+            'user_id' => $user['id'] ?? null,
+            'agent_id' => $user['agent_id'] ?? $user['id'] ?? null,
+            'current_password' => $currentPassword,
+            'old_password' => $currentPassword,
+            'oldPassword' => $currentPassword,
+            'password' => $newPassword,
+            'password_confirmation' => $confirmedPassword,
+            'new_password' => $newPassword,
+            'newPassword' => $newPassword,
+            'new_password_confirmation' => $confirmedPassword,
+            'confirm_password' => $confirmedPassword,
+            'confirmPassword' => $confirmedPassword,
+        ], static fn ($value) => $value !== null && $value !== '');
+    }
+
+    private function passwordUpdateFailed(array $response): bool
+    {
+        $data = is_array($response['data'] ?? null) ? $response['data'] : [];
+        $status = strtolower((string) ($data['status'] ?? ''));
+        $error = strtolower((string) ($data['error'] ?? ''));
+
+        return !($response['ok'] ?? false)
+            || in_array($status, ['error', 'failed', 'fail'], true)
+            || in_array($error, ['true', '1', 'yes'], true);
+    }
+
+    private function passwordUpdateMessage(array $response): string
+    {
+        $data = is_array($response['data'] ?? null) ? $response['data'] : [];
+
+        if (in_array((int) ($response['status'] ?? 0), [404, 405], true)) {
+            return 'Unable to update the password because the connected Zion password endpoint is not available.';
+        }
+
+        return (string) ($data['message'] ?? $data['error'] ?? 'Unable to update the password.');
     }
 
     private function shouldTryFallback(array $response): bool
