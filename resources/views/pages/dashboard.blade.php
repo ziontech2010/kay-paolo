@@ -4,7 +4,16 @@
     $isAdminRole = in_array((int) ($zionUser['role_id'] ?? 0), [1, 12, 13, 14, 15], true);
     $profileName = old('name', $zionUser['name'] ?? '');
     $profileEmail = old('email', $zionUser['email'] ?? '');
-    $profilePhone = old('phone', $zionUser['phone'] ?? $zionUser['mobile'] ?? '');
+    $profilePhone = old('phone', collect([
+        $zionUser['phone'] ?? null,
+        $zionUser['mobile'] ?? null,
+        $zionUser['shipper_phone'] ?? null,
+        $zionUser['shipper_phone_1'] ?? null,
+        $zionUser['phone_number'] ?? null,
+        $zionUser['mobile_phone'] ?? null,
+        $zionUser['contact_phone'] ?? null,
+        $zionUser['telephone'] ?? null,
+    ])->first(fn ($value) => filled($value)) ?? '');
     $profileAddress = old('address', $zionUser['shipper_address'] ?? $zionUser['address'] ?? '');
     $profileCity = old('city', $zionUser['shipper_city'] ?? $zionUser['city'] ?? '');
     $profileState = old('state', $zionUser['shipper_state'] ?? $zionUser['state'] ?? '');
@@ -40,6 +49,7 @@
                     <div><dt>Role</dt><dd id="dashboardRole">{{ $zionUser['role']['name'] ?? 'User' }}</dd></div>
                     <div><dt>Role ID</dt><dd id="dashboardRoleId">{{ $zionUser['role_id'] ?? '-' }}</dd></div>
                     <div><dt>Email</dt><dd id="dashboardEmail">{{ $zionUser['email'] ?? '-' }}</dd></div>
+                    <div><dt>Phone</dt><dd id="dashboardPhone">{{ $profilePhone ?: '-' }}</dd></div>
                     <div><dt>Account</dt><dd id="dashboardAccount">{{ $zionUser['account_number'] ?? '-' }}</dd></div>
                 </dl>
                 <div class="api-inline-result success" id="dashboardAdminAccess" @unless ($isAdminRole) hidden @endunless>

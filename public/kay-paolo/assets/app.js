@@ -590,10 +590,11 @@ document.addEventListener('DOMContentLoaded', () => {
       setText('dashboardRole', user.role?.name || 'User');
       setText('dashboardRoleId', user.role_id || '-');
       setText('dashboardEmail', user.email || '-');
+      setText('dashboardPhone', userPhone(user) || '-');
       setText('dashboardAccount', user.account_number || user.id || '-');
       setValue('profileName', user.name);
       setValue('profileEmail', user.email);
-      setValue('profilePhone', user.phone || user.mobile);
+      setValue('profilePhone', userPhone(user));
       setValue('profileAddress', user.shipper_address || user.address);
       setValue('profileCity', user.shipper_city || user.city);
       setValue('profileState', user.shipper_state || user.state);
@@ -603,6 +604,19 @@ document.addEventListener('DOMContentLoaded', () => {
       const adminAction = document.getElementById('dashboardAdminAction');
       if (adminAction) adminAction.hidden = !isAdminRole(user.role_id);
     }
+  }
+
+  function userPhone(user) {
+    return [
+      user?.phone,
+      user?.mobile,
+      user?.shipper_phone,
+      user?.shipper_phone_1,
+      user?.phone_number,
+      user?.mobile_phone,
+      user?.contact_phone,
+      user?.telephone
+    ].map((item) => String(item || '').trim()).find(Boolean) || '';
   }
 
   function initAuthNav() {
