@@ -312,6 +312,9 @@ class ExampleTest extends TestCase
         $this->assertStringContainsString('response?.data?.all_options', $script);
         $this->assertStringContainsString('historyDateRangeValue', $script);
         $this->assertStringContainsString("route('pickupList', '/api/kay-paolo/pickup-list')", $script);
+        $this->assertStringContainsString('per_page: selectedLimit', $script);
+        $this->assertStringContainsString('length: selectedLimit', $script);
+        $this->assertStringContainsString('created_in: createdIn', $script);
         $this->assertStringContainsString('Complete Pickup', $script);
         $this->assertStringContainsString('zionFlatRateOptions', $script);
         $this->assertStringContainsString("const countryCacheKey = 'kayPaoloCountries:v3'", $script);
@@ -546,15 +549,29 @@ class ExampleTest extends TestCase
             ->postJson('/api/kay-paolo/pickup-list', [
                 'limit' => 25,
                 'user_id' => 7,
+                'account_number' => '9400',
             ])
             ->assertOk()
             ->assertJsonPath('shippings.0.tracking_number', 'PKP88');
 
         Http::assertSent(function ($request) {
+            $data = $request->data();
+
             return str_contains($request->url(), '/api/bocicot/shipping-history-filter')
                 && $request->hasHeader('Authorization', 'Bearer fake-token')
-                && ! array_key_exists('pickup_status', $request->data())
-                && ! array_key_exists('status', $request->data());
+                && ($data['limit'] ?? null) === 25
+                && ($data['per_page'] ?? null) === 25
+                && ($data['length'] ?? null) === 25
+                && ($data['page'] ?? null) === 1
+                && ($data['start'] ?? null) === 0
+                && ($data['date_range'] ?? null) === ''
+                && ($data['created_in'] ?? null) === 'All Shipments'
+                && ($data['agent_id'] ?? null) === 7
+                && ($data['created_by'] ?? null) === 7
+                && ($data['created_by_id'] ?? null) === 7
+                && ($data['account_number'] ?? null) === '9400'
+                && ! array_key_exists('pickup_status', $data)
+                && ! array_key_exists('status', $data);
         });
     }
 

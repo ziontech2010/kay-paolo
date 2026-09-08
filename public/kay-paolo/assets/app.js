@@ -2126,13 +2126,28 @@ document.addEventListener('DOMContentLoaded', () => {
       if (loader) loader.hidden = false;
 
       try {
-        const response = await postJson(pickupMode ? route('pickupList', '/api/kay-paolo/pickup-list') : route('shippingHistory', '/api/kay-paolo/shipping-history'), {
-          limit: firstValue('entriesSelect') || 100,
-          date_range: historyDateRangeValue(firstValue('timeSelect')),
-          created_in: firstValue('timeSelect'),
+        const selectedLimit = Number(firstValue('entriesSelect')) || 100;
+        const createdIn = firstValue('timeSelect') || (pickupMode ? 'All Shipments' : 'Last 30 Days');
+        const user = storedUser();
+        const userId = user.id || user.user_id || undefined;
+        const agentId = user.agent_id || user.agentId || userId || undefined;
+
+        const response = await postJson(pickupMode ? route('pickupList', '/api/kay-paolo/pickup-list') : route('shippingHistory', '/api/kay-paolo/shipping-history'), compactPayload({
+          limit: selectedLimit,
+          per_page: selectedLimit,
+          length: selectedLimit,
+          page: 1,
+          start: 0,
+          date_range: historyDateRangeValue(createdIn),
+          created_in: createdIn,
           search: firstValue('searchInput'),
-          user_id: storedUser().id || storedUser().account_number || undefined
-        });
+          user_id: userId || user.account_number || undefined,
+          agent_id: agentId,
+          agentId: agentId,
+          created_by: user.created_by || agentId,
+          created_by_id: user.created_by_id || agentId,
+          account_number: user.account_number || undefined
+        }));
 
         if (response.html) {
           const cards = extractHistoryCards(response.html);

@@ -346,7 +346,7 @@ class ZionApiProxyController extends Controller
 
     public function pickupList(Request $request): JsonResponse
     {
-        $payload = $request->except('_token');
+        $payload = $this->pickupListPayload($request);
 
         return $this->forwardAuthenticatedWithFallback([
             ['endpoint' => 'bocicot/shipping-history-filter'],
@@ -359,6 +359,38 @@ class ZionApiProxyController extends Controller
             ['endpoint' => 'kay-paolo/pickup-list-filter'],
             ['endpoint' => 'kay-paolo/pickup-list'],
         ], $request, $payload);
+    }
+
+    private function pickupListPayload(Request $request): array
+    {
+        $payload = $request->except('_token');
+        $limit = (int) ($payload['limit'] ?? $payload['length'] ?? $payload['per_page'] ?? 100);
+
+        if ($limit <= 0) {
+            $limit = 100;
+        }
+
+        $agentId = $payload['agent_id']
+            ?? $payload['agentId']
+            ?? $payload['created_by_id']
+            ?? $payload['created_by']
+            ?? $payload['user_id']
+            ?? null;
+
+        return $this->compactPayload(array_merge($payload, [
+            'limit' => $limit,
+            'per_page' => $limit,
+            'length' => $limit,
+            'page' => $payload['page'] ?? 1,
+            'start' => $payload['start'] ?? 0,
+            'date_range' => $payload['date_range'] ?? '',
+            'created_in' => $payload['created_in'] ?? 'All Shipments',
+            'agent_id' => $agentId,
+            'agentId' => $agentId,
+            'created_by' => $payload['created_by'] ?? $agentId,
+            'created_by_id' => $payload['created_by_id'] ?? $agentId,
+            'account_number' => $payload['account_number'] ?? $payload['from_account'] ?? null,
+        ]));
     }
 
     public function voidShipment(Request $request): JsonResponse
