@@ -293,7 +293,8 @@ class ExampleTest extends TestCase
         $this->get('/shipment-history?view=pickup')
             ->assertStatus(200)
             ->assertSee('Pickup List', false)
-            ->assertSee('Login first to view pickup list.', false);
+            ->assertSee('Login first to view pickup list.', false)
+            ->assertSee('All Shipments', false);
 
         $script = file_get_contents(public_path('kay-paolo/assets/app.js'));
 
@@ -530,12 +531,12 @@ class ExampleTest extends TestCase
         Http::assertNothingSent();
     }
 
-    public function test_pickup_list_proxy_uses_pickup_endpoint(): void
+    public function test_pickup_list_proxy_uses_shipping_history_feed(): void
     {
         Http::fake([
-            '*/api/bocicot/pickup-list-filter' => Http::response([
+            '*/api/bocicot/shipping-history-filter' => Http::response([
                 'status' => 'success',
-                'pickups' => [
+                'shippings' => [
                     ['id' => 88, 'status' => 'Ready to Ship', 'tracking_number' => 'PKP88'],
                 ],
             ]),
@@ -547,12 +548,13 @@ class ExampleTest extends TestCase
                 'user_id' => 7,
             ])
             ->assertOk()
-            ->assertJsonPath('pickups.0.tracking_number', 'PKP88');
+            ->assertJsonPath('shippings.0.tracking_number', 'PKP88');
 
         Http::assertSent(function ($request) {
-            return str_contains($request->url(), '/api/bocicot/pickup-list-filter')
+            return str_contains($request->url(), '/api/bocicot/shipping-history-filter')
                 && $request->hasHeader('Authorization', 'Bearer fake-token')
-                && ($request['pickup_status'] ?? null) === 'pending';
+                && ! array_key_exists('pickup_status', $request->data())
+                && ! array_key_exists('status', $request->data());
         });
     }
 

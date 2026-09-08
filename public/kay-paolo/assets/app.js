@@ -2131,9 +2131,7 @@ document.addEventListener('DOMContentLoaded', () => {
           date_range: historyDateRangeValue(firstValue('timeSelect')),
           created_in: firstValue('timeSelect'),
           search: firstValue('searchInput'),
-          user_id: storedUser().id || storedUser().account_number || undefined,
-          pickup_status: pickupMode ? 'pending' : undefined,
-          status: pickupMode ? 'pending' : undefined
+          user_id: storedUser().id || storedUser().account_number || undefined
         });
 
         if (response.html) {
@@ -2314,7 +2312,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!rows.length) {
       const pickupMode = queryParam('view').toLowerCase() === 'pickup';
       container.innerHTML = pickupMode
-        ? historyNoticeCard('No Pickups', 'Pickup list', 'No pending pickups found for this account.')
+        ? historyNoticeCard('No Pickups', 'Pickup list', 'No pickup list records found for this account.')
         : historyNoticeCard('No Shipments', 'Shipment history', 'No shipments found for this account.');
       return;
     }

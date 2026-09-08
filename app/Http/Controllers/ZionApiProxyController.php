@@ -346,21 +346,18 @@ class ZionApiProxyController extends Controller
 
     public function pickupList(Request $request): JsonResponse
     {
-        $payload = array_merge($request->except('_token'), [
-            'pickup_status' => $request->input('pickup_status', 'pending'),
-            'status' => $request->input('status', 'pending'),
-        ]);
+        $payload = $request->except('_token');
 
         return $this->forwardAuthenticatedWithFallback([
+            ['endpoint' => 'bocicot/shipping-history-filter'],
+            ['endpoint' => 'web-api/shipping-history-filter-bocicot', 'web' => true],
+            ['endpoint' => 'kay-paolo/shipping-history-filter'],
             ['endpoint' => 'bocicot/pickup-list-filter'],
             ['endpoint' => 'web-api/pickup-list-filter-bocicot', 'web' => true],
             ['endpoint' => 'bocicot/pickup-list'],
             ['endpoint' => 'web-api/pickup-list-bocicot', 'web' => true],
             ['endpoint' => 'kay-paolo/pickup-list-filter'],
             ['endpoint' => 'kay-paolo/pickup-list'],
-            ['endpoint' => 'bocicot/shipping-history-filter'],
-            ['endpoint' => 'web-api/shipping-history-filter-bocicot', 'web' => true],
-            ['endpoint' => 'kay-paolo/shipping-history-filter'],
         ], $request, $payload);
     }
 

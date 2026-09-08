@@ -32,10 +32,10 @@
 
                 <span style="margin-left: 20px">Created in</span>
                 <select id="timeSelect">
-                    <option>Last 30 Days</option>
+                    <option @selected(! $isPickupList)>Last 30 Days</option>
                     <option>Last 90 Days</option>
                     <option>This Year</option>
-                    <option>All Time</option>
+                    <option @selected($isPickupList)>All Shipments</option>
                 </select>
             </div>
             <div class="controls-right">
