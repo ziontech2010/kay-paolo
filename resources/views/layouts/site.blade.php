@@ -71,7 +71,8 @@
                     <div class="dropdown">
                         <a href="{{ route('quote') }}">Create a Shipment</a>
                         <a href="{{ route('quote') }}">Get Quote</a>
-                        <a href="{{ route('shipment-history') }}">Pickup List / Shipment History</a>
+                        <a href="{{ route('shipment-history', ['view' => 'pickup']) }}">Pickup List</a>
+                        <a href="{{ route('shipment-history') }}">Shipment History</a>
                         <a href="{{ route('shipment-history') }}">Invoices &amp; Receipts</a>
                     </div>
                 </li>
@@ -202,6 +203,7 @@
             flatRates: @json(route('api.kay-paolo.flat-rates')),
             saveConsignee: @json(route('api.kay-paolo.save-consignee')),
             shippingHistory: @json(route('api.kay-paolo.shipping-history')),
+            pickupList: @json(route('api.kay-paolo.pickup-list')),
             emailShipment: @json(route('api.kay-paolo.email-shipment')),
             voidShipment: @json(route('api.kay-paolo.void-shipping'))
         },

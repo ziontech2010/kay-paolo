@@ -290,6 +290,11 @@ class ExampleTest extends TestCase
             ->assertSee('history-card-main', false)
             ->assertSee('historyResult', false);
 
+        $this->get('/shipment-history?view=pickup')
+            ->assertStatus(200)
+            ->assertSee('Pickup List', false)
+            ->assertSee('Login first to view pickup list.', false);
+
         $script = file_get_contents(public_path('kay-paolo/assets/app.js'));
 
         $this->assertStringContainsString('history-card-details', $script);
@@ -305,6 +310,8 @@ class ExampleTest extends TestCase
         $this->assertStringContainsString('response?.data?.flat_rates', $script);
         $this->assertStringContainsString('response?.data?.all_options', $script);
         $this->assertStringContainsString('historyDateRangeValue', $script);
+        $this->assertStringContainsString("route('pickupList', '/api/kay-paolo/pickup-list')", $script);
+        $this->assertStringContainsString('Complete Pickup', $script);
         $this->assertStringContainsString("const countryCacheKey = 'kayPaoloCountries:v3'", $script);
         $this->assertStringContainsString('kayPaoloPaymentOptions:v4', $script);
     }
@@ -330,6 +337,8 @@ class ExampleTest extends TestCase
         $this->assertStringContainsString('history-more-menu', $script);
         $this->assertStringContainsString("data-history-action=\"label\"", $script);
         $this->assertStringContainsString('applyCouponBtn', $script);
+        $this->assertStringContainsString('clearQuoteResults', $script);
+        $this->assertStringContainsString("window.localStorage.removeItem('kayPaoloLastQuotePayload')", $script);
         $this->assertStringContainsString('const couponCode = firstValue(\'couponCode\')', $script);
         $this->assertStringContainsString('coupon: couponCode', $script);
         $this->assertStringContainsString('home_delivery_required: isHomeDelivery', $script);
@@ -496,6 +505,8 @@ class ExampleTest extends TestCase
 
     public function test_flat_rates_proxy_falls_back_when_bocicot_returns_server_error(): void
     {
+        Cache::flush();
+
         Http::fake([
             '*/web-api/get-flat-rates-bocicot' => Http::response([
                 'message' => 'Internal Server Error',
@@ -523,6 +534,32 @@ class ExampleTest extends TestCase
 
         Http::assertSent(function ($request) {
             return str_contains($request->url(), '/api/kay-paolo/get-flat-rates');
+        });
+    }
+
+    public function test_pickup_list_proxy_uses_pickup_endpoint(): void
+    {
+        Http::fake([
+            '*/api/bocicot/pickup-list-filter' => Http::response([
+                'status' => 'success',
+                'pickups' => [
+                    ['id' => 88, 'status' => 'Ready to Ship', 'tracking_number' => 'PKP88'],
+                ],
+            ]),
+        ]);
+
+        $this->withHeader('Authorization', 'Bearer fake-token')
+            ->postJson('/api/kay-paolo/pickup-list', [
+                'limit' => 25,
+                'user_id' => 7,
+            ])
+            ->assertOk()
+            ->assertJsonPath('pickups.0.tracking_number', 'PKP88');
+
+        Http::assertSent(function ($request) {
+            return str_contains($request->url(), '/api/bocicot/pickup-list-filter')
+                && $request->hasHeader('Authorization', 'Bearer fake-token')
+                && ($request['pickup_status'] ?? null) === 'pending';
         });
     }
 

@@ -8,30 +8,30 @@ use Illuminate\Support\Facades\Http;
 
 class ZionShippingApi
 {
-    public function post(string $endpoint, array $payload = [], ?string $token = null): array
+    public function post(string $endpoint, array $payload = [], ?string $token = null, ?int $timeout = null): array
     {
-        return $this->request('post', $endpoint, $payload, $token);
+        return $this->request('post', $endpoint, $payload, $token, false, $timeout);
     }
 
-    public function postWeb(string $endpoint, array $payload = [], ?string $token = null): array
+    public function postWeb(string $endpoint, array $payload = [], ?string $token = null, ?int $timeout = null): array
     {
-        return $this->request('post', $endpoint, $payload, $token, true);
+        return $this->request('post', $endpoint, $payload, $token, true, $timeout);
     }
 
-    public function get(string $endpoint, array $query = [], ?string $token = null): array
+    public function get(string $endpoint, array $query = [], ?string $token = null, ?int $timeout = null): array
     {
-        return $this->request('get', $endpoint, $query, $token);
+        return $this->request('get', $endpoint, $query, $token, false, $timeout);
     }
 
-    public function getWeb(string $endpoint, array $query = [], ?string $token = null): array
+    public function getWeb(string $endpoint, array $query = [], ?string $token = null, ?int $timeout = null): array
     {
-        return $this->request('get', $endpoint, $query, $token, true);
+        return $this->request('get', $endpoint, $query, $token, true, $timeout);
     }
 
-    public function getRaw(string $endpoint, array $query = [], ?string $token = null, bool $webPath = false): ?Response
+    public function getRaw(string $endpoint, array $query = [], ?string $token = null, bool $webPath = false, ?int $timeout = null): ?Response
     {
         $client = Http::baseUrl($this->baseUrl())
-            ->timeout((int) config('services.zion_shipping.timeout', 45));
+            ->timeout($timeout ?? (int) config('services.zion_shipping.timeout', 45));
 
         if ($token) {
             $client = $client->withToken($token);
@@ -71,11 +71,11 @@ class ZionShippingApi
         return 'api/'.$endpoint;
     }
 
-    private function request(string $method, string $endpoint, array $payload = [], ?string $token = null, bool $webPath = false): array
+    private function request(string $method, string $endpoint, array $payload = [], ?string $token = null, bool $webPath = false, ?int $timeout = null): array
     {
         $client = Http::baseUrl($this->baseUrl())
             ->acceptJson()
-            ->timeout((int) config('services.zion_shipping.timeout', 45));
+            ->timeout($timeout ?? (int) config('services.zion_shipping.timeout', 45));
 
         if ($token) {
             $client = $client->withToken($token);

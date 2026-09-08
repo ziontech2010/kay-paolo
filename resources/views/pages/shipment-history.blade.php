@@ -1,12 +1,17 @@
 @extends('layouts.site')
 
-@section('title', 'Shipment History | Kay Paolo Shipping')
+@php
+    $isPickupList = request()->query('view') === 'pickup';
+    $pageTitle = $isPickupList ? 'Pickup List' : 'Shipment History';
+@endphp
+
+@section('title', $pageTitle . ' | Kay Paolo Shipping')
 
 @section('banner')
 <div class="page-banner">
     <div class="wrap">
-        <h1>Shipment History</h1>
-        <div class="breadcrumb"><a href="{{ route('home') }}">Home</a><span class="sep">/</span><a href="{{ route('quote') }}">Shipping</a><span class="sep">/</span><span>Shipment History</span></div>
+        <h1>{{ $pageTitle }}</h1>
+        <div class="breadcrumb"><a href="{{ route('home') }}">Home</a><span class="sep">/</span><a href="{{ route('quote') }}">Shipping</a><span class="sep">/</span><span>{{ $pageTitle }}</span></div>
     </div>
 </div>
 @endsection
@@ -70,7 +75,7 @@
             </div>
 
             <div class="history-card-list" id="historyCardList">
-                <div class="api-alert error" id="authNotice">Login first to view shipment history.</div>
+                <div class="api-alert error" id="authNotice">Login first to view {{ strtolower($pageTitle) }}.</div>
                 <div class="api-loader" id="historyLoader" hidden>
                     <img src="{{ asset('kay-paolo/assets/processing-shipping.gif') }}" alt="Loading shipment history">
                 </div>
@@ -79,7 +84,7 @@
                         <div class="history-card-main">
                             <div class="history-card-col">
                                 <h4 style="color: var(--navy-800)">Loading</h4>
-                                <span class="status-lbl">Shipment history</span>
+                                <span class="status-lbl">{{ $pageTitle }}</span>
                                 <span class="meta-label">Account</span>
                                 <span class="meta-val">Waiting for your login session</span>
                             </div>
@@ -89,7 +94,7 @@
                                 <span class="meta-label">Delivery Option</span>
                                 <span class="meta-val">-</span>
                                 <span class="meta-label">Description</span>
-                                <span class="meta-val" style="font-weight: 600">Shipment history will load from your account.</span>
+                                <span class="meta-val" style="font-weight: 600">{{ $pageTitle }} will load from your account.</span>
                             </div>
                             <div class="history-card-col">
                                 <div class="address-block">

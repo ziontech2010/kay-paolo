@@ -39,6 +39,13 @@ class AccountAccessTest extends TestCase
 
     public function test_account_profile_update_changes_portal_session_contact_details(): void
     {
+        Http::fake([
+            '*/web-api/update-profile-bocicot' => Http::response([
+                'status' => 'success',
+                'message' => 'Profile updated.',
+            ]),
+        ]);
+
         $this->withSession($this->zionSession())
             ->post('/account/profile', [
                 'name' => 'Kay Paolo Admin',
@@ -53,7 +60,17 @@ class AccountAccessTest extends TestCase
             ->assertSessionHas('zion.user.name', 'Kay Paolo Admin')
             ->assertSessionHas('zion.user.email', 'admin@kaypaoloshipping.com')
             ->assertSessionHas('zion.user.phone', '7325550100')
+            ->assertSessionHas('zion.user.shipper_phone', '7325550100')
             ->assertSessionHas('zion.user.shipper_address', '414 Main St');
+
+        Http::assertSent(function (\Illuminate\Http\Client\Request $request) {
+            $data = $request->data();
+
+            return str_contains($request->url(), '/web-api/update-profile-bocicot')
+                && $request->hasHeader('Authorization', 'Bearer session-token')
+                && ($data['phone'] ?? null) === '7325550100'
+                && ($data['shipper_phone'] ?? null) === '7325550100';
+        });
     }
 
     public function test_account_exposes_pickup_invoice_security_and_profile_access(): void
@@ -63,6 +80,7 @@ class AccountAccessTest extends TestCase
             ->assertOk()
             ->assertSee('id="profileForm"', false)
             ->assertSee('id="profilePhone" name="phone" type="text" value="7325550100" readonly', false)
+            ->assertSee('/shipment-history?view=pickup', false)
             ->assertSee('Pickup List', false)
             ->assertSee('Invoices &amp; Receipts', false)
             ->assertSee('Security &amp; Password', false);

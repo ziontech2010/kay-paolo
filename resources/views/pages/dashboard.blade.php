@@ -10,9 +10,16 @@
         $zionUser['shipper_phone'] ?? null,
         $zionUser['shipper_phone_1'] ?? null,
         $zionUser['phone_number'] ?? null,
+        $zionUser['phoneNumber'] ?? null,
         $zionUser['mobile_phone'] ?? null,
+        $zionUser['mobileNumber'] ?? null,
+        $zionUser['mobile_number'] ?? null,
         $zionUser['contact_phone'] ?? null,
+        $zionUser['contactPhone'] ?? null,
         $zionUser['telephone'] ?? null,
+        $zionUser['telephone_number'] ?? null,
+        $zionUser['shipper_contact'] ?? null,
+        $zionUser['contact'] ?? null,
     ])->first(fn ($value) => filled($value)) ?? '');
     $profileAddress = old('address', $zionUser['shipper_address'] ?? $zionUser['address'] ?? '');
     $profileCity = old('city', $zionUser['shipper_city'] ?? $zionUser['city'] ?? '');
@@ -110,7 +117,7 @@
                 <h3>Create Quote</h3>
                 <p>Generate rates through Kay Paolo routes backed by live shipping data.</p>
             </a>
-            <a class="service-card action-card" href="{{ route('shipment-history') }}">
+            <a class="service-card action-card" href="{{ route('shipment-history', ['view' => 'pickup']) }}">
                 <span class="num">PICKUP</span>
                 <h3>Pickup List</h3>
                 <p>View scheduled pickups and shipment history from the connected shipping account.</p>

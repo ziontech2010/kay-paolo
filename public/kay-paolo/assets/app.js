@@ -613,9 +613,16 @@ document.addEventListener('DOMContentLoaded', () => {
       user?.shipper_phone,
       user?.shipper_phone_1,
       user?.phone_number,
+      user?.phoneNumber,
       user?.mobile_phone,
+      user?.mobileNumber,
+      user?.mobile_number,
       user?.contact_phone,
-      user?.telephone
+      user?.contactPhone,
+      user?.telephone,
+      user?.telephone_number,
+      user?.shipper_contact,
+      user?.contact
     ].map((item) => String(item || '').trim()).find(Boolean) || '';
   }
 
@@ -991,9 +998,21 @@ document.addEventListener('DOMContentLoaded', () => {
     const toCountryName = selectedCountryName(toCountry);
     const toCountryCode = countryCode(toCountry?.value || toCountryName);
     const fromState = firstValue('from_state');
-    const cacheKey = `${toCountryCode || 'any'}:${fromState || 'any'}`;
+    const quoteUserId = firstValue('quoteUserId') || storedUser().id || storedUser().account_number || 'guest';
+    const cacheKey = `${quoteUserId}:${toCountryCode || 'any'}:${fromState || 'any'}`;
 
     if (!force && select.dataset.loadedFor === cacheKey && select.options.length > 1) return;
+    if (!force && flatRateCache.has(cacheKey)) {
+      const cachedOptions = flatRateCache.get(cacheKey) || [];
+      populateFlatRateSelect(select, cachedOptions);
+      select.dataset.loadedFor = cacheKey;
+      select.disabled = false;
+      if (note) {
+        note.className = cachedOptions.length ? 'api-inline-result success pkg-flat-rate-note' : 'api-inline-result api-alert error pkg-flat-rate-note';
+        note.textContent = cachedOptions.length ? `${cachedOptions.length} flat rate item(s) loaded.` : 'No flat rate items available for this destination.';
+      }
+      return;
+    }
 
     const setNote = (message, isError = false) => {
       if (!note) return;
@@ -1245,11 +1264,18 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
-    const requestQuote = async () => {
+    const clearQuoteResults = () => {
       const container = document.getElementById('quoteResult');
       const shippingResult = document.getElementById('shippingResult');
       if (container) container.innerHTML = '';
       if (shippingResult) shippingResult.innerHTML = '';
+      window.localStorage.removeItem('kayPaoloLastQuotePayload');
+      window.localStorage.removeItem('kayPaoloLastQuoteResponse');
+    };
+
+    const requestQuote = async () => {
+      clearQuoteResults();
+      const container = document.getElementById('quoteResult');
       showLoader('quoteLoader', true);
 
       try {
@@ -1274,6 +1300,9 @@ document.addEventListener('DOMContentLoaded', () => {
       event.preventDefault();
       await requestQuote();
     });
+
+    quoteForm.addEventListener('input', clearQuoteResults);
+    quoteForm.addEventListener('change', clearQuoteResults);
 
     document.addEventListener('click', (event) => {
       const button = event.target.closest('.create-shipment-btn');
@@ -2107,6 +2136,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const result = document.getElementById('historyResult');
     const loader = document.getElementById('historyLoader');
+    const pickupMode = queryParam('view').toLowerCase() === 'pickup';
+    const historyLabel = pickupMode ? 'Pickup list' : 'Shipment history';
 
     const filter = () => {
       const query = value('searchInput').toLowerCase();
@@ -2123,16 +2154,18 @@ document.addEventListener('DOMContentLoaded', () => {
     const load = async () => {
       if (!result || !storedToken()) return;
 
-      result.innerHTML = historyNoticeCard('Loading', 'Shipment history', 'Loading shipment history from your account.');
+      result.innerHTML = historyNoticeCard('Loading', historyLabel, `Loading ${historyLabel.toLowerCase()} from your account.`);
       if (loader) loader.hidden = false;
 
       try {
-        const response = await postJson(route('shippingHistory', '/api/kay-paolo/shipping-history'), {
+        const response = await postJson(pickupMode ? route('pickupList', '/api/kay-paolo/pickup-list') : route('shippingHistory', '/api/kay-paolo/shipping-history'), {
           limit: firstValue('entriesSelect') || 100,
           date_range: historyDateRangeValue(firstValue('timeSelect')),
           created_in: firstValue('timeSelect'),
           search: firstValue('searchInput'),
-          user_id: storedUser().id || storedUser().account_number || undefined
+          user_id: storedUser().id || storedUser().account_number || undefined,
+          pickup_status: pickupMode ? 'pending' : undefined,
+          status: pickupMode ? 'pending' : undefined
         });
 
         if (response.html) {
@@ -2290,9 +2323,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function normalizeHistoryRows(response) {
     const candidates = [
+      response?.pickups,
+      response?.pickup_list,
       response?.shippings,
       response?.shipping_history,
       response?.history,
+      response?.data?.pickups,
+      response?.data?.pickup_list,
       response?.data?.shippings,
       response?.data?.shipping_history,
       response?.data?.history,
@@ -2307,7 +2344,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function renderHistoryRows(container, rows) {
     if (!rows.length) {
-      container.innerHTML = historyNoticeCard('No Shipments', 'Shipment history', 'No shipments found for this account.');
+      const pickupMode = queryParam('view').toLowerCase() === 'pickup';
+      container.innerHTML = pickupMode
+        ? historyNoticeCard('No Pickups', 'Pickup list', 'No pending pickups found for this account.')
+        : historyNoticeCard('No Shipments', 'Shipment history', 'No shipments found for this account.');
       return;
     }
 
@@ -2408,6 +2448,7 @@ document.addEventListener('DOMContentLoaded', () => {
             </div>
           </div>
           <div class="history-card-footer">
+            ${queryParam('view').toLowerCase() === 'pickup' ? '<button type="button" class="btn btn-gold" data-history-action="edit">Complete Pickup</button>' : ''}
             <div class="history-more">
               <button type="button" class="more-link" data-history-more-toggle aria-haspopup="true" aria-expanded="false">
                 More

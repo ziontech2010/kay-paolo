@@ -188,12 +188,35 @@ class ZionApiProxyController extends Controller
     public function flatRates(Request $request): JsonResponse
     {
         $payload = $this->sanitizeFlatRatePayload($request->except('_token'));
+        $token = $request->bearerToken();
 
-        return $this->forwardAuthenticatedWithFallback([
+        if (!$token) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Please login to Kay Paolo first.',
+            ], 401);
+        }
+
+        $cacheKey = 'kay-paolo-flat-rates:'.sha1(json_encode([
+            'payload' => $payload,
+            'token' => hash('sha256', $token),
+        ]));
+
+        if (is_array($cached = Cache::get($cacheKey))) {
+            return $this->jsonResponse($cached);
+        }
+
+        $response = $this->postWithFallback([
             ['endpoint' => 'web-api/get-flat-rates-bocicot', 'web' => true],
             ['endpoint' => 'bocicot/get-flat-rates'],
             ['endpoint' => 'kay-paolo/get-flat-rates'],
-        ], $request, $payload);
+        ], $payload, $token, 8);
+
+        if (($response['ok'] ?? false)) {
+            Cache::put($cacheKey, $response, now()->addMinutes(15));
+        }
+
+        return $this->jsonResponse($response);
     }
 
     public function saveConsignee(Request $request): JsonResponse
@@ -336,6 +359,26 @@ class ZionApiProxyController extends Controller
             ['endpoint' => 'web-api/shipping-history-filter-bocicot', 'web' => true],
             ['endpoint' => 'kay-paolo/shipping-history-filter'],
         ], $request);
+    }
+
+    public function pickupList(Request $request): JsonResponse
+    {
+        $payload = array_merge($request->except('_token'), [
+            'pickup_status' => $request->input('pickup_status', 'pending'),
+            'status' => $request->input('status', 'pending'),
+        ]);
+
+        return $this->forwardAuthenticatedWithFallback([
+            ['endpoint' => 'bocicot/pickup-list-filter'],
+            ['endpoint' => 'web-api/pickup-list-filter-bocicot', 'web' => true],
+            ['endpoint' => 'bocicot/pickup-list'],
+            ['endpoint' => 'web-api/pickup-list-bocicot', 'web' => true],
+            ['endpoint' => 'kay-paolo/pickup-list-filter'],
+            ['endpoint' => 'kay-paolo/pickup-list'],
+            ['endpoint' => 'bocicot/shipping-history-filter'],
+            ['endpoint' => 'web-api/shipping-history-filter-bocicot', 'web' => true],
+            ['endpoint' => 'kay-paolo/shipping-history-filter'],
+        ], $request, $payload);
     }
 
     public function voidShipment(Request $request): JsonResponse
@@ -838,15 +881,16 @@ class ZionApiProxyController extends Controller
         ));
     }
 
-    private function postWithFallback(array $targets, array $payload, ?string $token = null): array
+    private function postWithFallback(array $targets, array $payload, ?string $token = null, ?int $timeout = null): array
     {
         $lastResponse = null;
 
         foreach ($targets as $target) {
             $endpoint = $target['endpoint'];
+            $requestTimeout = $target['timeout'] ?? $timeout;
             $lastResponse = !empty($target['web'])
-                ? $this->zion->postWeb($endpoint, $payload, $token)
-                : $this->zion->post($endpoint, $payload, $token);
+                ? $this->zion->postWeb($endpoint, $payload, $token, $requestTimeout)
+                : $this->zion->post($endpoint, $payload, $token, $requestTimeout);
 
             if ($lastResponse['ok'] && !$this->shouldTryFallback($lastResponse)) {
                 return $lastResponse;
