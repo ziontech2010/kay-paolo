@@ -340,6 +340,8 @@ class ExampleTest extends TestCase
         $this->assertStringContainsString('applyCouponBtn', $script);
         $this->assertStringContainsString('clearQuoteResults', $script);
         $this->assertStringContainsString("window.localStorage.removeItem('kayPaoloLastQuotePayload')", $script);
+        $this->assertStringContainsString("numberValue(firstValue('totalValue', 'package_value'), 0)", $script);
+        $this->assertStringContainsString('hasNonZeroMoney(discount)', $script);
         $this->assertStringContainsString('const couponCode = firstValue(\'couponCode\')', $script);
         $this->assertStringContainsString('coupon: couponCode', $script);
         $this->assertStringContainsString('home_delivery_required: isHomeDelivery', $script);
@@ -399,6 +401,8 @@ class ExampleTest extends TestCase
                 && ($request['coupon'] ?? null) === 'SAVE10'
                 && ($request['promo_code'] ?? null) === 'SAVE10'
                 && ($request['home_delivery_required'] ?? null) === 1
+                && ($request['total_value'] ?? null) === 0
+                && ($request['package_value'] ?? null) === 0
                 && ($request['flat_rate_price'][0] ?? null) === '88.00';
         });
 

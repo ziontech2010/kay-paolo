@@ -2079,6 +2079,11 @@ document.addEventListener('DOMContentLoaded', () => {
     return `$${raw || '0.00'}`;
   }
 
+  function hasNonZeroMoney(amount) {
+    const numeric = Number(String(amount ?? '').replace(/[^0-9.-]/g, ''));
+    return Number.isFinite(numeric) && Math.abs(numeric) > 0.004;
+  }
+
   function readableDate(dateValue) {
     const normalized = dateValue instanceof Date
       ? dateValue
@@ -2801,8 +2806,8 @@ document.addEventListener('DOMContentLoaded', () => {
       to_phone_2: firstValue('toHomePhone', 'to_phone_2'),
       consignee_phone: firstValue('toPhone', 'to_phone_1'),
       package_count: dimensionPieceCountFromDimensions(dimensions),
-      total_value: numberValue(firstValue('totalValue', 'package_value'), 10),
-      package_value: numberValue(firstValue('totalValue', 'package_value'), 10),
+      total_value: numberValue(firstValue('totalValue', 'package_value'), 0),
+      package_value: numberValue(firstValue('totalValue', 'package_value'), 0),
       dimensions,
       flat_rate: flatRate,
       shipment_type: shipmentType,
@@ -3031,7 +3036,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const flatRateLabel = padArray(payload.flat_rate_label, rowCount, '');
     const deliveryLocation = normalizeDeliveryLocation(payload.delivery_location || payload.deliveryLocation);
     const selectedShipper = payload.selected_shipper || payload.delivery_option || '';
-    const declaredValue = numberValue(payload.total_value || payload.package_value, 10);
+    const declaredValue = numberValue(payload.total_value || payload.package_value, 0);
     const fragileShipment = payload.is_fragile_shipment ?? payload.fragile_shipment ?? 0;
     const couponCode = payload.promo || payload.coupon_code || payload.coupon || payload.promo_code || payload.discount_code || '';
     const isHomeDelivery = deliveryLocation.toLowerCase().includes('home') ? 1 : 0;
@@ -3500,7 +3505,7 @@ document.addEventListener('DOMContentLoaded', () => {
           <div class="breakdown-item"><span>Freight:</span> <span class="mono">${escapeHtml(freight)}</span></div>
           <div class="breakdown-item"><span>Insurance:</span> <span class="mono">${escapeHtml(insurance)}</span></div>
           <div class="breakdown-item"><span>Home Delivery:</span> <span class="mono">${escapeHtml(homeDelivery)}</span></div>
-          ${discount ? `<div class="breakdown-item"><span>Discount:</span> <span class="mono">${escapeHtml(discount)}</span></div>` : ''}
+          ${hasNonZeroMoney(discount) ? `<div class="breakdown-item"><span>Discount:</span> <span class="mono">${escapeHtml(discount)}</span></div>` : ''}
           <div class="breakdown-item"><span>Tax:</span> <span class="mono">${escapeHtml(tax)}</span></div>
         </div>
         <div class="rate-price-action">

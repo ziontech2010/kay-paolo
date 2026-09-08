@@ -902,7 +902,7 @@ class ZionApiProxyController extends Controller
         $shipmentType = $this->padArray($payload['shipment_type'] ?? [], $rowCount, '');
         $deliveryLocation = $this->normalizeDeliveryLocation($payload['delivery_location'] ?? $payload['deliveryLocation'] ?? '');
         $selectedShipper = $payload['selected_shipper'] ?? $payload['delivery_option'] ?? null;
-        $declaredValue = $this->positiveNumber($payload['total_value'] ?? $payload['package_value'] ?? null, 10);
+        $declaredValue = $this->positiveNumber($payload['total_value'] ?? $payload['package_value'] ?? null, 0);
         $fragileShipment = $payload['is_fragile_shipment'] ?? $payload['fragile_shipment'] ?? 0;
 
         return $this->compactPayload([
@@ -1035,7 +1035,7 @@ class ZionApiProxyController extends Controller
         $flatRate = $this->padArray($payload['flat_rate'] ?? [], $rowCount, '0');
         $shipmentType = $this->padArray($payload['shipment_type'] ?? [], $rowCount, '');
         $deliveryLocation = $this->normalizeDeliveryLocation($payload['delivery_location'] ?? $payload['deliveryLocation'] ?? '');
-        $declaredValue = $this->positiveNumber($payload['total_value'] ?? $payload['package_value'] ?? null, 10);
+        $declaredValue = $this->positiveNumber($payload['total_value'] ?? $payload['package_value'] ?? null, 0);
         $fragileShipment = $payload['is_fragile_shipment'] ?? $payload['fragile_shipment'] ?? 0;
         $promo = trim((string) ($payload['promo'] ?? $payload['coupon_code'] ?? $payload['coupon'] ?? $payload['promo_code'] ?? $payload['discount_code'] ?? ''));
 
