@@ -346,24 +346,22 @@ class ZionApiProxyController extends Controller
 
     public function pickupList(Request $request): JsonResponse
     {
+        // Zion has no agent pickup-list API. Reuse the working shipping-history JSON feed
+        // (same Bocicot/Kay Paolo paths as shippingHistory) so pickup view stays in sync.
         $payload = $this->pickupListPayload($request);
 
         return $this->forwardAuthenticatedWithFallback([
+            ['endpoint' => 'kay-paolo/shipping-history-filter'],
             ['endpoint' => 'bocicot/shipping-history-filter'],
             ['endpoint' => 'web-api/shipping-history-filter-bocicot', 'web' => true],
-            ['endpoint' => 'kay-paolo/shipping-history-filter'],
-            ['endpoint' => 'bocicot/pickup-list-filter'],
-            ['endpoint' => 'web-api/pickup-list-filter-bocicot', 'web' => true],
-            ['endpoint' => 'bocicot/pickup-list'],
-            ['endpoint' => 'web-api/pickup-list-bocicot', 'web' => true],
-            ['endpoint' => 'kay-paolo/pickup-list-filter'],
-            ['endpoint' => 'kay-paolo/pickup-list'],
         ], $request, $payload);
     }
 
     private function pickupListPayload(Request $request): array
     {
         $payload = $request->except('_token');
+        unset($payload['status'], $payload['pickup_status']);
+
         $limit = (int) ($payload['limit'] ?? $payload['length'] ?? $payload['per_page'] ?? 100);
 
         if ($limit <= 0) {

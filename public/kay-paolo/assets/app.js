@@ -2316,9 +2316,23 @@ document.addEventListener('DOMContentLoaded', () => {
       response?.data?.history,
       response?.data?.data,
       response?.data
-    ].find((item) => Array.isArray(item) || (item && typeof item === 'object'));
+    ].find((item) => (Array.isArray(item) && item.length) || (item && typeof item === 'object' && !Array.isArray(item) && Object.keys(item).length));
 
-    if (!candidates) return [];
+    if (!candidates) {
+      const emptyList = [
+        response?.shippings,
+        response?.shipping_history,
+        response?.pickups,
+        response?.pickup_list,
+        response?.history,
+        response?.data?.shippings,
+        response?.data?.shipping_history,
+        response?.data?.pickups,
+        response?.data?.pickup_list,
+        response?.data?.history
+      ].find((item) => Array.isArray(item));
+      return emptyList || [];
+    }
 
     return Array.isArray(candidates) ? candidates : Object.values(candidates);
   }
@@ -2491,7 +2505,23 @@ document.addEventListener('DOMContentLoaded', () => {
   function historyStatus(row) {
     const raw = historyField(row, ['status_name', 'shipping_status', 'status'], 'Ready to Ship');
     const status = raw.toLowerCase();
+    const statusByCode = {
+      '1': 'Ready to Ship',
+      '2': 'Picked Up',
+      '3': 'In Transit',
+      '4': 'Customs',
+      '5': 'Delayed',
+      '6': 'Available',
+      '7': 'Not Deliverable',
+      '8': 'Delivered',
+      '9': 'Voided',
+      '10': 'Out for Delivery',
+      '11': 'Transfer in Office',
+      '12': 'Awaiting for Delivery',
+      '13': 'Not Delivered'
+    };
 
+    if (statusByCode[status]) return statusByCode[status];
     if (status.includes('void')) return 'Voided';
     if (status.includes('not deliver')) return 'Not Deliverable';
     if (status.includes('deliver')) return 'Delivered';

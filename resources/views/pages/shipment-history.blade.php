@@ -50,15 +50,15 @@
                     <div class="shipment-card-header" style="text-transform: none; font-family: 'Inter', sans-serif; font-size: 16px; font-weight: 700; letter-spacing: 0; padding: 12px 20px">Status</div>
                     <div class="shipment-card-body" style="padding: 20px">
                         <div class="filter-list">
-                            <label class="filter-item"><span class="filter-item-label"><input type="checkbox" class="status-filter" value="Ready to Ship"> Ready to Ship</span><span class="filter-badge badge-ready" data-history-status-badge="Ready to Ship">9.91%</span></label>
+                            <label class="filter-item"><span class="filter-item-label"><input type="checkbox" class="status-filter" value="Ready to Ship"> Ready to Ship</span><span class="filter-badge badge-ready" data-history-status-badge="Ready to Ship">0.00%</span></label>
                             <label class="filter-item"><span class="filter-item-label"><input type="checkbox" class="status-filter" value="Picked Up"> Picked Up</span><span class="filter-badge badge-ready" style="background:#e6fcf5;color:#099268" data-history-status-badge="Picked Up">0.00%</span></label>
-                            <label class="filter-item"><span class="filter-item-label"><input type="checkbox" class="status-filter" value="In Transit"> In Transit</span><span class="filter-badge badge-transit" data-history-status-badge="In Transit">8.36%</span></label>
-                            <label class="filter-item"><span class="filter-item-label"><input type="checkbox" class="status-filter" value="Customs"> Customs</span><span class="filter-badge badge-customs" data-history-status-badge="Customs">9.91%</span></label>
+                            <label class="filter-item"><span class="filter-item-label"><input type="checkbox" class="status-filter" value="In Transit"> In Transit</span><span class="filter-badge badge-transit" data-history-status-badge="In Transit">0.00%</span></label>
+                            <label class="filter-item"><span class="filter-item-label"><input type="checkbox" class="status-filter" value="Customs"> Customs</span><span class="filter-badge badge-customs" data-history-status-badge="Customs">0.00%</span></label>
                             <label class="filter-item"><span class="filter-item-label"><input type="checkbox" class="status-filter" value="Delayed"> Delayed</span><span class="filter-badge badge-delayed" data-history-status-badge="Delayed">0.00%</span></label>
-                            <label class="filter-item"><span class="filter-item-label"><input type="checkbox" class="status-filter" value="Available"> Available</span><span class="filter-badge badge-available" data-history-status-badge="Available">1.55%</span></label>
-                            <label class="filter-item"><span class="filter-item-label"><input type="checkbox" class="status-filter" value="Not Deliverable"> Not Deliverable</span><span class="filter-badge badge-notdel" data-history-status-badge="Not Deliverable">0.62%</span></label>
-                            <label class="filter-item"><span class="filter-item-label"><input type="checkbox" class="status-filter" value="Delivered"> Delivered</span><span class="filter-badge badge-delivered" data-history-status-badge="Delivered">68.42%</span></label>
-                            <label class="filter-item"><span class="filter-item-label"><input type="checkbox" class="status-filter" value="Voided"> Voided</span><span class="filter-badge badge-voided" data-history-status-badge="Voided">0.62%</span></label>
+                            <label class="filter-item"><span class="filter-item-label"><input type="checkbox" class="status-filter" value="Available"> Available</span><span class="filter-badge badge-available" data-history-status-badge="Available">0.00%</span></label>
+                            <label class="filter-item"><span class="filter-item-label"><input type="checkbox" class="status-filter" value="Not Deliverable"> Not Deliverable</span><span class="filter-badge badge-notdel" data-history-status-badge="Not Deliverable">0.00%</span></label>
+                            <label class="filter-item"><span class="filter-item-label"><input type="checkbox" class="status-filter" value="Delivered"> Delivered</span><span class="filter-badge badge-delivered" data-history-status-badge="Delivered">0.00%</span></label>
+                            <label class="filter-item"><span class="filter-item-label"><input type="checkbox" class="status-filter" value="Voided"> Voided</span><span class="filter-badge badge-voided" data-history-status-badge="Voided">0.00%</span></label>
                         </div>
                     </div>
                 </div>
@@ -67,8 +67,8 @@
                     <div class="shipment-card-header" style="text-transform: none; font-family: 'Inter', sans-serif; font-size: 16px; font-weight: 700; letter-spacing: 0; padding: 12px 20px">Category</div>
                     <div class="shipment-card-body" style="padding: 20px">
                         <div class="filter-list">
-                            <label class="filter-item"><span class="filter-item-label"><input type="checkbox" class="category-filter" value="Domestic"> Domestic</span><span class="filter-badge badge-gray" data-history-category-badge="Domestic">20.43%</span></label>
-                            <label class="filter-item"><span class="filter-item-label"><input type="checkbox" class="category-filter" value="International"> International</span><span class="filter-badge badge-gray" data-history-category-badge="International">79.57%</span></label>
+                            <label class="filter-item"><span class="filter-item-label"><input type="checkbox" class="category-filter" value="Domestic"> Domestic</span><span class="filter-badge badge-gray" data-history-category-badge="Domestic">0.00%</span></label>
+                            <label class="filter-item"><span class="filter-item-label"><input type="checkbox" class="category-filter" value="International"> International</span><span class="filter-badge badge-gray" data-history-category-badge="International">0.00%</span></label>
                         </div>
                     </div>
                 </div>
