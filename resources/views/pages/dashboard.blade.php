@@ -54,7 +54,6 @@
                 <p class="muted-text">Logged in and stored in the Kay Paolo session.</p>
                 <dl class="session-list">
                     <div><dt>Role</dt><dd id="dashboardRole">{{ $zionUser['role']['name'] ?? 'User' }}</dd></div>
-                    <div><dt>Role ID</dt><dd id="dashboardRoleId">{{ $zionUser['role_id'] ?? '-' }}</dd></div>
                     <div><dt>Email</dt><dd id="dashboardEmail">{{ $zionUser['email'] ?? '-' }}</dd></div>
                     <div><dt>Phone</dt><dd id="dashboardPhone">{{ $profilePhone ?: '-' }}</dd></div>
                     <div><dt>Account</dt><dd id="dashboardAccount">{{ $zionUser['account_number'] ?? '-' }}</dd></div>
@@ -64,26 +63,17 @@
                 </div>
             </div>
 
-            <form class="contact-form compact-form account-profile-form" method="POST" action="{{ route('account.profile.update') }}" id="profileForm">
-                @csrf
+            <div class="contact-form compact-form account-profile-form" id="profileForm">
                 <h3>Profile</h3>
-
-                @if (session('profile_status'))
-                    <div class="api-alert success">{{ session('profile_status') }}</div>
-                @endif
-
-                @if ($errors->any())
-                    <div class="api-alert error">{{ $errors->first() }}</div>
-                @endif
 
                 <div class="field">
                     <label for="profileName">Name</label>
-                    <input id="profileName" name="name" type="text" value="{{ $profileName }}" required>
+                    <input id="profileName" name="name" type="text" value="{{ $profileName }}" readonly>
                 </div>
                 <div class="form-row-2">
                     <div class="field">
                         <label for="profileEmail">Email</label>
-                        <input id="profileEmail" name="email" type="email" value="{{ $profileEmail }}" required>
+                        <input id="profileEmail" name="email" type="email" value="{{ $profileEmail }}" readonly>
                     </div>
                     <div class="field">
                         <label for="profilePhone">Phone</label>
@@ -92,24 +82,23 @@
                 </div>
                 <div class="field">
                     <label for="profileAddress">Address</label>
-                    <input id="profileAddress" name="address" type="text" value="{{ $profileAddress }}">
+                    <input id="profileAddress" name="address" type="text" value="{{ $profileAddress }}" readonly>
                 </div>
                 <div class="form-row-3">
                     <div class="field">
                         <label for="profileCity">City</label>
-                        <input id="profileCity" name="city" type="text" value="{{ $profileCity }}">
+                        <input id="profileCity" name="city" type="text" value="{{ $profileCity }}" readonly>
                     </div>
                     <div class="field">
                         <label for="profileState">State</label>
-                        <input id="profileState" name="state" type="text" value="{{ $profileState }}">
+                        <input id="profileState" name="state" type="text" value="{{ $profileState }}" readonly>
                     </div>
                     <div class="field">
                         <label for="profileZip">Zip</label>
-                        <input id="profileZip" name="zip" type="text" value="{{ $profileZip }}">
+                        <input id="profileZip" name="zip" type="text" value="{{ $profileZip }}" readonly>
                     </div>
                 </div>
-                <button class="btn btn-gold" type="submit">Save Profile</button>
-            </form>
+            </div>
         </div>
         <div class="dashboard-actions">
             <a class="service-card action-card" href="{{ route('quote') }}">

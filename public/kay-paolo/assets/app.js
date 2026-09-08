@@ -587,7 +587,6 @@ document.addEventListener('DOMContentLoaded', () => {
     if (user && Object.keys(user).length) {
       dashboardName.textContent = user.name || 'Kay Paolo user';
       setText('dashboardRole', user.role?.name || 'User');
-      setText('dashboardRoleId', user.role_id || '-');
       setText('dashboardEmail', user.email || '-');
       setText('dashboardPhone', userPhone(user) || '-');
       setText('dashboardAccount', user.account_number || user.id || '-');

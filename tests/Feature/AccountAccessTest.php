@@ -79,11 +79,30 @@ class AccountAccessTest extends TestCase
             ->get('/account')
             ->assertOk()
             ->assertSee('id="profileForm"', false)
+            ->assertSee('id="profileName" name="name" type="text" value="', false)
+            ->assertSee('id="profileEmail" name="email" type="email" value="', false)
             ->assertSee('id="profilePhone" name="phone" type="text" value="7325550100" readonly', false)
+            ->assertSee('id="profileAddress" name="address" type="text"', false)
+            ->assertSee('id="profileCity" name="city" type="text"', false)
+            ->assertSee('id="profileState" name="state" type="text"', false)
+            ->assertSee('id="profileZip" name="zip" type="text"', false)
+            ->assertSee('readonly>', false)
+            ->assertDontSee('Role ID', false)
+            ->assertDontSee('Save Profile', false)
+            ->assertDontSee('account.profile.update', false)
             ->assertSee('/shipment-history?view=pickup', false)
             ->assertSee('Pickup List', false)
             ->assertSee('Invoices &amp; Receipts', false)
             ->assertSee('Security &amp; Password', false);
+
+        $html = $this->withSession($this->zionSession())->get('/account')->getContent();
+        foreach (['profileName', 'profileEmail', 'profilePhone', 'profileAddress', 'profileCity', 'profileState', 'profileZip'] as $fieldId) {
+            $this->assertMatchesRegularExpression(
+                '/id="'.$fieldId.'"[^>]*\breadonly\b/',
+                $html,
+                "Expected {$fieldId} to be readonly."
+            );
+        }
     }
 
     public function test_security_password_contact_url_shows_password_form(): void
