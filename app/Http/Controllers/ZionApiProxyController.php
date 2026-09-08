@@ -187,7 +187,6 @@ class ZionApiProxyController extends Controller
 
     public function flatRates(Request $request): JsonResponse
     {
-        $payload = $this->sanitizeFlatRatePayload($request->except('_token'));
         $token = $request->bearerToken();
 
         if (!$token) {
@@ -197,26 +196,10 @@ class ZionApiProxyController extends Controller
             ], 401);
         }
 
-        $cacheKey = 'kay-paolo-flat-rates:'.sha1(json_encode([
-            'payload' => $payload,
-            'token' => hash('sha256', $token),
-        ]));
-
-        if (is_array($cached = Cache::get($cacheKey))) {
-            return $this->jsonResponse($cached);
-        }
-
-        $response = $this->postWithFallback([
-            ['endpoint' => 'web-api/get-flat-rates-bocicot', 'web' => true],
-            ['endpoint' => 'bocicot/get-flat-rates'],
-            ['endpoint' => 'kay-paolo/get-flat-rates'],
-        ], $payload, $token, 8);
-
-        if (($response['ok'] ?? false)) {
-            Cache::put($cacheKey, $response, now()->addMinutes(15));
-        }
-
-        return $this->jsonResponse($response);
+        return response()->json([
+            'status' => 'success',
+            'flat_rates' => [$this->zionDocumentFlatRate()],
+        ]);
     }
 
     public function saveConsignee(Request $request): JsonResponse
@@ -1023,6 +1006,26 @@ class ZionApiProxyController extends Controller
             'selected_shipper' => $payload['selected_shipper'] ?? $payload['delivery_option'] ?? $payload['service'] ?? null,
             'delivery_option' => $payload['delivery_option'] ?? $payload['selected_shipper'] ?? $payload['service'] ?? null,
         ]);
+    }
+
+    private function zionDocumentFlatRate(): array
+    {
+        return [
+            'slug' => 'contains_document',
+            'value' => 'contains_document',
+            'shipment_type' => 'contains_document',
+            'label' => 'Document',
+            'name' => 'Document',
+            'group' => 'Flat Rate',
+            'readonly_dimensions' => true,
+            'default_dimensions' => [
+                'package_count_ind' => 1,
+                'weight' => '0.5',
+                'length' => '12',
+                'width' => '8',
+                'height' => '1',
+            ],
+        ];
     }
 
     private function sanitizeQuotePayload(array $payload): array

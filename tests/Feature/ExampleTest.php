@@ -312,6 +312,7 @@ class ExampleTest extends TestCase
         $this->assertStringContainsString('historyDateRangeValue', $script);
         $this->assertStringContainsString("route('pickupList', '/api/kay-paolo/pickup-list')", $script);
         $this->assertStringContainsString('Complete Pickup', $script);
+        $this->assertStringContainsString('zionFlatRateOptions', $script);
         $this->assertStringContainsString("const countryCacheKey = 'kayPaoloCountries:v3'", $script);
         $this->assertStringContainsString('kayPaoloPaymentOptions:v4', $script);
     }
@@ -503,24 +504,9 @@ class ExampleTest extends TestCase
             ->assertJsonPath('customer.account_number', '9400');
     }
 
-    public function test_flat_rates_proxy_falls_back_when_bocicot_returns_server_error(): void
+    public function test_flat_rates_endpoint_matches_zion_document_option(): void
     {
-        Cache::flush();
-
-        Http::fake([
-            '*/web-api/get-flat-rates-bocicot' => Http::response([
-                'message' => 'Internal Server Error',
-            ], 500),
-            '*/api/bocicot/get-flat-rates' => Http::response([
-                'message' => 'Not Found',
-            ], 404),
-            '*/api/kay-paolo/get-flat-rates' => Http::response([
-                'status' => 'success',
-                'flat_rates' => [
-                    ['slug' => 'regular_boat_box', 'label' => 'Regular Boat Box', 'price' => '88.00'],
-                ],
-            ]),
-        ]);
+        Http::fake();
 
         $this->withHeader('Authorization', 'Bearer fake-token')
             ->postJson('/api/kay-paolo/flat-rates', [
@@ -529,12 +515,15 @@ class ExampleTest extends TestCase
                 'shipment_type' => 'regular_boat',
             ])
             ->assertOk()
-            ->assertJsonPath('flat_rates.0.slug', 'regular_boat_box')
-            ->assertJsonPath('flat_rates.0.price', '88.00');
+            ->assertJsonPath('status', 'success')
+            ->assertJsonPath('flat_rates.0.slug', 'contains_document')
+            ->assertJsonPath('flat_rates.0.label', 'Document')
+            ->assertJsonPath('flat_rates.0.default_dimensions.weight', '0.5')
+            ->assertJsonPath('flat_rates.0.default_dimensions.length', '12')
+            ->assertJsonPath('flat_rates.0.default_dimensions.width', '8')
+            ->assertJsonPath('flat_rates.0.default_dimensions.height', '1');
 
-        Http::assertSent(function ($request) {
-            return str_contains($request->url(), '/api/kay-paolo/get-flat-rates');
-        });
+        Http::assertNothingSent();
     }
 
     public function test_pickup_list_proxy_uses_pickup_endpoint(): void

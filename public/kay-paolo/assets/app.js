@@ -8,7 +8,6 @@ document.addEventListener('DOMContentLoaded', () => {
   const trackingResponseKey = 'kayPaoloTrackingResponse';
   const countryCacheKey = 'kayPaoloCountries:v3';
   const paymentOptionsCacheKey = () => `kayPaoloPaymentOptions:v4:${storedUser().id || storedUser().account_number || 'guest'}`;
-  const flatRateCache = new Map();
 
   const route = (name, fallback) => config.routes?.[name] || fallback;
   const storedToken = () => window.localStorage.getItem(tokenKey) || '';
@@ -984,77 +983,41 @@ document.addEventListener('DOMContentLoaded', () => {
   function reloadVisibleFlatRateFields(container) {
     container.querySelectorAll('.package-block').forEach((block) => {
       if (block.querySelector('.pkg-flat-rate')?.checked) {
-        loadFlatRatesForBlock(block, true);
+        loadFlatRatesForBlock(block);
       }
     });
   }
 
-  async function loadFlatRatesForBlock(block, force = false) {
+  function loadFlatRatesForBlock(block) {
     const select = block.querySelector('.pkg-flat-rate-type');
     const note = block.querySelector('.pkg-flat-rate-note');
     if (!select) return;
 
-    const toCountry = firstElement('toCountry', 'to_country');
-    const toCountryName = selectedCountryName(toCountry);
-    const toCountryCode = countryCode(toCountry?.value || toCountryName);
-    const fromState = firstValue('from_state');
-    const quoteUserId = firstValue('quoteUserId') || storedUser().id || storedUser().account_number || 'guest';
-    const cacheKey = `${quoteUserId}:${toCountryCode || 'any'}:${fromState || 'any'}`;
+    populateFlatRateSelect(select, zionFlatRateOptions());
+    select.disabled = false;
+    if (note) {
+      note.textContent = '';
+      note.className = 'api-inline-result pkg-flat-rate-note';
+    }
+  }
 
-    if (!force && select.dataset.loadedFor === cacheKey && select.options.length > 1) return;
-    if (!force && flatRateCache.has(cacheKey)) {
-      const cachedOptions = flatRateCache.get(cacheKey) || [];
-      populateFlatRateSelect(select, cachedOptions);
-      select.dataset.loadedFor = cacheKey;
-      select.disabled = false;
-      if (note) {
-        note.className = cachedOptions.length ? 'api-inline-result success pkg-flat-rate-note' : 'api-inline-result api-alert error pkg-flat-rate-note';
-        note.textContent = cachedOptions.length ? `${cachedOptions.length} flat rate item(s) loaded.` : 'No flat rate items available for this destination.';
+  function zionFlatRateOptions() {
+    return [{
+      slug: 'contains_document',
+      value: 'contains_document',
+      shipment_type: 'contains_document',
+      label: 'Document',
+      name: 'Document',
+      group: 'Flat Rate',
+      readonly_dimensions: true,
+      default_dimensions: {
+        package_count_ind: 1,
+        weight: '0.5',
+        length: '12',
+        width: '8',
+        height: '1'
       }
-      return;
-    }
-
-    const setNote = (message, isError = false) => {
-      if (!note) return;
-      note.className = isError ? 'api-inline-result api-alert error pkg-flat-rate-note' : 'api-inline-result success pkg-flat-rate-note';
-      note.textContent = message;
-    };
-
-    select.disabled = true;
-    select.innerHTML = '<option value="">Loading flat rate items...</option>';
-    setNote('Loading live flat rate items...');
-
-    try {
-      const response = await postJson(route('flatRates', '/api/kay-paolo/flat-rates'), {
-        user_id: firstValue('quoteUserId') || storedUser().id || undefined,
-        quote_user_id: firstValue('quoteUserId') || storedUser().id || undefined,
-        agent_id: storedUser().agent_id || storedUser().id || undefined,
-        to_country: toCountryCode || undefined,
-        country: toCountryCode || undefined,
-        country_code: toCountryCode || undefined,
-        to_country_name: toCountryName || undefined,
-        from_state: fromState || undefined,
-        origin_state: fromState || undefined,
-        to: {
-          country: toCountryCode || undefined,
-          country_name: toCountryName || undefined
-        },
-        from: {
-          state: fromState || undefined
-        }
-      });
-      const options = normalizeFlatRateOptions(response);
-      flatRateCache.set(cacheKey, options);
-      populateFlatRateSelect(select, options);
-      select.dataset.loadedFor = cacheKey;
-      select.disabled = false;
-      setNote(options.length ? `${options.length} flat rate item(s) loaded.` : 'No flat rate items available for this destination.', options.length === 0);
-    } catch (error) {
-      populateFlatRateSelect(select, []);
-      select.dataset.loadedFor = cacheKey;
-      select.disabled = false;
-      setNote('Unable to load live flat rate items from the shipping API.', true);
-    }
+    }];
   }
 
   function normalizeFlatRateOptions(response) {
