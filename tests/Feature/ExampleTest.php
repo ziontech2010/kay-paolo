@@ -583,6 +583,41 @@ class ExampleTest extends TestCase
                 && ! array_key_exists('pickup_status', $data)
                 && ! array_key_exists('status', $data);
         });
+
+        Http::assertNotSent(function ($request) {
+            return str_contains($request->url(), '/api/kay-paolo/shipping-history-filter');
+        });
+    }
+
+    public function test_pickup_list_proxy_converts_bocicot_html_and_skips_kay_paolo_feed(): void
+    {
+        Http::fake([
+            '*/api/bocicot/shipping-history-filter' => Http::response(
+                '<div class="row wp-history"><h3 class="ship-number">HTS111</h3><p class="zs-trasit">Ready to Ship</p><a href="/edit-shipment/111">Edit</a></div><div class="row wp-history"><h3 class="ship-number">HTS222</h3><p class="zs-trasit">In Transit</p><a href="/edit-shipment/222">Edit</a></div>',
+                200,
+                ['Content-Type' => 'text/html']
+            ),
+            '*/api/kay-paolo/shipping-history-filter' => Http::response([
+                'status' => 'success',
+                'shippings' => [
+                    ['id' => 99, 'tracking_number' => 'SHOULD-NOT-WIN'],
+                ],
+            ]),
+        ]);
+
+        $this->withHeader('Authorization', 'Bearer fake-token')
+            ->postJson('/api/kay-paolo/pickup-list', [
+                'limit' => 100,
+                'created_in' => 'All Shipments',
+            ])
+            ->assertOk()
+            ->assertJsonPath('count', 2)
+            ->assertJsonPath('shippings.0.tracking_number', 'HTS111')
+            ->assertJsonPath('shippings.1.id', 222);
+
+        Http::assertNotSent(function ($request) {
+            return str_contains($request->url(), '/api/kay-paolo/shipping-history-filter');
+        });
     }
 
     public function test_shipment_document_routes_render_kay_branded_document_ui(): void

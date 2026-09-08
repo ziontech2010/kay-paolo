@@ -337,23 +337,12 @@ class ZionApiProxyController extends Controller
 
     public function shippingHistory(Request $request): JsonResponse
     {
-        return $this->forwardAuthenticatedWithFallback([
-            ['endpoint' => 'bocicot/shipping-history-filter'],
-            ['endpoint' => 'web-api/shipping-history-filter-bocicot', 'web' => true],
-            ['endpoint' => 'kay-paolo/shipping-history-filter'],
-        ], $request);
+        return $this->forwardBocicotShippingHistory($request);
     }
 
     public function pickupList(Request $request): JsonResponse
     {
-        // Prefer Bocicot shipping-history (same feed as zionshipping.com/shipping-history).
-        $payload = $this->pickupListPayload($request);
-
-        return $this->forwardAuthenticatedWithFallback([
-            ['endpoint' => 'bocicot/shipping-history-filter'],
-            ['endpoint' => 'web-api/shipping-history-filter-bocicot', 'web' => true],
-            ['endpoint' => 'kay-paolo/shipping-history-filter'],
-        ], $request, $payload);
+        return $this->forwardBocicotShippingHistory($request, $this->pickupListPayload($request));
     }
 
     private function pickupListPayload(Request $request): array
@@ -888,6 +877,159 @@ class ZionApiProxyController extends Controller
             $payload ?? $request->except('_token'),
             $token
         ));
+    }
+
+    private function forwardBocicotShippingHistory(Request $request, ?array $payload = null): JsonResponse
+    {
+        $token = $request->bearerToken();
+
+        if (!$token) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Please login to Kay Paolo first.',
+            ], 401);
+        }
+
+        $payload = $payload ?? $request->except('_token');
+        $lastResponse = null;
+
+        foreach ([
+            ['endpoint' => 'bocicot/shipping-history-filter'],
+            ['endpoint' => 'web-api/shipping-history-filter-bocicot', 'web' => true],
+        ] as $target) {
+            $lastResponse = !empty($target['web'])
+                ? $this->zion->postWeb($target['endpoint'], $payload, $token)
+                : $this->zion->post($target['endpoint'], $payload, $token);
+
+            $normalized = $this->normalizeBocicotHistoryResponse($lastResponse);
+            $data = is_array($normalized['data'] ?? null) ? $normalized['data'] : [];
+            $hasShippings = isset($data['shippings']) && is_array($data['shippings']);
+
+            if (($normalized['ok'] ?? false) && $hasShippings) {
+                return $this->jsonResponse($normalized);
+            }
+
+            if (!$this->shouldTryFallbackWithoutHtml($lastResponse)) {
+                return $this->jsonResponse($normalized);
+            }
+        }
+
+        return $this->jsonResponse($lastResponse ?? [
+            'ok' => false,
+            'status' => 502,
+            'data' => [
+                'status' => 'error',
+                'message' => 'Unable to reach the Bocicot shipping history API.',
+            ],
+        ]);
+    }
+
+    private function normalizeBocicotHistoryResponse(array $response): array
+    {
+        $data = is_array($response['data'] ?? null) ? $response['data'] : [];
+
+        if (isset($data['shippings']) && is_array($data['shippings'])) {
+            unset($data['html']);
+            $response['data'] = $data;
+            $response['ok'] = true;
+            $response['status'] = (int) ($response['status'] ?? 200) ?: 200;
+
+            return $response;
+        }
+
+        $html = (string) ($data['html'] ?? '');
+        if ($html === '' || !str_contains($html, '<')) {
+            return $response;
+        }
+
+        $rows = $this->parseBocicotHistoryHtml($html);
+        $response['ok'] = true;
+        $response['status'] = 200;
+        $response['data'] = [
+            'status' => 'success',
+            'error' => false,
+            'count' => count($rows),
+            'shippings' => $rows,
+            'shipping_history' => $rows,
+        ];
+
+        return $response;
+    }
+
+    private function parseBocicotHistoryHtml(string $html): array
+    {
+        $rows = [];
+        $blocks = preg_split('/<div class="row wp-history">/i', $html);
+        array_shift($blocks);
+
+        foreach ($blocks as $block) {
+            $id = null;
+            if (preg_match('/(?:edit-shipment|get_shipping_label|get_shipping_receipt|void-shipment|email-shipment|text-shipment|pay-shipment-consent)\/(\d+)/i', $block, $match)) {
+                $id = (int) $match[1];
+            }
+
+            $tracking = '';
+            if (preg_match('/class="ship-number"[^>]*>(.*?)<\/h3>/is', $block, $match)) {
+                $tracking = trim(html_entity_decode(strip_tags($match[1])));
+            }
+
+            $statusName = 'Ready to Ship';
+            if (preg_match('/class="zs-trasit"[^>]*>(.*?)<\/p>/is', $block, $match)) {
+                $statusName = trim(html_entity_decode(strip_tags($match[1]))) ?: $statusName;
+            }
+
+            $createdAt = '';
+            if (preg_match('/class="zs-date"[^>]*>(.*?)<\/h3>/is', $block, $match)) {
+                $createdAt = trim(html_entity_decode(strip_tags($match[1])));
+            }
+
+            $option = '';
+            if (preg_match('/class="zs-express"[^>]*>(.*?)<\/h4>/is', $block, $match)) {
+                $option = trim(html_entity_decode(strip_tags($match[1])));
+            }
+
+            $description = '';
+            if (preg_match('/<p class="zs-express"[^>]*>(.*?)<\/p>/is', $block, $match)) {
+                $description = trim(html_entity_decode(strip_tags($match[1])));
+            }
+
+            $invoice = '';
+            if (preg_match('/track-package\/([^"\'\/]+)/i', $block, $match)) {
+                $invoice = urldecode($match[1]);
+            } elseif (preg_match('/voidShipment\([^,]+,\s*[\'"]([^\'"]+)/i', $block, $match)) {
+                $invoice = $match[1];
+            }
+
+            $rows[] = [
+                'id' => $id,
+                'invoice_num' => $invoice,
+                'tracking_number' => $tracking ?: $invoice,
+                'status_name' => $statusName,
+                'created_at' => $createdAt,
+                'shipment_date' => $createdAt,
+                'selected_shipper' => $option,
+                'delivery_option' => $option,
+                'package_description' => $description,
+            ];
+        }
+
+        return $rows;
+    }
+
+    private function shouldTryFallbackWithoutHtml(array $response): bool
+    {
+        $status = (int) ($response['status'] ?? 0);
+        $data = is_array($response['data'] ?? null) ? $response['data'] : [];
+        $message = strtolower((string) ($data['message'] ?? ''));
+        $error = strtolower((string) ($data['error'] ?? ''));
+        $appLocked = strtolower((string) ($data['app_locked'] ?? ''));
+
+        return $status === 0
+            || in_array($status, [404, 405], true)
+            || $status >= 500
+            || str_contains($message, 'session store not set')
+            || str_contains($message, 'app is locked')
+            || ($error === 'true' && $appLocked === 'true');
     }
 
     private function postWithFallback(array $targets, array $payload, ?string $token = null, ?int $timeout = null): array
