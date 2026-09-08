@@ -346,14 +346,13 @@ class ZionApiProxyController extends Controller
 
     public function pickupList(Request $request): JsonResponse
     {
-        // Zion has no agent pickup-list API. Reuse the working shipping-history JSON feed
-        // (same Bocicot/Kay Paolo paths as shippingHistory) so pickup view stays in sync.
+        // Prefer Bocicot shipping-history (same feed as zionshipping.com/shipping-history).
         $payload = $this->pickupListPayload($request);
 
         return $this->forwardAuthenticatedWithFallback([
-            ['endpoint' => 'kay-paolo/shipping-history-filter'],
             ['endpoint' => 'bocicot/shipping-history-filter'],
             ['endpoint' => 'web-api/shipping-history-filter-bocicot', 'web' => true],
+            ['endpoint' => 'kay-paolo/shipping-history-filter'],
         ], $request, $payload);
     }
 

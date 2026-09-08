@@ -537,13 +537,14 @@ class ExampleTest extends TestCase
     public function test_pickup_list_proxy_uses_shipping_history_feed(): void
     {
         Http::fake([
-            '*/api/kay-paolo/shipping-history-filter' => Http::response([
+            '*/api/bocicot/shipping-history-filter' => Http::response([
                 'status' => 'success',
                 'shippings' => [
                     ['id' => 88, 'status' => 1, 'status_name' => 'Ready to Ship', 'tracking_number' => 'PKP88'],
+                    ['id' => 89, 'status' => 1, 'status_name' => 'Ready to Ship', 'tracking_number' => 'PKP89'],
                 ],
             ]),
-            '*/api/bocicot/shipping-history-filter' => Http::response([
+            '*/api/kay-paolo/shipping-history-filter' => Http::response([
                 'status' => 'success',
                 'shippings' => [
                     ['id' => 99, 'status' => 1, 'status_name' => 'Ready to Ship', 'tracking_number' => 'SHOULD-NOT-WIN'],
@@ -560,12 +561,13 @@ class ExampleTest extends TestCase
                 'pickup_status' => 'pending',
             ])
             ->assertOk()
-            ->assertJsonPath('shippings.0.tracking_number', 'PKP88');
+            ->assertJsonPath('shippings.0.tracking_number', 'PKP88')
+            ->assertJsonCount(2, 'shippings');
 
         Http::assertSent(function ($request) {
             $data = $request->data();
 
-            return str_contains($request->url(), '/api/kay-paolo/shipping-history-filter')
+            return str_contains($request->url(), '/api/bocicot/shipping-history-filter')
                 && $request->hasHeader('Authorization', 'Bearer fake-token')
                 && ($data['limit'] ?? null) === 25
                 && ($data['per_page'] ?? null) === 25
