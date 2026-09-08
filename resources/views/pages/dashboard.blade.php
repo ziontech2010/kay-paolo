@@ -80,7 +80,7 @@
                     </div>
                     <div class="field">
                         <label for="profilePhone">Phone</label>
-                        <input id="profilePhone" name="phone" type="text" value="{{ $profilePhone }}">
+                        <input id="profilePhone" name="phone" type="text" value="{{ $profilePhone }}" readonly>
                     </div>
                 </div>
                 <div class="field">

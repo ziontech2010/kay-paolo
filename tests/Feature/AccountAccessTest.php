@@ -52,7 +52,7 @@ class AccountAccessTest extends TestCase
             ->assertRedirect('/account')
             ->assertSessionHas('zion.user.name', 'Kay Paolo Admin')
             ->assertSessionHas('zion.user.email', 'admin@kaypaoloshipping.com')
-            ->assertSessionHas('zion.user.phone', '7325550199')
+            ->assertSessionHas('zion.user.phone', '7325550100')
             ->assertSessionHas('zion.user.shipper_address', '414 Main St');
     }
 
@@ -62,6 +62,7 @@ class AccountAccessTest extends TestCase
             ->get('/account')
             ->assertOk()
             ->assertSee('id="profileForm"', false)
+            ->assertSee('id="profilePhone" name="phone" type="text" value="7325550100" readonly', false)
             ->assertSee('Pickup List', false)
             ->assertSee('Invoices &amp; Receipts', false)
             ->assertSee('Security &amp; Password', false);

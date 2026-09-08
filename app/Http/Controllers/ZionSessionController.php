@@ -68,7 +68,6 @@ class ZionSessionController extends Controller
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:160'],
             'email' => ['required', 'email', 'max:180'],
-            'phone' => ['nullable', 'string', 'max:40'],
             'address' => ['nullable', 'string', 'max:255'],
             'city' => ['nullable', 'string', 'max:120'],
             'state' => ['nullable', 'string', 'max:80'],
@@ -78,8 +77,6 @@ class ZionSessionController extends Controller
         $user = session('zion.user', []);
         $user['name'] = $validated['name'];
         $user['email'] = $validated['email'];
-        $user['phone'] = $validated['phone'] ?? '';
-        $user['mobile'] = $validated['phone'] ?? '';
         $user['address'] = $validated['address'] ?? '';
         $user['shipper_address'] = $validated['address'] ?? '';
         $user['city'] = $validated['city'] ?? '';
