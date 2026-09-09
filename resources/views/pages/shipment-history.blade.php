@@ -50,7 +50,7 @@
                     <div class="shipment-card-header" style="text-transform: none; font-family: 'Inter', sans-serif; font-size: 16px; font-weight: 700; letter-spacing: 0; padding: 12px 20px">Status</div>
                     <div class="shipment-card-body" style="padding: 20px">
                         <div class="filter-list">
-                            <label class="filter-item"><span class="filter-item-label"><input type="checkbox" class="status-filter" value="Ready to Ship" @checked($isPickupList)> Ready to Ship</span><span class="filter-badge badge-ready" data-history-status-badge="Ready to Ship">0.00%</span></label>
+                            <label class="filter-item"><span class="filter-item-label"><input type="checkbox" class="status-filter" value="Ready to Ship"> Ready to Ship</span><span class="filter-badge badge-ready" data-history-status-badge="Ready to Ship">0.00%</span></label>
                             <label class="filter-item"><span class="filter-item-label"><input type="checkbox" class="status-filter" value="Picked Up"> Picked Up</span><span class="filter-badge badge-ready" style="background:#e6fcf5;color:#099268" data-history-status-badge="Picked Up">0.00%</span></label>
                             <label class="filter-item"><span class="filter-item-label"><input type="checkbox" class="status-filter" value="In Transit"> In Transit</span><span class="filter-badge badge-transit" data-history-status-badge="In Transit">0.00%</span></label>
                             <label class="filter-item"><span class="filter-item-label"><input type="checkbox" class="status-filter" value="Customs"> Customs</span><span class="filter-badge badge-customs" data-history-status-badge="Customs">0.00%</span></label>

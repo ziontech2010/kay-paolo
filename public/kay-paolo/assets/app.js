@@ -2424,7 +2424,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function filterPickupHistoryRows(rows) {
-    return rows.filter((row) => historyStatus(row) === 'Ready to Ship');
+    return rows.filter((row) => ['Ready to Ship', 'Picked Up'].includes(historyStatus(row)));
   }
 
   function renderHistoryRows(container, rows) {

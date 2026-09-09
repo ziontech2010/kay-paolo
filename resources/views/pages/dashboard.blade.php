@@ -109,7 +109,7 @@
             <a class="service-card action-card" href="{{ route('shipment-history', ['view' => 'pickup']) }}">
                 <span class="num">PICKUP</span>
                 <h3>Pickup List</h3>
-                <p>View scheduled pickups and shipment history from the connected shipping account.</p>
+                <p>View pending pickups from the Bocicot shipping account. Invoices stay on Invoices &amp; Receipts.</p>
             </a>
             <a class="service-card action-card" href="{{ route('shipment-history') }}">
                 <span class="num">BILLING</span>

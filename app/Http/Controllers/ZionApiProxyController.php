@@ -388,18 +388,18 @@ class ZionApiProxyController extends Controller
     {
         $response = $this->collectBocicotShippingHistory($request, $this->pickupListPayload($request));
 
-        return $this->jsonResponse($this->keepReadyToShipHistory($response));
+        return $this->jsonResponse($this->keepPendingPickupHistory($response));
     }
 
     private function pickupListPayload(Request $request): array
     {
         $payload = $request->except('_token');
-        unset($payload['pickup_status']);
+        unset($payload['status'], $payload['pickup_status']);
 
         $limit = (int) ($payload['limit'] ?? $payload['length'] ?? $payload['per_page'] ?? 100);
 
         if ($limit <= 0) {
-            $limit = 100;
+            $limit = 500;
         }
 
         $agentId = $payload['agent_id']
@@ -422,7 +422,6 @@ class ZionApiProxyController extends Controller
             'created_by' => $payload['created_by'] ?? $agentId,
             'created_by_id' => $payload['created_by_id'] ?? $agentId,
             'account_number' => $payload['account_number'] ?? $payload['from_account'] ?? null,
-            'status' => [1 => 'on'],
         ]));
     }
 
@@ -980,7 +979,7 @@ class ZionApiProxyController extends Controller
         ];
     }
 
-    private function keepReadyToShipHistory(array $response): array
+    private function keepPendingPickupHistory(array $response): array
     {
         $data = is_array($response['data'] ?? null) ? $response['data'] : [];
         $rows = $data['shippings'] ?? null;
@@ -994,18 +993,19 @@ class ZionApiProxyController extends Controller
                 return false;
             }
 
-            $status = $row['status'] ?? $row['status_name'] ?? $row['shipping_status'] ?? '';
-            if (is_numeric($status)) {
-                return (int) $status === 1;
+            $status = $row['status'] ?? '';
+            if (is_numeric($status) && in_array((int) $status, [1, 2], true)) {
+                return true;
             }
 
-            $label = strtolower(trim((string) $status));
+            $label = strtolower(trim((string) ($row['status_name'] ?? $row['shipping_status'] ?? $status)));
 
-            return str_contains($label, 'ready');
+            return str_contains($label, 'ready') || str_contains($label, 'picked');
         }));
 
         $data['shippings'] = $rows;
         $data['shipping_history'] = $rows;
+        $data['pickups'] = $rows;
         $data['count'] = count($rows);
         $response['data'] = $data;
 

@@ -636,7 +636,8 @@ class ExampleTest extends TestCase
                 && ($data['created_by'] ?? null) === 7
                 && ($data['created_by_id'] ?? null) === 7
                 && ($data['account_number'] ?? null) === '9400'
-                && (($data['status'][1] ?? null) === 'on');
+                && ! array_key_exists('pickup_status', $data)
+                && ! array_key_exists('status', $data);
         });
 
         Http::assertNotSent(function ($request) {
