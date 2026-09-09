@@ -196,9 +196,53 @@ class ZionApiProxyController extends Controller
             ], 401);
         }
 
+        $payload = $this->sanitizeFlatRatePayload($request->except('_token'));
+        $lastResponse = null;
+        $emptySuccess = null;
+
+        foreach ([
+            ['endpoint' => 'bocicot/flat-rates', 'method' => 'get'],
+            ['endpoint' => 'bocicot/get-flat-rates', 'method' => 'get'],
+            ['endpoint' => 'bocicot/flat-rate', 'method' => 'get'],
+            ['endpoint' => 'web-api/get-flat-rates-bocicot', 'web' => true],
+            ['endpoint' => 'web-api/flat-rates-bocicot', 'web' => true],
+            ['endpoint' => 'kay-paolo/flat-rates', 'method' => 'get'],
+        ] as $target) {
+            $lastResponse = $this->requestZionTarget($target, $payload, $token);
+
+            if ($lastResponse['ok'] && $this->flatRateResponseHasOptions($lastResponse['data'])) {
+                $data = $lastResponse['data'];
+                $data['status'] = $data['status'] ?? 'success';
+                $data['source'] = 'api';
+
+                return response()->json($data);
+            }
+
+            if ($lastResponse['ok']) {
+                if (!$this->shouldTryFallback($lastResponse)) {
+                    $emptySuccess = $lastResponse;
+                }
+
+                continue;
+            }
+
+            if (!$this->shouldTryFallback($lastResponse)) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => $lastResponse['data']['message'] ?? 'Unable to load flat-rate items from the Bocicot API.',
+                    'flat_rates' => [],
+                    'source' => 'api',
+                ], $lastResponse['status'] > 0 ? $lastResponse['status'] : 502);
+            }
+        }
+
         return response()->json([
             'status' => 'success',
+            'message' => $emptySuccess
+                ? 'Bocicot flat-rate API returned no flat-rate items; showing the default flat-rate item.'
+                : 'Bocicot flat-rate API unavailable; showing the default flat-rate item.',
             'flat_rates' => [$this->zionDocumentFlatRate()],
+            'source' => 'fallback',
         ]);
     }
 
@@ -1037,11 +1081,7 @@ class ZionApiProxyController extends Controller
         $lastResponse = null;
 
         foreach ($targets as $target) {
-            $endpoint = $target['endpoint'];
-            $requestTimeout = $target['timeout'] ?? $timeout;
-            $lastResponse = !empty($target['web'])
-                ? $this->zion->postWeb($endpoint, $payload, $token, $requestTimeout)
-                : $this->zion->post($endpoint, $payload, $token, $requestTimeout);
+            $lastResponse = $this->requestZionTarget($target, $payload, $token, 'post', $timeout);
 
             if ($lastResponse['ok'] && !$this->shouldTryFallback($lastResponse)) {
                 return $lastResponse;
@@ -1060,6 +1100,23 @@ class ZionApiProxyController extends Controller
                 'message' => 'Unable to reach the shipping API.',
             ],
         ];
+    }
+
+    private function requestZionTarget(array $target, array $payload, ?string $token = null, string $defaultMethod = 'post', ?int $timeout = null): array
+    {
+        $endpoint = $target['endpoint'];
+        $method = strtolower((string) ($target['method'] ?? $defaultMethod));
+        $requestTimeout = $target['timeout'] ?? $timeout;
+
+        if ($method === 'get') {
+            return !empty($target['web'])
+                ? $this->zion->getWeb($endpoint, $payload, $token, $requestTimeout)
+                : $this->zion->get($endpoint, $payload, $token, $requestTimeout);
+        }
+
+        return !empty($target['web'])
+            ? $this->zion->postWeb($endpoint, $payload, $token, $requestTimeout)
+            : $this->zion->post($endpoint, $payload, $token, $requestTimeout);
     }
 
     private function sanitizeShipmentPayload(array $payload): array
@@ -1174,6 +1231,103 @@ class ZionApiProxyController extends Controller
             'selected_shipper' => $payload['selected_shipper'] ?? $payload['delivery_option'] ?? $payload['service'] ?? null,
             'delivery_option' => $payload['delivery_option'] ?? $payload['selected_shipper'] ?? $payload['service'] ?? null,
         ]);
+    }
+
+    private function flatRateResponseHasOptions(array $payload): bool
+    {
+        foreach ([
+            $payload['all_options'] ?? null,
+            data_get($payload, 'data.all_options'),
+            $payload['all_groups'] ?? null,
+            data_get($payload, 'data.all_groups'),
+            $payload['groups'] ?? null,
+            data_get($payload, 'data.groups'),
+            $payload['options'] ?? null,
+            data_get($payload, 'data.options'),
+            $payload['flat_rates'] ?? null,
+            data_get($payload, 'data.flat_rates'),
+            $payload['flat_rate'] ?? null,
+            data_get($payload, 'data.flat_rate'),
+            $payload['flatRates'] ?? null,
+            data_get($payload, 'data.flatRates'),
+            $payload['flatrates'] ?? null,
+            data_get($payload, 'data.flatrates'),
+            $payload['rates'] ?? null,
+            data_get($payload, 'data.rates'),
+            $payload['items'] ?? null,
+            data_get($payload, 'data.items'),
+            data_get($payload, 'data.data'),
+            $payload['data'] ?? null,
+        ] as $candidate) {
+            if ($this->hasFlatRateRows($candidate)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function hasFlatRateRows(mixed $candidate): bool
+    {
+        if (is_string($candidate)) {
+            return trim($candidate) !== '';
+        }
+
+        if (!is_array($candidate) || $candidate === []) {
+            return false;
+        }
+
+        if (array_is_list($candidate)) {
+            foreach ($candidate as $item) {
+                if (is_string($item) && trim($item) !== '') {
+                    return true;
+                }
+
+                if (is_array($item) && (
+                    $this->flatRateOptionLooksUsable($item)
+                    || $this->hasFlatRateRows($item['options'] ?? null)
+                )) {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        foreach ($candidate as $key => $item) {
+            if (in_array((string) $key, ['status', 'message', 'error', 'html', 'source'], true)) {
+                continue;
+            }
+
+            if (is_string($item) && trim($item) !== '') {
+                return true;
+            }
+
+            if (!is_numeric((string) $key) && is_array($item) && $item !== []) {
+                return true;
+            }
+
+            if (is_array($item) && (
+                $this->flatRateOptionLooksUsable($item)
+                || $this->hasFlatRateRows($item['options'] ?? null)
+                || (array_is_list($item) && $this->hasFlatRateRows($item))
+            )) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function flatRateOptionLooksUsable(array $option): bool
+    {
+        foreach (['slug', 'value', 'typeCode', 'type_code', 'code', 'shipment_type', 'shipmentType', 'type', 'id', 'label', 'name', 'title', 'description'] as $key) {
+            if (isset($option[$key]) && trim((string) $option[$key]) !== '') {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private function zionDocumentFlatRate(): array

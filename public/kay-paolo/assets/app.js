@@ -8,6 +8,13 @@ document.addEventListener('DOMContentLoaded', () => {
   const trackingResponseKey = 'kayPaoloTrackingResponse';
   const countryCacheKey = 'kayPaoloCountries:v3';
   const paymentOptionsCacheKey = () => `kayPaoloPaymentOptions:v4:${storedUser().id || storedUser().account_number || 'guest'}`;
+  const flatRateOptionsCacheKey = (payload = {}) => {
+    const user = payload.quote_user_id || payload.user_id || storedUser().id || storedUser().account_number || 'guest';
+    const from = payload.from_country || 'any';
+    const to = payload.to_country || payload.country || 'any';
+    const state = payload.from_state || 'any';
+    return `kayPaoloFlatRates:v2:${user}:${from}:${to}:${state}`;
+  };
 
   const route = (name, fallback) => config.routes?.[name] || fallback;
   const storedToken = () => window.localStorage.getItem(tokenKey) || '';
@@ -987,17 +994,96 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  function loadFlatRatesForBlock(block) {
+  async function loadFlatRatesForBlock(block) {
     const select = block.querySelector('.pkg-flat-rate-type');
     const note = block.querySelector('.pkg-flat-rate-note');
     if (!select) return;
 
-    populateFlatRateSelect(select, zionFlatRateOptions());
-    select.disabled = false;
-    if (note) {
-      note.textContent = '';
-      note.className = 'api-inline-result pkg-flat-rate-note';
+    const payload = flatRateLookupPayload();
+    const cacheKey = flatRateOptionsCacheKey(payload);
+    const cachedOptions = normalizeFlatRateOptions(storedJson(cacheKey, []));
+    const previousValue = select.value;
+    const requestId = `${Date.now()}-${Math.random()}`;
+    select.dataset.flatRateRequestId = requestId;
+
+    if (cachedOptions.length) {
+      useFlatRateOptions(block, cachedOptions, previousValue);
+    } else {
+      select.innerHTML = '<option value="">Loading flat rate items...</option>';
+      select.disabled = true;
+      if (note) {
+        note.textContent = '';
+        note.className = 'api-inline-result pkg-flat-rate-note';
+      }
     }
+
+    try {
+      const response = await postJson(route('flatRates', '/api/kay-paolo/flat-rates'), payload, { token: storedToken() });
+      if (select.dataset.flatRateRequestId !== requestId || !block.querySelector('.pkg-flat-rate')?.checked) return;
+
+      const apiOptions = normalizeFlatRateOptions(response);
+      const options = apiOptions.length ? apiOptions : zionFlatRateOptions();
+      if (apiOptions.length && response?.source === 'api') {
+        window.localStorage.setItem(cacheKey, JSON.stringify({ flat_rates: apiOptions }));
+      }
+      useFlatRateOptions(block, options, previousValue);
+      if (note) {
+        note.textContent = response?.source === 'api' ? '' : (response?.message || '');
+        note.className = `api-inline-result pkg-flat-rate-note${note.textContent ? ' warning' : ''}`;
+      }
+    } catch (error) {
+      if (select.dataset.flatRateRequestId !== requestId || !block.querySelector('.pkg-flat-rate')?.checked) return;
+
+      useFlatRateOptions(block, cachedOptions.length ? cachedOptions : zionFlatRateOptions(), previousValue);
+      if (note && !cachedOptions.length) {
+        note.textContent = error.message || 'Flat-rate items are temporarily unavailable.';
+        note.className = 'api-inline-result pkg-flat-rate-note warning';
+      }
+    }
+  }
+
+  function useFlatRateOptions(block, options, previousValue = '') {
+    const select = block?.querySelector('.pkg-flat-rate-type');
+    if (!select) return;
+
+    populateFlatRateSelect(select, options);
+    if (previousValue && Array.from(select.options).some((option) => option.value === previousValue)) {
+      select.value = previousValue;
+      applyFlatRateDefaults(block, select.selectedOptions[0]);
+    } else {
+      setFlatRateDimensionReadonly(block, false);
+    }
+    select.disabled = false;
+  }
+
+  function flatRateLookupPayload() {
+    const toCountry = firstElement('toCountry', 'to_country', 'shipmentToCountry');
+    const fromCountry = firstElement('from_country', 'shipmentFromCountry');
+    const toCountryName = selectedCountryName(toCountry);
+    const fromCountryName = selectedCountryName(fromCountry);
+    const toCountryCode = countryCode(toCountry?.value || toCountryName);
+    const fromCountryCode = countryCode(fromCountry?.value || fromCountryName);
+    const quoteCustomerId = firstValue('quoteUserId') || queryParam('customer') || storedUser().id || undefined;
+    const agentId = storedUser().agent_id || storedUser().id || undefined;
+    const deliveryLocation = normalizeDeliveryLocation(firstValue('deliveryLocation', 'delivery_location'));
+
+    return {
+      user_id: quoteCustomerId,
+      quote_user_id: quoteCustomerId,
+      agent_id: agentId,
+      from_country: fromCountryCode || undefined,
+      from_country_name: fromCountryName || undefined,
+      to_country: toCountryCode || undefined,
+      country: toCountryCode || undefined,
+      country_code: toCountryCode || undefined,
+      to_country_name: toCountryName || undefined,
+      country_name: toCountryName || undefined,
+      from_state: firstValue('from_state') || undefined,
+      origin_state: firstValue('from_state') || undefined,
+      delivery_location: deliveryLocation || undefined,
+      selected_shipper: deliveryLocation || undefined,
+      delivery_option: deliveryLocation || undefined
+    };
   }
 
   function zionFlatRateOptions() {
@@ -1021,6 +1107,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function normalizeFlatRateOptions(response) {
     const candidates = [
+      Array.isArray(response) ? response : null,
       response?.all_options,
       response?.data?.all_options,
       response?.all_groups,

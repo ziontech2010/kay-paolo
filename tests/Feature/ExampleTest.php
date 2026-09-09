@@ -512,18 +512,69 @@ class ExampleTest extends TestCase
             ->assertJsonPath('customer.account_number', '9400');
     }
 
-    public function test_flat_rates_endpoint_matches_zion_document_option(): void
+    public function test_flat_rates_endpoint_uses_bocicot_api_before_default_option(): void
     {
-        Http::fake();
+        Http::fake([
+            '*/api/bocicot/flat-rates*' => Http::response([
+                'status' => 'success',
+                'flat_rates' => [
+                    [
+                        'code' => 'regular_boat_box',
+                        'name' => 'Regular Boat Box',
+                        'rate' => '44.50',
+                        'dimensions' => [
+                            'weight' => '7',
+                            'length' => '18',
+                            'width' => '12',
+                            'height' => '8',
+                        ],
+                    ],
+                ],
+            ]),
+        ]);
+
+        $this->withHeader('Authorization', 'Bearer fake-token')
+            ->postJson('/api/kay-paolo/flat-rates', [
+                'user_id' => 7020,
+                'from_country' => 'US',
+                'to_country' => 'HT',
+                'from_state' => 'FL',
+            ])
+            ->assertOk()
+            ->assertJsonPath('status', 'success')
+            ->assertJsonPath('source', 'api')
+            ->assertJsonPath('flat_rates.0.code', 'regular_boat_box')
+            ->assertJsonPath('flat_rates.0.name', 'Regular Boat Box')
+            ->assertJsonPath('flat_rates.0.rate', '44.50')
+            ->assertJsonPath('flat_rates.0.dimensions.weight', '7')
+            ->assertJsonPath('flat_rates.0.dimensions.length', '18')
+            ->assertJsonPath('flat_rates.0.dimensions.width', '12')
+            ->assertJsonPath('flat_rates.0.dimensions.height', '8');
+
+        Http::assertSent(function ($request) {
+            return $request->method() === 'GET'
+                && str_contains($request->url(), '/api/bocicot/flat-rates')
+                && str_contains($request->url(), 'user_id=7020')
+                && str_contains($request->url(), 'to_country=HT')
+                && str_contains($request->url(), 'from_state=FL');
+        });
+    }
+
+    public function test_flat_rates_endpoint_falls_back_to_default_document_option_when_bocicot_unavailable(): void
+    {
+        Http::fake([
+            '*flat-rates*' => Http::response(['message' => 'Not Found'], 404),
+            '*flat-rate*' => Http::response(['message' => 'Not Found'], 404),
+        ]);
 
         $this->withHeader('Authorization', 'Bearer fake-token')
             ->postJson('/api/kay-paolo/flat-rates', [
                 'from_country' => 'US',
                 'to_country' => 'HT',
-                'shipment_type' => 'regular_boat',
             ])
             ->assertOk()
             ->assertJsonPath('status', 'success')
+            ->assertJsonPath('source', 'fallback')
             ->assertJsonPath('flat_rates.0.slug', 'contains_document')
             ->assertJsonPath('flat_rates.0.label', 'Document')
             ->assertJsonPath('flat_rates.0.default_dimensions.weight', '0.5')
@@ -531,7 +582,9 @@ class ExampleTest extends TestCase
             ->assertJsonPath('flat_rates.0.default_dimensions.width', '8')
             ->assertJsonPath('flat_rates.0.default_dimensions.height', '1');
 
-        Http::assertNothingSent();
+        Http::assertSent(function ($request) {
+            return str_contains($request->url(), '/api/bocicot/flat-rates');
+        });
     }
 
     public function test_pickup_list_proxy_uses_shipping_history_feed(): void
