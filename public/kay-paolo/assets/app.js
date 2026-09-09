@@ -2242,11 +2242,11 @@ document.addEventListener('DOMContentLoaded', () => {
             enhanceHistoryCards(result);
             updateHistoryBadgesFromCards();
           } else {
-            renderHistoryRows(result, normalizeHistoryRows(response));
+            renderHistoryRows(result, pickupMode ? filterPickupHistoryRows(normalizeHistoryRows(response)) : normalizeHistoryRows(response));
             enhanceHistoryCards(result);
           }
         } else {
-          renderHistoryRows(result, normalizeHistoryRows(response));
+          renderHistoryRows(result, pickupMode ? filterPickupHistoryRows(normalizeHistoryRows(response)) : normalizeHistoryRows(response));
           enhanceHistoryCards(result);
         }
         filter();
@@ -2421,6 +2421,10 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     return Array.isArray(candidates) ? candidates : Object.values(candidates);
+  }
+
+  function filterPickupHistoryRows(rows) {
+    return rows.filter((row) => historyStatus(row) === 'Ready to Ship');
   }
 
   function renderHistoryRows(container, rows) {

@@ -312,6 +312,7 @@ class ExampleTest extends TestCase
         $this->assertStringContainsString('response?.data?.all_options', $script);
         $this->assertStringContainsString('historyDateRangeValue', $script);
         $this->assertStringContainsString("route('pickupList', '/api/kay-paolo/pickup-list')", $script);
+        $this->assertStringContainsString('filterPickupHistoryRows', $script);
         $this->assertStringContainsString('per_page: selectedLimit', $script);
         $this->assertStringContainsString('length: selectedLimit', $script);
         $this->assertStringContainsString('created_in: createdIn', $script);
@@ -594,7 +595,8 @@ class ExampleTest extends TestCase
                 'status' => 'success',
                 'shippings' => [
                     ['id' => 88, 'status' => 1, 'status_name' => 'Ready to Ship', 'tracking_number' => 'PKP88'],
-                    ['id' => 89, 'status' => 1, 'status_name' => 'Ready to Ship', 'tracking_number' => 'PKP89'],
+                    ['id' => 89, 'status' => 8, 'status_name' => 'Delivered', 'tracking_number' => 'INV89'],
+                    ['id' => 90, 'status' => 9, 'status_name' => 'Voided', 'tracking_number' => 'VOID90'],
                 ],
             ]),
             '*/api/kay-paolo/shipping-history-filter' => Http::response([
@@ -615,7 +617,8 @@ class ExampleTest extends TestCase
             ])
             ->assertOk()
             ->assertJsonPath('shippings.0.tracking_number', 'PKP88')
-            ->assertJsonCount(2, 'shippings');
+            ->assertJsonCount(1, 'shippings')
+            ->assertJsonPath('count', 1);
 
         Http::assertSent(function ($request) {
             $data = $request->data();
@@ -633,8 +636,7 @@ class ExampleTest extends TestCase
                 && ($data['created_by'] ?? null) === 7
                 && ($data['created_by_id'] ?? null) === 7
                 && ($data['account_number'] ?? null) === '9400'
-                && ! array_key_exists('pickup_status', $data)
-                && ! array_key_exists('status', $data);
+                && (($data['status'][1] ?? null) === 'on');
         });
 
         Http::assertNotSent(function ($request) {
@@ -646,7 +648,7 @@ class ExampleTest extends TestCase
     {
         Http::fake([
             '*/api/bocicot/shipping-history-filter' => Http::response(
-                '<div class="row wp-history"><h3 class="ship-number">HTS111</h3><p class="zs-trasit">Ready to Ship</p><a href="/edit-shipment/111">Edit</a></div><div class="row wp-history"><h3 class="ship-number">HTS222</h3><p class="zs-trasit">In Transit</p><a href="/edit-shipment/222">Edit</a></div>',
+                '<div class="row wp-history"><h3 class="ship-number">HTS111</h3><p class="zs-trasit">Ready to Ship</p><a href="/edit-shipment/111">Edit</a></div><div class="row wp-history"><h3 class="ship-number">HTS222</h3><p class="zs-trasit">Voided</p><a href="/edit-shipment/222">Edit</a></div>',
                 200,
                 ['Content-Type' => 'text/html']
             ),
@@ -664,9 +666,8 @@ class ExampleTest extends TestCase
                 'created_in' => 'All Shipments',
             ])
             ->assertOk()
-            ->assertJsonPath('count', 2)
-            ->assertJsonPath('shippings.0.tracking_number', 'HTS111')
-            ->assertJsonPath('shippings.1.id', 222);
+            ->assertJsonPath('count', 1)
+            ->assertJsonPath('shippings.0.tracking_number', 'HTS111');
 
         Http::assertNotSent(function ($request) {
             return str_contains($request->url(), '/api/kay-paolo/shipping-history-filter');

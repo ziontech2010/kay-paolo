@@ -386,13 +386,15 @@ class ZionApiProxyController extends Controller
 
     public function pickupList(Request $request): JsonResponse
     {
-        return $this->forwardBocicotShippingHistory($request, $this->pickupListPayload($request));
+        $response = $this->collectBocicotShippingHistory($request, $this->pickupListPayload($request));
+
+        return $this->jsonResponse($this->keepReadyToShipHistory($response));
     }
 
     private function pickupListPayload(Request $request): array
     {
         $payload = $request->except('_token');
-        unset($payload['status'], $payload['pickup_status']);
+        unset($payload['pickup_status']);
 
         $limit = (int) ($payload['limit'] ?? $payload['length'] ?? $payload['per_page'] ?? 100);
 
@@ -420,6 +422,7 @@ class ZionApiProxyController extends Controller
             'created_by' => $payload['created_by'] ?? $agentId,
             'created_by_id' => $payload['created_by_id'] ?? $agentId,
             'account_number' => $payload['account_number'] ?? $payload['from_account'] ?? null,
+            'status' => [1 => 'on'],
         ]));
     }
 
@@ -925,13 +928,22 @@ class ZionApiProxyController extends Controller
 
     private function forwardBocicotShippingHistory(Request $request, ?array $payload = null): JsonResponse
     {
+        return $this->jsonResponse($this->collectBocicotShippingHistory($request, $payload));
+    }
+
+    private function collectBocicotShippingHistory(Request $request, ?array $payload = null): array
+    {
         $token = $request->bearerToken();
 
         if (!$token) {
-            return response()->json([
-                'status' => 'error',
-                'message' => 'Please login to Kay Paolo first.',
-            ], 401);
+            return [
+                'ok' => false,
+                'status' => 401,
+                'data' => [
+                    'status' => 'error',
+                    'message' => 'Please login to Kay Paolo first.',
+                ],
+            ];
         }
 
         $payload = $payload ?? $request->except('_token');
@@ -950,22 +962,54 @@ class ZionApiProxyController extends Controller
             $hasShippings = isset($data['shippings']) && is_array($data['shippings']);
 
             if (($normalized['ok'] ?? false) && $hasShippings) {
-                return $this->jsonResponse($normalized);
+                return $normalized;
             }
 
             if (!$this->shouldTryFallbackWithoutHtml($lastResponse)) {
-                return $this->jsonResponse($normalized);
+                return $normalized;
             }
         }
 
-        return $this->jsonResponse($lastResponse ?? [
+        return $lastResponse ?? [
             'ok' => false,
             'status' => 502,
             'data' => [
                 'status' => 'error',
                 'message' => 'Unable to reach the Bocicot shipping history API.',
             ],
-        ]);
+        ];
+    }
+
+    private function keepReadyToShipHistory(array $response): array
+    {
+        $data = is_array($response['data'] ?? null) ? $response['data'] : [];
+        $rows = $data['shippings'] ?? null;
+
+        if (!is_array($rows)) {
+            return $response;
+        }
+
+        $rows = array_values(array_filter($rows, function ($row) {
+            if (!is_array($row)) {
+                return false;
+            }
+
+            $status = $row['status'] ?? $row['status_name'] ?? $row['shipping_status'] ?? '';
+            if (is_numeric($status)) {
+                return (int) $status === 1;
+            }
+
+            $label = strtolower(trim((string) $status));
+
+            return str_contains($label, 'ready');
+        }));
+
+        $data['shippings'] = $rows;
+        $data['shipping_history'] = $rows;
+        $data['count'] = count($rows);
+        $response['data'] = $data;
+
+        return $response;
     }
 
     private function normalizeBocicotHistoryResponse(array $response): array
