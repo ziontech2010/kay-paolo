@@ -147,6 +147,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initReceiptPages();
   initShipmentHistoryFilters();
   initPickupCompletePage();
+  initAgentInvoicesPage();
 
   async function postJson(url, payload, options = {}) {
     const headers = {
@@ -3005,6 +3006,103 @@ document.addEventListener('DOMContentLoaded', () => {
     toggleEmptyState(snapshotPreviewEmpty, true);
     renderSelectedFilePreview();
     loadPickup();
+  }
+
+  function initAgentInvoicesPage() {
+    const page = document.getElementById('agentInvoicesPage');
+    if (!page) return;
+
+    const loader = document.getElementById('agentInvoicesLoader');
+    const notice = document.getElementById('agentInvoicesNotice');
+    const result = document.getElementById('agentInvoicesResult');
+
+    const showNotice = (message, isError = true) => {
+      if (!notice) return;
+      notice.hidden = !message;
+      notice.className = `api-alert ${isError ? 'error' : 'success'}`;
+      notice.textContent = message || '';
+    };
+
+    const money = (value) => {
+      const amount = Number(value);
+      return Number.isFinite(amount) ? amount.toFixed(2) : '0.00';
+    };
+
+    const renderRows = (rows, message = '') => {
+      if (!result) return;
+      if (!rows.length) {
+        result.innerHTML = `<div class="pickup-list-empty"><p>${escapeHtml(message || "Sorry, you don't have any invoices.")}</p></div>`;
+        return;
+      }
+
+      result.innerHTML = `
+        <div class="agent-invoices-table-scroll">
+          <table class="agent-invoices-table">
+            <thead>
+              <tr>
+                <th>Invoice Number</th>
+                <th class="text-right">Total Shipments</th>
+                <th class="text-right">Total Commission</th>
+                <th class="text-right">Total Online Payments</th>
+                <th class="text-right">Total Due</th>
+                <th class="text-right">Download</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${rows.map((row) => {
+                const invoiceNum = historyField(row, ['invoice_num', 'invoice', 'invoice_number'], '-');
+                const downloadUrl = historyField(row, ['download_url'], '')
+                  || (invoiceNum && invoiceNum !== '-' ? zionWebUrl(`agent-bills/${encodeURIComponent(invoiceNum)}.pdf`) : '');
+                return `
+                  <tr>
+                    <td>${escapeHtml(invoiceNum)}</td>
+                    <td class="text-right">${escapeHtml(money(row.total_shipments))}</td>
+                    <td class="text-right">${escapeHtml(money(row.total_agent_commission))}</td>
+                    <td class="text-right">${escapeHtml(money(row.total_card_payments))}</td>
+                    <td class="text-right">${escapeHtml(money(row.total_due))}</td>
+                    <td class="text-right">
+                      ${downloadUrl
+                        ? `<a class="btn btn-gold btn-sm" href="${escapeHtml(downloadUrl)}" target="_blank" rel="noopener">Download</a>`
+                        : '<span class="meta-val">N/A</span>'}
+                    </td>
+                  </tr>
+                `;
+              }).join('')}
+            </tbody>
+          </table>
+        </div>
+      `;
+    };
+
+    const load = async () => {
+      if (!storedToken()) {
+        showNotice('Login first to view agent invoices.');
+        return;
+      }
+
+      if (loader) loader.hidden = false;
+      showNotice('');
+      if (result) {
+        result.innerHTML = historyNoticeCard('Loading', 'Agent invoices', 'Loading agent invoices from your account.');
+      }
+
+      try {
+        const response = await postJson(route('agentInvoices', '/api/kay-paolo/agent-invoices'), {});
+        const rows = Array.isArray(response?.invoices)
+          ? response.invoices
+          : (Array.isArray(response?.agent_invoices) ? response.agent_invoices : []);
+        renderRows(rows, response?.message || '');
+      } catch (error) {
+        showNotice(error.message || 'Unable to load agent invoices.');
+        if (result) {
+          result.innerHTML = `<div class="pickup-list-empty"><p>${escapeHtml(error.message || 'Unable to load agent invoices.')}</p></div>`;
+        }
+      } finally {
+        if (loader) loader.hidden = true;
+      }
+    };
+
+    load();
   }
 
   function historyDateRangeValue(label) {

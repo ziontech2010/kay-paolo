@@ -111,10 +111,10 @@
                 <h3>Pickup List</h3>
                 <p>View pending pickups from the Bocicot shipping account. Invoices stay on Invoices &amp; Receipts.</p>
             </a>
-            <a class="service-card action-card" href="{{ route('shipment-history') }}">
+            <a class="service-card action-card" href="{{ route('agent-invoices') }}">
                 <span class="num">BILLING</span>
                 <h3>Invoices &amp; Receipts</h3>
-                <p>Open labels, receipts, and invoice documents from shipment history.</p>
+                <p>View agent invoices, commission totals, and download invoice PDFs.</p>
             </a>
             <a class="service-card action-card" href="{{ route('tracking') }}">
                 <span class="num">TRACK</span>

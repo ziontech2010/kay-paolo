@@ -33,6 +33,7 @@ Route::get('/shipment-history', function () {
     return view('pages.shipment-history');
 })->name('shipment-history');
 Route::get('/pickup-list', fn () => view('pages.pickup-list'))->name('pickup-list');
+Route::get('/agent-invoices', fn () => view('pages.agent-invoices'))->name('agent-invoices');
 Route::get('/pickups/{pickup}/complete', fn (int $pickup) => view('pages.pickup-complete', ['pickupId' => $pickup]))
     ->whereNumber('pickup')
     ->name('pickup.complete');
@@ -81,6 +82,7 @@ Route::redirect('/quote-details.html', '/quote-details');
 Route::redirect('/create-shipment.html', '/create-shipment');
 Route::redirect('/shipment-history.html', '/shipment-history');
 Route::redirect('/pickup-list.html', '/pickup-list');
+Route::redirect('/agent-invoices.html', '/agent-invoices');
 Route::redirect('/tracking.html', '/tracking');
 Route::redirect('/tracking-detail.html', '/tracking-detail');
 Route::redirect('/account.html', '/account');

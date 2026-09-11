@@ -748,6 +748,51 @@ class ExampleTest extends TestCase
         });
     }
 
+    public function test_agent_invoices_page_renders_and_proxy_forwards_zion_feed(): void
+    {
+        $this->get('/agent-invoices')
+            ->assertOk()
+            ->assertSee('Agent Invoices', false)
+            ->assertSee('Login first to view agent invoices.', false)
+            ->assertSee('agentInvoicesPage', false)
+            ->assertSee('agentInvoicesResult', false);
+
+        Http::fake([
+            '*/api/kay-paolo/agent-invoices' => Http::response([
+                'status' => 'success',
+                'count' => 1,
+                'invoices' => [
+                    [
+                        'id' => 44,
+                        'invoice_num' => 'AI-1001',
+                        'total_shipments' => 12,
+                        'total_agent_commission' => 150.5,
+                        'total_card_payments' => 40,
+                        'total_due' => 110.5,
+                        'download_url' => 'https://www.zionshipping.com/agent-bills/AI-1001.pdf',
+                    ],
+                ],
+            ]),
+        ]);
+
+        $this->withHeader('Authorization', 'Bearer fake-token')
+            ->postJson('/api/kay-paolo/agent-invoices')
+            ->assertOk()
+            ->assertJsonPath('invoices.0.invoice_num', 'AI-1001')
+            ->assertJsonPath('count', 1);
+
+        Http::assertSent(function ($request) {
+            return str_contains($request->url(), '/api/kay-paolo/agent-invoices')
+                && $request->hasHeader('Authorization', 'Bearer fake-token');
+        });
+
+        $script = file_get_contents(public_path('kay-paolo/assets/app.js'));
+        $this->assertStringContainsString('initAgentInvoicesPage', $script);
+        $this->assertStringContainsString("route('agentInvoices', '/api/kay-paolo/agent-invoices')", $script);
+        $this->assertStringContainsString('Total Commission', $script);
+        $this->assertStringContainsString('Total Online Payments', $script);
+    }
+
     public function test_pickup_list_proxy_forwards_empty_zion_pickup_list(): void
     {
         Http::fake([

@@ -4085,3 +4085,56 @@ footer ul li a:hover {
     grid-template-columns: 1fr;
   }
 }
+
+.agent-invoices-table-wrap {
+  margin-top: 8px;
+}
+
+.agent-invoices-table-scroll {
+  overflow-x: auto;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: #fff;
+}
+
+.agent-invoices-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 760px;
+}
+
+.agent-invoices-table th,
+.agent-invoices-table td {
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--line);
+  font-size: 14px;
+  color: var(--navy-900);
+  vertical-align: middle;
+}
+
+.agent-invoices-table th {
+  background: #f8fafc;
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-600);
+  text-align: left;
+}
+
+.agent-invoices-table tbody tr:nth-child(even) {
+  background: #f8fafc;
+}
+
+.agent-invoices-table .text-right,
+.text-right {
+  text-align: right;
+}
+
+.btn-sm {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 14px;
+  font-size: 13px;
+  min-width: 0;
+}

@@ -73,7 +73,7 @@
                         <a href="{{ route('quote') }}">Get Quote</a>
                         <a href="{{ route('pickup-list') }}">Pickup List</a>
                         <a href="{{ route('shipment-history') }}">Shipment History</a>
-                        <a href="{{ route('shipment-history') }}">Invoices &amp; Receipts</a>
+                        <a href="{{ route('agent-invoices') }}">Invoices &amp; Receipts</a>
                     </div>
                 </li>
                 <li class="has-dd">
@@ -209,6 +209,8 @@
             webcamUpload: @json(route('api.kay-paolo.webcam-upload')),
             pickupCompletePage: @json(url('/pickups')),
             pickupListPage: @json(route('pickup-list')),
+            agentInvoices: @json(route('api.kay-paolo.agent-invoices')),
+            agentInvoicesPage: @json(route('agent-invoices')),
             emailShipment: @json(route('api.kay-paolo.email-shipment')),
             voidShipment: @json(route('api.kay-paolo.void-shipping'))
         },

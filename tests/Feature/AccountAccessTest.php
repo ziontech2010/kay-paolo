@@ -92,6 +92,7 @@ class AccountAccessTest extends TestCase
             ->assertDontSee('account.profile.update', false)
             ->assertSee('/pickup-list', false)
             ->assertSee('Pickup List', false)
+            ->assertSee('/agent-invoices', false)
             ->assertSee('Invoices &amp; Receipts', false)
             ->assertSee('Security &amp; Password', false);
 

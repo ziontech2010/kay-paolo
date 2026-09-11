@@ -488,6 +488,13 @@ class ZionApiProxyController extends Controller
         return $this->jsonResponse($response);
     }
 
+    public function agentInvoices(Request $request): JsonResponse
+    {
+        return $this->forwardAuthenticatedWithFallback([
+            ['endpoint' => 'kay-paolo/agent-invoices'],
+        ], $request, $request->except('_token'));
+    }
+
     private function pickupListPayload(Request $request): array
     {
         $payload = $request->except('_token');
