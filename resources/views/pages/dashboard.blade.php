@@ -109,7 +109,7 @@
             <a class="service-card action-card" href="{{ route('pickup-list') }}">
                 <span class="num">PICKUP</span>
                 <h3>Pickup List</h3>
-                <p>View pending pickups from the Bocicot shipping account. Invoices stay on Invoices &amp; Receipts.</p>
+                <p>View pending pickups from the KAY PAOLO SHIPPING account. Invoices stay on Invoices &amp; Receipts.</p>
             </a>
             <a class="service-card action-card" href="{{ route('agent-invoices') }}">
                 <span class="num">BILLING</span>
