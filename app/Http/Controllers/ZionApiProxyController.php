@@ -391,6 +391,103 @@ class ZionApiProxyController extends Controller
         ], $request, $this->pickupListPayload($request));
     }
 
+    public function pickupShow(Request $request, int $pickup): JsonResponse
+    {
+        $token = $request->bearerToken();
+
+        if (!$token) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Please login to Kay Paolo first.',
+            ], 401);
+        }
+
+        $response = $this->zion->post('kay-paolo/pickup/'.$pickup, $request->except('_token'), $token);
+
+        return $this->jsonResponse($response);
+    }
+
+    public function pickupComplete(Request $request, int $pickup): JsonResponse
+    {
+        $token = $request->bearerToken();
+
+        if (!$token) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Please login to Kay Paolo first.',
+            ], 401);
+        }
+
+        $attachments = array_values(array_filter((array) $request->input('attachments', []), function ($value) {
+            return trim((string) $value) !== '';
+        }));
+
+        $files = [];
+        foreach ($request->file('photos', []) as $photo) {
+            if (!$photo || !$photo->isValid()) {
+                continue;
+            }
+
+            $files[] = [
+                'name' => 'photos[]',
+                'contents' => fopen($photo->getRealPath(), 'r'),
+                'filename' => $photo->getClientOriginalName() ?: ('pickup-'.uniqid().'.jpg'),
+                'content_type' => $photo->getMimeType() ?: 'image/jpeg',
+            ];
+        }
+
+        $response = $this->zion->postMultipart(
+            'kay-paolo/pickup/'.$pickup.'/complete',
+            ['attachments' => $attachments],
+            $files,
+            $token
+        );
+
+        return $this->jsonResponse($response);
+    }
+
+    public function webcamUpload(Request $request): JsonResponse
+    {
+        $token = $request->bearerToken();
+
+        if (!$token) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Please login to Kay Paolo first.',
+            ], 401);
+        }
+
+        if ($request->hasFile('photo')) {
+            $photo = $request->file('photo');
+            if (!$photo || !$photo->isValid()) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'Invalid file',
+                ], 422);
+            }
+
+            $response = $this->zion->postMultipart(
+                'kay-paolo/webcam-upload',
+                [],
+                [[
+                    'name' => 'photo',
+                    'contents' => fopen($photo->getRealPath(), 'r'),
+                    'filename' => $photo->getClientOriginalName() ?: ('snapshot-'.uniqid().'.jpg'),
+                    'content_type' => $photo->getMimeType() ?: 'image/jpeg',
+                ]],
+                $token
+            );
+
+            return $this->jsonResponse($response);
+        }
+
+        $response = $this->zion->post('kay-paolo/webcam-upload', [
+            'image_file' => $request->input('image_file'),
+        ], $token);
+
+        return $this->jsonResponse($response);
+    }
+
     private function pickupListPayload(Request $request): array
     {
         $payload = $request->except('_token');

@@ -26,6 +26,9 @@ Route::get('/quote', fn () => view('pages.quote'))->name('quote');
 Route::get('/quote-details', fn () => view('pages.quote-details'))->name('quote.details');
 Route::get('/create-shipment', fn () => view('pages.create-shipment'))->name('create-shipment');
 Route::get('/shipment-history', fn () => view('pages.shipment-history'))->name('shipment-history');
+Route::get('/pickups/{pickup}/complete', fn (int $pickup) => view('pages.pickup-complete', ['pickupId' => $pickup]))
+    ->whereNumber('pickup')
+    ->name('pickup.complete');
 Route::get('/tracking', fn () => view('pages.tracking'))->name('tracking');
 Route::get('/tracking-detail', fn () => view('pages.tracking-detail'))->name('tracking.detail');
 Route::get('/shipment-confirmation', fn () => view('pages.shipment-confirmation'))->name('shipment.confirmation');

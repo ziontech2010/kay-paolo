@@ -146,6 +146,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initShipmentConfirmationPage();
   initReceiptPages();
   initShipmentHistoryFilters();
+  initPickupCompletePage();
 
   async function postJson(url, payload, options = {}) {
     const headers = {
@@ -2328,12 +2329,12 @@ document.addEventListener('DOMContentLoaded', () => {
           const directionUrl = card.dataset.directionUrl || '';
           if (directionUrl) window.open(directionUrl, '_blank', 'noopener');
         } else if (action === 'complete-pickup') {
-          const completeUrl = card.dataset.completeUrl || '';
-          if (completeUrl) {
-            window.open(completeUrl, '_blank', 'noopener');
-          } else {
+          const pickupId = card.dataset.pickupId || '';
+          if (!pickupId) {
             window.alert('Pickup completion page is unavailable for this record.');
+            return;
           }
+          window.location.href = `${route('pickupCompletePage', '/pickups')}/${encodeURIComponent(pickupId)}/complete`;
         } else if (action === 'label') {
           window.open(`${route('shipmentLabel', '/shipment-label')}${queryString ? `?${queryString}` : ''}`, '_blank');
         } else if (action === 'receipt') {
@@ -2482,7 +2483,9 @@ document.addEventListener('DOMContentLoaded', () => {
       const status = historyField(row, ['status', 'status_raw', 'pickup_status'], 'Pending') || 'Pending';
       const directionUrl = historyField(row, ['direction_url'], '')
         || (address && address !== 'N/A' ? `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(address)}` : '');
-      const completeUrl = historyField(row, ['complete_url'], '');
+      const completeUrl = pickupId
+        ? `${route('pickupCompletePage', '/pickups')}/${encodeURIComponent(pickupId)}/complete`
+        : (historyField(row, ['complete_path', 'complete_url'], '') || '');
       const searchPool = [pickupDate, pickupShipment, clientAgent, phone, address, packageCount, weight, volume, cf, status, billAmount].join(' ');
 
       return `
@@ -2690,6 +2693,318 @@ document.addEventListener('DOMContentLoaded', () => {
     }).join('');
 
     updateHistoryBadgesFromRows(rows);
+  }
+
+  function initPickupCompletePage() {
+    const page = document.getElementById('pickupCompletePage');
+    if (!page) return;
+
+    const pickupId = Number(page.dataset.pickupId || 0);
+    const loader = document.getElementById('pickupCompleteLoader');
+    const notice = document.getElementById('pickupCompleteNotice');
+    const content = document.getElementById('pickupCompleteContent');
+    const form = document.getElementById('pickup-complete-form');
+    const fileInput = document.getElementById('pickup-photos');
+    const filePreview = document.getElementById('pickup-file-preview');
+    const filePreviewEmpty = document.getElementById('pickup-file-preview-empty');
+    const snapshotPreview = document.getElementById('pickup-snapshot-preview');
+    const snapshotPreviewEmpty = document.getElementById('pickup-snapshot-preview-empty');
+    const snapshotButton = document.getElementById('btn-pickup-snapshot');
+    const directionsLink = document.getElementById('pickupCompleteDirections');
+    const submitButton = document.getElementById('pickupCompleteSubmit');
+    const maxPhotos = 6;
+
+    if (!pickupId || !form) return;
+
+    const showNotice = (message, isError = true) => {
+      if (!notice) return;
+      notice.hidden = !message;
+      notice.className = `api-alert ${isError ? 'error' : 'success'}`;
+      notice.textContent = message || '';
+    };
+
+    const countSnapshotInputs = () => form.querySelectorAll('input[name="attachments[]"]').length;
+    const countSelectedFiles = () => (fileInput && fileInput.files ? fileInput.files.length : 0);
+    const countTotalMedia = () => countSnapshotInputs() + countSelectedFiles();
+    const toggleEmptyState = (element, isEmpty) => {
+      if (element) element.style.display = isEmpty ? 'block' : 'none';
+    };
+
+    const renderSelectedFilePreview = () => {
+      if (!filePreview) return;
+      filePreview.innerHTML = '';
+      if (!fileInput || !fileInput.files || !fileInput.files.length) {
+        toggleEmptyState(filePreviewEmpty, true);
+        return;
+      }
+
+      Array.from(fileInput.files).forEach((file, index) => {
+        const item = document.createElement('div');
+        item.className = 'pickup-complete-preview-item';
+        const image = document.createElement('img');
+        image.src = URL.createObjectURL(file);
+        image.onload = () => URL.revokeObjectURL(image.src);
+        const label = document.createElement('p');
+        label.textContent = `Upload ${index + 1}: ${file.name}`;
+        item.appendChild(image);
+        item.appendChild(label);
+        filePreview.appendChild(item);
+      });
+      toggleEmptyState(filePreviewEmpty, false);
+    };
+
+    const appendSnapshotPreview = (fileName, previewSrc = '') => {
+      if (!snapshotPreview) return;
+      const wrapper = document.createElement('div');
+      wrapper.className = 'pickup-complete-preview-item';
+      const imageHtml = previewSrc
+        ? `<img src="${previewSrc}" alt="Pickup Snapshot">`
+        : '<div style="height:120px;border-radius:8px;background:#e2e8f0;display:flex;align-items:center;justify-content:center;color:#64748b;font-size:12px">Snapshot saved</div>';
+      wrapper.innerHTML = `
+        ${imageHtml}
+        <p>Snapshot: ${escapeHtml(fileName)}</p>
+        <button type="button" class="btn btn-outline jq-remove-pickup-snapshot" data-file="${escapeHtml(fileName)}" style="margin-top:8px;width:100%">Remove</button>
+      `;
+      snapshotPreview.appendChild(wrapper);
+
+      const hiddenInput = document.createElement('input');
+      hiddenInput.type = 'hidden';
+      hiddenInput.name = 'attachments[]';
+      hiddenInput.value = fileName;
+      form.appendChild(hiddenInput);
+      toggleEmptyState(snapshotPreviewEmpty, false);
+    };
+
+    const loadWebcamScript = () => new Promise((resolve, reject) => {
+      if (window.Webcam) {
+        resolve();
+        return;
+      }
+      const script = document.createElement('script');
+      script.src = 'https://cdnjs.cloudflare.com/ajax/libs/webcamjs/1.0.26/webcam.min.js';
+      script.onload = () => resolve();
+      script.onerror = () => reject(new Error('Unable to load camera library.'));
+      document.head.appendChild(script);
+    });
+
+    const initPickupCamera = async () => {
+      try {
+        await loadWebcamScript();
+      } catch (error) {
+        const cameraContainer = document.getElementById('pickup_camera');
+        if (cameraContainer) {
+          cameraContainer.innerHTML = '<div style="color:#fff;padding:24px;text-align:center;opacity:.85">Unable to load camera. You can still upload images.</div>';
+        }
+        return;
+      }
+
+      window.Webcam.reset();
+      window.Webcam.set({
+        width: 450,
+        height: 450,
+        image_format: 'png',
+        jpeg_quality: 100,
+        constraints: {
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
+          facingMode: { ideal: 'environment' }
+        }
+      });
+      window.Webcam.on('error', () => {
+        const cameraContainer = document.getElementById('pickup_camera');
+        if (cameraContainer && !cameraContainer.innerHTML.includes('Unable to open camera')) {
+          cameraContainer.insertAdjacentHTML('afterbegin', '<div style="color:#fff;padding:24px;text-align:center;opacity:.85">Unable to open camera. You can still upload images.</div>');
+        }
+      });
+      window.Webcam.attach('#pickup_camera');
+      setTimeout(() => {
+        const iosInput = document.getElementById('pickup_camera-ios_input');
+        if (iosInput) iosInput.setAttribute('capture', 'environment');
+      }, 150);
+    };
+
+    const uploadSnapshotData = async (formData, previewSrc = '') => {
+      const headers = {
+        Accept: 'application/json',
+        'X-CSRF-TOKEN': csrf
+      };
+      if (storedToken()) headers.Authorization = `Bearer ${storedToken()}`;
+
+      const response = await fetch(route('webcamUpload', '/api/kay-paolo/webcam-upload'), {
+        method: 'POST',
+        headers,
+        body: formData
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || !data.status) {
+        throw new Error(data.message || 'Unable to upload snapshot.');
+      }
+      appendSnapshotPreview(data.name, previewSrc);
+    };
+
+    const takePickupSnapshot = () => {
+      if (countTotalMedia() >= maxPhotos) {
+        window.alert('You can add a maximum of 6 pickup photos.');
+        return;
+      }
+      if (!window.Webcam) {
+        window.alert('Camera is not ready yet.');
+        return;
+      }
+      window.Webcam.snap(async (dataUri) => {
+        if (!dataUri) {
+          window.alert('Unable to capture snapshot. Please allow camera access and try again.');
+          return;
+        }
+        try {
+          const formData = new FormData();
+          formData.append('image_file', dataUri);
+          await uploadSnapshotData(formData, dataUri);
+        } catch (error) {
+          window.alert(error.message || 'Unable to upload snapshot.');
+        }
+      });
+    };
+
+    const fillPickupDetails = (pickup) => {
+      const title = pickup.pickup_shipment
+        || (pickup.pickup_reference ? `Pickup ${pickup.pickup_reference}` : `Pickup ${pickup.id || pickupId}`);
+      document.getElementById('pickupCompleteTitle').textContent = title;
+      document.getElementById('pickupCompleteClient').textContent = pickup.client_agent_name || 'Unknown';
+      document.getElementById('pickupCompleteDate').textContent = pickup.pickup_date_display || pickup.pickup_date || 'N/A';
+      document.getElementById('pickupCompletePhone').textContent = pickup.phone || 'N/A';
+      document.getElementById('pickupCompletePackages').textContent = pickup.package_count ?? '0';
+      document.getElementById('pickupCompleteSpecs').textContent = `${pickup.weight || 0} lbs / ${pickup.volume || 0} Ci / ${pickup.cf || 0} CF`;
+      document.getElementById('pickupCompleteAddress').textContent = pickup.full_address || 'N/A';
+      if (directionsLink) {
+        directionsLink.href = pickup.direction_url
+          || `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(pickup.full_address || '')}`;
+      }
+    };
+
+    const loadPickup = async () => {
+      if (!storedToken()) {
+        showNotice('Login first to complete this pickup.');
+        return;
+      }
+
+      if (loader) loader.hidden = false;
+      showNotice('');
+      try {
+        const response = await postJson(`${route('pickupShow', '/api/kay-paolo/pickup')}/${pickupId}`, {});
+        const pickup = response.pickup || response.data?.pickup || response;
+        if (!pickup || !pickup.id) {
+          throw new Error(response.message || 'Pickup not found.');
+        }
+        fillPickupDetails(pickup);
+        if (content) content.hidden = false;
+        await initPickupCamera();
+      } catch (error) {
+        showNotice(error.message || 'Unable to load pickup.');
+        if (content) content.hidden = true;
+      } finally {
+        if (loader) loader.hidden = true;
+      }
+    };
+
+    snapshotButton?.addEventListener('click', takePickupSnapshot);
+
+    document.addEventListener('change', async (event) => {
+      if (event.target?.id !== 'pickup_camera-ios_input') return;
+      const iosInput = event.target;
+      if (!iosInput.files?.[0]) return;
+      if (countTotalMedia() >= maxPhotos) {
+        window.alert('You can add a maximum of 6 pickup photos.');
+        iosInput.value = '';
+        return;
+      }
+      try {
+        const formData = new FormData();
+        formData.append('photo', iosInput.files[0]);
+        await uploadSnapshotData(formData);
+      } catch (error) {
+        window.alert(error.message || 'Unable to upload snapshot.');
+      }
+      iosInput.value = '';
+    });
+
+    fileInput?.addEventListener('change', () => {
+      if (countTotalMedia() > maxPhotos) {
+        window.alert('You can add a maximum of 6 pickup photos.');
+        fileInput.value = '';
+      }
+      renderSelectedFilePreview();
+    });
+
+    snapshotPreview?.addEventListener('click', (event) => {
+      const button = event.target.closest('.jq-remove-pickup-snapshot');
+      if (!button) return;
+      event.preventDefault();
+      const fileName = button.getAttribute('data-file');
+      form.querySelector(`input[name="attachments[]"][value="${fileName.replace(/"/g, '\\"')}"]`)?.remove();
+      button.closest('.pickup-complete-preview-item')?.remove();
+      toggleEmptyState(snapshotPreviewEmpty, countSnapshotInputs() === 0);
+    });
+
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const totalMedia = countTotalMedia();
+      if (totalMedia < 1 || totalMedia > maxPhotos) {
+        window.alert('Please add between 1 and 6 pickup photos before submitting.');
+        return;
+      }
+
+      const formData = new FormData();
+      if (fileInput?.files) {
+        Array.from(fileInput.files).forEach((file) => formData.append('photos[]', file));
+      }
+      form.querySelectorAll('input[name="attachments[]"]').forEach((input) => {
+        formData.append('attachments[]', input.value);
+      });
+
+      if (submitButton) {
+        submitButton.disabled = true;
+        submitButton.textContent = 'Submitting...';
+      }
+      if (loader) loader.hidden = false;
+      showNotice('');
+
+      try {
+        const headers = {
+          Accept: 'application/json',
+          'X-CSRF-TOKEN': csrf
+        };
+        if (storedToken()) headers.Authorization = `Bearer ${storedToken()}`;
+
+        const response = await fetch(`${route('pickupComplete', '/api/kay-paolo/pickup')}/${pickupId}/complete`, {
+          method: 'POST',
+          headers,
+          body: formData
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok || data.status === 'error' || data.error === true || data.error === 'true') {
+          throw new Error(data.message || 'Unable to complete pickup.');
+        }
+
+        showNotice(data.message || 'Pickup completed successfully.', false);
+        window.setTimeout(() => {
+          window.location.href = route('shipmentHistoryPickup', '/shipment-history?view=pickup');
+        }, 800);
+      } catch (error) {
+        showNotice(error.message || 'Unable to complete pickup.');
+        if (submitButton) {
+          submitButton.disabled = false;
+          submitButton.textContent = 'Submit Pickup Completion';
+        }
+      } finally {
+        if (loader) loader.hidden = true;
+      }
+    });
+
+    toggleEmptyState(filePreviewEmpty, true);
+    toggleEmptyState(snapshotPreviewEmpty, true);
+    renderSelectedFilePreview();
+    loadPickup();
   }
 
   function historyDateRangeValue(label) {

@@ -13,6 +13,61 @@ class ZionShippingApi
         return $this->request('post', $endpoint, $payload, $token, false, $timeout);
     }
 
+    public function postMultipart(string $endpoint, array $fields = [], array $files = [], ?string $token = null, ?int $timeout = null): array
+    {
+        $client = Http::baseUrl($this->baseUrl())
+            ->acceptJson()
+            ->timeout($timeout ?? (int) config('services.zion_shipping.timeout', 45));
+
+        if ($token) {
+            $client = $client->withToken($token);
+        }
+
+        foreach ($files as $file) {
+            if (!is_array($file) || empty($file['contents'])) {
+                continue;
+            }
+
+            $client = $client->attach(
+                (string) ($file['name'] ?? 'photos[]'),
+                $file['contents'],
+                (string) ($file['filename'] ?? 'photo.jpg'),
+                array_filter([
+                    'Content-Type' => $file['content_type'] ?? null,
+                ])
+            );
+        }
+
+        $payload = [];
+        foreach ($fields as $key => $value) {
+            if (is_array($value)) {
+                $payload[$key] = array_values($value);
+                continue;
+            }
+
+            if ($value === null) {
+                continue;
+            }
+
+            $payload[$key] = $value;
+        }
+
+        try {
+            $response = $client->post($this->endpointPath($endpoint, false), $payload);
+        } catch (ConnectionException $exception) {
+            return [
+                'ok' => false,
+                'status' => 0,
+                'data' => [
+                    'status' => 'error',
+                    'message' => 'Unable to reach the shipping API.',
+                ],
+            ];
+        }
+
+        return $this->formatResponse($response);
+    }
+
     public function postWeb(string $endpoint, array $payload = [], ?string $token = null, ?int $timeout = null): array
     {
         return $this->request('post', $endpoint, $payload, $token, true, $timeout);

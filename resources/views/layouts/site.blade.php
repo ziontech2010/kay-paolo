@@ -204,6 +204,11 @@
             saveConsignee: @json(route('api.kay-paolo.save-consignee')),
             shippingHistory: @json(route('api.kay-paolo.shipping-history')),
             pickupList: @json(route('api.kay-paolo.pickup-list')),
+            pickupShow: @json(url('/api/kay-paolo/pickup')),
+            pickupComplete: @json(url('/api/kay-paolo/pickup')),
+            webcamUpload: @json(route('api.kay-paolo.webcam-upload')),
+            pickupCompletePage: @json(url('/pickups')),
+            shipmentHistoryPickup: @json(route('shipment-history', ['view' => 'pickup'])),
             emailShipment: @json(route('api.kay-paolo.email-shipment')),
             voidShipment: @json(route('api.kay-paolo.void-shipping'))
         },

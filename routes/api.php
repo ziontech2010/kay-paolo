@@ -16,6 +16,9 @@ Route::prefix('kay-paolo')->name('api.kay-paolo.')->group(function () {
     Route::post('/store-shipment-document-context', [ZionApiProxyController::class, 'storeShipmentDocumentContext'])->name('store-shipment-document-context');
     Route::post('/shipping-history', [ZionApiProxyController::class, 'shippingHistory'])->name('shipping-history');
     Route::post('/pickup-list', [ZionApiProxyController::class, 'pickupList'])->name('pickup-list');
+    Route::match(['get', 'post'], '/pickup/{pickup}', [ZionApiProxyController::class, 'pickupShow'])->whereNumber('pickup')->name('pickup-show');
+    Route::post('/pickup/{pickup}/complete', [ZionApiProxyController::class, 'pickupComplete'])->whereNumber('pickup')->name('pickup-complete');
+    Route::post('/webcam-upload', [ZionApiProxyController::class, 'webcamUpload'])->name('webcam-upload');
     Route::post('/void-shipping', [ZionApiProxyController::class, 'voidShipment'])->name('void-shipping');
     Route::post('/validate-tracking', [ZionApiProxyController::class, 'tracking'])->name('validate-tracking');
     Route::post('/email-shipment', [ZionApiProxyController::class, 'emailShipment'])->name('email-shipment');

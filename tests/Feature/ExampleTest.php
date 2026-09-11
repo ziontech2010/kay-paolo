@@ -323,6 +323,8 @@ class ExampleTest extends TestCase
         $this->assertStringContainsString('Complete Pickup', $script);
         $this->assertStringContainsString('client_agent_name', $script);
         $this->assertStringContainsString('direction_url', $script);
+        $this->assertStringContainsString('initPickupCompletePage', $script);
+        $this->assertStringContainsString("route('pickupCompletePage', '/pickups')", $script);
         $this->assertStringContainsString('zionFlatRateOptions', $script);
         $this->assertStringContainsString("const countryCacheKey = 'kayPaoloCountries:v3'", $script);
         $this->assertStringContainsString('kayPaoloPaymentOptions:v4', $script);
@@ -616,7 +618,8 @@ class ExampleTest extends TestCase
                         'bill_amount' => '15.00',
                         'status' => 'Pending',
                         'direction_url' => 'https://www.google.com/maps/dir/?api=1&destination=414+Main+St',
-                        'complete_url' => 'https://www.zionshipping.com/settings/pickups/501/complete',
+                        'complete_url' => '/pickups/501/complete',
+                        'complete_path' => '/pickups/501/complete',
                     ],
                 ],
             ]),
@@ -665,6 +668,79 @@ class ExampleTest extends TestCase
 
         Http::assertNotSent(function ($request) {
             return str_contains($request->url(), '/api/bocicot/shipping-history-filter');
+        });
+    }
+
+    public function test_pickup_complete_page_renders_kay_paolo_completion_ui(): void
+    {
+        $this->get('/pickups/11521/complete')
+            ->assertOk()
+            ->assertSee('Complete Pickup', false)
+            ->assertSee('data-pickup-id="11521"', false)
+            ->assertSee('Take Snapshot', false)
+            ->assertSee('Submit Pickup Completion', false)
+            ->assertSee('Back To Pickup List', false)
+            ->assertSee('pickup-complete-form', false);
+    }
+
+    public function test_pickup_show_proxy_forwards_to_zion_pickup_endpoint(): void
+    {
+        Http::fake([
+            '*/api/kay-paolo/pickup/11521' => Http::response([
+                'status' => 'success',
+                'pickup' => [
+                    'id' => 11521,
+                    'pickup_shipment' => 'Pickup PK11521 / Shipment INV11521',
+                    'client_agent_name' => 'Kay Client / Kay Agent',
+                    'phone' => '7325551212',
+                    'full_address' => '414 Main St, Asbury Park, NJ 07712',
+                    'package_count' => 2,
+                    'weight' => '12.5',
+                    'volume' => '1000',
+                    'cf' => '0.58',
+                    'direction_url' => 'https://www.google.com/maps/dir/?api=1&destination=414+Main+St',
+                ],
+            ]),
+        ]);
+
+        $this->withHeader('Authorization', 'Bearer fake-token')
+            ->postJson('/api/kay-paolo/pickup/11521')
+            ->assertOk()
+            ->assertJsonPath('pickup.id', 11521)
+            ->assertJsonPath('pickup.client_agent_name', 'Kay Client / Kay Agent');
+
+        Http::assertSent(function ($request) {
+            return str_contains($request->url(), '/api/kay-paolo/pickup/11521')
+                && $request->hasHeader('Authorization', 'Bearer fake-token');
+        });
+    }
+
+    public function test_pickup_complete_proxy_forwards_multipart_photos(): void
+    {
+        Http::fake([
+            '*/api/kay-paolo/pickup/11521/complete' => Http::response([
+                'status' => 'success',
+                'message' => 'Pickup completed successfully.',
+                'pickup_id' => 11521,
+                'redirect' => '/shipment-history?view=pickup',
+            ]),
+        ]);
+
+        $photo = \Illuminate\Http\UploadedFile::fake()->image('pickup.jpg');
+
+        $this->withHeader('Authorization', 'Bearer fake-token')
+            ->post('/api/kay-paolo/pickup/11521/complete', [
+                'photos' => [$photo],
+                'attachments' => ['snap1.png'],
+            ])
+            ->assertOk()
+            ->assertJsonPath('message', 'Pickup completed successfully.')
+            ->assertJsonPath('pickup_id', 11521);
+
+        Http::assertSent(function ($request) {
+            return str_contains($request->url(), '/api/kay-paolo/pickup/11521/complete')
+                && $request->hasHeader('Authorization', 'Bearer fake-token')
+                && $request->isMultipart();
         });
     }
 
