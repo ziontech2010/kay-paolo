@@ -589,10 +589,14 @@ document.addEventListener('DOMContentLoaded', () => {
       authNotice.hidden = true;
     }
 
+    const user = storedUser();
+    if (user?.email) {
+      setValue('agentEmail', user.email);
+    }
+
     const dashboardName = document.getElementById('dashboardUserName');
     if (!dashboardName) return;
 
-    const user = storedUser();
     if (user && Object.keys(user).length) {
       dashboardName.textContent = user.name || 'Kay Paolo user';
       setText('dashboardRole', user.role?.name || 'User');

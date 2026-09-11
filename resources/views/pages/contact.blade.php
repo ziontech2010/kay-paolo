@@ -68,7 +68,7 @@
 
                     <div class="field">
                         <label for="agentEmail">Agent Email</label>
-                        <input id="agentEmail" name="email" type="email" value="{{ $agentEmail }}" placeholder="Enter agent email" @if (session('zion.access_token')) readonly @else required @endif autocomplete="username">
+                        <input id="agentEmail" name="email" type="email" value="{{ $agentEmail }}" placeholder="Agent email" readonly required autocomplete="username">
                     </div>
                     <div class="field">
                         <label for="currentPassword">Current Password</label>

@@ -114,6 +114,8 @@ class AccountAccessTest extends TestCase
             ->assertSee('name="current_password"', false)
             ->assertSee('name="password_confirmation"', false)
             ->assertSee('Update Password', false)
+            ->assertSee('id="agentEmail"', false)
+            ->assertSee('readonly', false)
             ->assertDontSee('id="contactForm"', false);
     }
 
