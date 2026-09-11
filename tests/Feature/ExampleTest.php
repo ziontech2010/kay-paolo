@@ -290,13 +290,16 @@ class ExampleTest extends TestCase
             ->assertSee('history-card-main', false)
             ->assertSee('historyResult', false);
 
-        $this->get('/shipment-history?view=pickup')
+        $this->get('/pickup-list')
             ->assertStatus(200)
             ->assertSee('Pickup List', false)
             ->assertSee('Login first to view pickup list.', false)
             ->assertSee('All Pickups', false)
             ->assertSee('Pending Pickups', false)
             ->assertSee('pickupPendingCount', false);
+
+        $this->get('/shipment-history?view=pickup')
+            ->assertRedirect('/pickup-list');
 
         $script = file_get_contents(public_path('kay-paolo/assets/app.js'));
 
@@ -324,7 +327,8 @@ class ExampleTest extends TestCase
         $this->assertStringContainsString('client_agent_name', $script);
         $this->assertStringContainsString('direction_url', $script);
         $this->assertStringContainsString('initPickupCompletePage', $script);
-        $this->assertStringContainsString("route('pickupCompletePage', '/pickups')", $script);
+        $this->assertStringContainsString("route('pickupListPage', '/pickup-list')", $script);
+        $this->assertStringContainsString('pickupListPage', $script);
         $this->assertStringContainsString('zionFlatRateOptions', $script);
         $this->assertStringContainsString("const countryCacheKey = 'kayPaoloCountries:v3'", $script);
         $this->assertStringContainsString('kayPaoloPaymentOptions:v4', $script);
@@ -722,7 +726,7 @@ class ExampleTest extends TestCase
                 'status' => 'success',
                 'message' => 'Pickup completed successfully.',
                 'pickup_id' => 11521,
-                'redirect' => '/shipment-history?view=pickup',
+                'redirect' => '/pickup-list',
             ]),
         ]);
 

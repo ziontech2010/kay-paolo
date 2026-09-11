@@ -71,7 +71,7 @@
                     <div class="dropdown">
                         <a href="{{ route('quote') }}">Create a Shipment</a>
                         <a href="{{ route('quote') }}">Get Quote</a>
-                        <a href="{{ route('shipment-history', ['view' => 'pickup']) }}">Pickup List</a>
+                        <a href="{{ route('pickup-list') }}">Pickup List</a>
                         <a href="{{ route('shipment-history') }}">Shipment History</a>
                         <a href="{{ route('shipment-history') }}">Invoices &amp; Receipts</a>
                     </div>
@@ -208,7 +208,7 @@
             pickupComplete: @json(url('/api/kay-paolo/pickup')),
             webcamUpload: @json(route('api.kay-paolo.webcam-upload')),
             pickupCompletePage: @json(url('/pickups')),
-            shipmentHistoryPickup: @json(route('shipment-history', ['view' => 'pickup'])),
+            pickupListPage: @json(route('pickup-list')),
             emailShipment: @json(route('api.kay-paolo.email-shipment')),
             voidShipment: @json(route('api.kay-paolo.void-shipping'))
         },

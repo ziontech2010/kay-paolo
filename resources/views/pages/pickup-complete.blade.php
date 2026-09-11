@@ -8,7 +8,7 @@
         <h1>Complete Pickup</h1>
         <div class="breadcrumb">
             <a href="{{ route('home') }}">Home</a><span class="sep">/</span>
-            <a href="{{ route('shipment-history', ['view' => 'pickup']) }}">Pickup List</a><span class="sep">/</span>
+            <a href="{{ route('pickup-list') }}">Pickup List</a><span class="sep">/</span>
             <span>Complete Pickup</span>
         </div>
     </div>
@@ -32,7 +32,7 @@
                         <h2 id="pickupCompleteTitle">Pickup</h2>
                         <p id="pickupCompleteClient" class="pickup-complete-subtitle"></p>
                     </div>
-                    <a href="{{ route('shipment-history', ['view' => 'pickup']) }}" class="btn btn-outline">Back To Pickup List</a>
+                    <a href="{{ route('pickup-list') }}" class="btn btn-outline">Back To Pickup List</a>
                 </div>
 
                 <div class="pickup-complete-meta">

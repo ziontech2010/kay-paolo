@@ -2191,7 +2191,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const result = document.getElementById('historyResult');
     const loader = document.getElementById('historyLoader');
-    const pickupMode = queryParam('view').toLowerCase() === 'pickup';
+    const pickupMode = Boolean(document.getElementById('pickupListPage')) || queryParam('view').toLowerCase() === 'pickup';
     const historyLabel = pickupMode ? 'Pickup list' : 'Shipment history';
 
     const filter = () => {
@@ -2570,7 +2570,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function renderHistoryRows(container, rows) {
     if (!rows.length) {
-      const pickupMode = queryParam('view').toLowerCase() === 'pickup';
+      const pickupMode = Boolean(document.getElementById('pickupListPage')) || queryParam('view').toLowerCase() === 'pickup';
       container.innerHTML = pickupMode
         ? historyNoticeCard('No Pickups', 'Pickup list', 'No active pickups are assigned to your states right now.')
         : historyNoticeCard('No Shipments', 'Shipment history', 'No shipments found for this account.');
@@ -2988,7 +2988,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         showNotice(data.message || 'Pickup completed successfully.', false);
         window.setTimeout(() => {
-          window.location.href = route('shipmentHistoryPickup', '/shipment-history?view=pickup');
+          window.location.href = route('pickupListPage', '/pickup-list');
         }, 800);
       } catch (error) {
         showNotice(error.message || 'Unable to complete pickup.');

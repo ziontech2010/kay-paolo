@@ -25,7 +25,14 @@ Route::post('/account/password', [ZionSessionController::class, 'updatePassword'
 Route::get('/quote', fn () => view('pages.quote'))->name('quote');
 Route::get('/quote-details', fn () => view('pages.quote-details'))->name('quote.details');
 Route::get('/create-shipment', fn () => view('pages.create-shipment'))->name('create-shipment');
-Route::get('/shipment-history', fn () => view('pages.shipment-history'))->name('shipment-history');
+Route::get('/shipment-history', function () {
+    if (request()->query('view') === 'pickup') {
+        return redirect()->route('pickup-list');
+    }
+
+    return view('pages.shipment-history');
+})->name('shipment-history');
+Route::get('/pickup-list', fn () => view('pages.pickup-list'))->name('pickup-list');
 Route::get('/pickups/{pickup}/complete', fn (int $pickup) => view('pages.pickup-complete', ['pickupId' => $pickup]))
     ->whereNumber('pickup')
     ->name('pickup.complete');
@@ -73,6 +80,7 @@ Route::redirect('/quote.html', '/quote');
 Route::redirect('/quote-details.html', '/quote-details');
 Route::redirect('/create-shipment.html', '/create-shipment');
 Route::redirect('/shipment-history.html', '/shipment-history');
+Route::redirect('/pickup-list.html', '/pickup-list');
 Route::redirect('/tracking.html', '/tracking');
 Route::redirect('/tracking-detail.html', '/tracking-detail');
 Route::redirect('/account.html', '/account');

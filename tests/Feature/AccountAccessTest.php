@@ -90,7 +90,7 @@ class AccountAccessTest extends TestCase
             ->assertDontSee('Role ID', false)
             ->assertDontSee('Save Profile', false)
             ->assertDontSee('account.profile.update', false)
-            ->assertSee('/shipment-history?view=pickup', false)
+            ->assertSee('/pickup-list', false)
             ->assertSee('Pickup List', false)
             ->assertSee('Invoices &amp; Receipts', false)
             ->assertSee('Security &amp; Password', false);

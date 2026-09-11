@@ -106,7 +106,7 @@
                 <h3>Create Quote</h3>
                 <p>Generate rates through Kay Paolo routes backed by live shipping data.</p>
             </a>
-            <a class="service-card action-card" href="{{ route('shipment-history', ['view' => 'pickup']) }}">
+            <a class="service-card action-card" href="{{ route('pickup-list') }}">
                 <span class="num">PICKUP</span>
                 <h3>Pickup List</h3>
                 <p>View pending pickups from the Bocicot shipping account. Invoices stay on Invoices &amp; Receipts.</p>
