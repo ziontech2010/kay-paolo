@@ -386,9 +386,9 @@ class ZionApiProxyController extends Controller
 
     public function pickupList(Request $request): JsonResponse
     {
-        $response = $this->collectBocicotShippingHistory($request, $this->pickupListPayload($request));
-
-        return $this->jsonResponse($this->keepPendingPickupHistory($response));
+        return $this->forwardAuthenticatedWithFallback([
+            ['endpoint' => 'kay-paolo/pickup-list'],
+        ], $request, $this->pickupListPayload($request));
     }
 
     private function pickupListPayload(Request $request): array
@@ -409,20 +409,45 @@ class ZionApiProxyController extends Controller
             ?? $payload['user_id']
             ?? null;
 
+        $createdIn = (string) ($payload['created_in'] ?? 'All Shipments');
+        $dateRange = (string) ($payload['date_range'] ?? '');
+        $filter = (string) ($payload['filter'] ?? $this->pickupListFilterFromLabel($createdIn, $dateRange));
+
         return $this->compactPayload(array_merge($payload, [
             'limit' => $limit,
             'per_page' => $limit,
             'length' => $limit,
             'page' => $payload['page'] ?? 1,
             'start' => $payload['start'] ?? 0,
-            'date_range' => $payload['date_range'] ?? '',
-            'created_in' => $payload['created_in'] ?? 'All Shipments',
+            'date_range' => $dateRange,
+            'created_in' => $createdIn,
+            'filter' => $filter,
+            'search' => $payload['search'] ?? '',
             'agent_id' => $agentId,
             'agentId' => $agentId,
             'created_by' => $payload['created_by'] ?? $agentId,
             'created_by_id' => $payload['created_by_id'] ?? $agentId,
             'account_number' => $payload['account_number'] ?? $payload['from_account'] ?? null,
         ]));
+    }
+
+    private function pickupListFilterFromLabel(string $createdIn, string $dateRange = ''): string
+    {
+        $value = strtolower(trim($createdIn !== '' ? $createdIn : $dateRange));
+
+        if (str_contains($value, 'today')) {
+            return 'today';
+        }
+
+        if (str_contains($value, 'week') || str_contains($value, '7')) {
+            return 'week';
+        }
+
+        if (str_contains($value, '30') || str_contains($value, 'month')) {
+            return 'month';
+        }
+
+        return 'all';
     }
 
     public function voidShipment(Request $request): JsonResponse

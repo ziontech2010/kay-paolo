@@ -294,7 +294,9 @@ class ExampleTest extends TestCase
             ->assertStatus(200)
             ->assertSee('Pickup List', false)
             ->assertSee('Login first to view pickup list.', false)
-            ->assertSee('All Shipments', false);
+            ->assertSee('All Pickups', false)
+            ->assertSee('Pending Pickups', false)
+            ->assertSee('pickupPendingCount', false);
 
         $script = file_get_contents(public_path('kay-paolo/assets/app.js'));
 
@@ -312,11 +314,15 @@ class ExampleTest extends TestCase
         $this->assertStringContainsString('response?.data?.all_options', $script);
         $this->assertStringContainsString('historyDateRangeValue', $script);
         $this->assertStringContainsString("route('pickupList', '/api/kay-paolo/pickup-list')", $script);
-        $this->assertStringContainsString('filterPickupHistoryRows', $script);
+        $this->assertStringContainsString('normalizePickupListRows', $script);
+        $this->assertStringContainsString('renderPickupListRows', $script);
+        $this->assertStringContainsString('pickupListFilterValue', $script);
         $this->assertStringContainsString('per_page: selectedLimit', $script);
         $this->assertStringContainsString('length: selectedLimit', $script);
         $this->assertStringContainsString('created_in: createdIn', $script);
         $this->assertStringContainsString('Complete Pickup', $script);
+        $this->assertStringContainsString('client_agent_name', $script);
+        $this->assertStringContainsString('direction_url', $script);
         $this->assertStringContainsString('zionFlatRateOptions', $script);
         $this->assertStringContainsString("const countryCacheKey = 'kayPaoloCountries:v3'", $script);
         $this->assertStringContainsString('kayPaoloPaymentOptions:v4', $script);
@@ -588,21 +594,36 @@ class ExampleTest extends TestCase
         });
     }
 
-    public function test_pickup_list_proxy_uses_shipping_history_feed(): void
+    public function test_pickup_list_proxy_uses_zion_pickup_list_feed(): void
     {
         Http::fake([
+            '*/api/kay-paolo/pickup-list' => Http::response([
+                'status' => 'success',
+                'pending_count' => 1,
+                'count' => 1,
+                'pickups' => [
+                    [
+                        'id' => 501,
+                        'pickup_date_display' => 'Sep 11, 2026',
+                        'pickup_shipment' => 'Pickup PKP88 / Shipment INV88',
+                        'client_agent_name' => 'Kay Client / Kay Agent',
+                        'phone' => '7325551212',
+                        'full_address' => '414 Main St, Asbury Park, NJ 07712',
+                        'package_count' => 2,
+                        'weight' => '12.5',
+                        'volume' => '1000',
+                        'cf' => '0.58',
+                        'bill_amount' => '15.00',
+                        'status' => 'Pending',
+                        'direction_url' => 'https://www.google.com/maps/dir/?api=1&destination=414+Main+St',
+                        'complete_url' => 'https://www.zionshipping.com/settings/pickups/501/complete',
+                    ],
+                ],
+            ]),
             '*/api/bocicot/shipping-history-filter' => Http::response([
                 'status' => 'success',
                 'shippings' => [
-                    ['id' => 88, 'status' => 1, 'status_name' => 'Ready to Ship', 'tracking_number' => 'PKP88'],
-                    ['id' => 89, 'status' => 8, 'status_name' => 'Delivered', 'tracking_number' => 'INV89'],
-                    ['id' => 90, 'status' => 9, 'status_name' => 'Voided', 'tracking_number' => 'VOID90'],
-                ],
-            ]),
-            '*/api/kay-paolo/shipping-history-filter' => Http::response([
-                'status' => 'success',
-                'shippings' => [
-                    ['id' => 99, 'status' => 1, 'status_name' => 'Ready to Ship', 'tracking_number' => 'SHOULD-NOT-WIN'],
+                    ['id' => 88, 'status' => 1, 'status_name' => 'Ready to Ship', 'tracking_number' => 'SHOULD-NOT-WIN'],
                 ],
             ]),
         ]);
@@ -612,26 +633,28 @@ class ExampleTest extends TestCase
                 'limit' => 25,
                 'user_id' => 7,
                 'account_number' => '9400',
+                'created_in' => 'All Pickups',
                 'status' => 'pending',
                 'pickup_status' => 'pending',
             ])
             ->assertOk()
-            ->assertJsonPath('shippings.0.tracking_number', 'PKP88')
-            ->assertJsonCount(1, 'shippings')
-            ->assertJsonPath('count', 1);
+            ->assertJsonPath('pickups.0.id', 501)
+            ->assertJsonPath('pickups.0.client_agent_name', 'Kay Client / Kay Agent')
+            ->assertJsonPath('pending_count', 1)
+            ->assertJsonCount(1, 'pickups');
 
         Http::assertSent(function ($request) {
             $data = $request->data();
 
-            return str_contains($request->url(), '/api/bocicot/shipping-history-filter')
+            return str_contains($request->url(), '/api/kay-paolo/pickup-list')
                 && $request->hasHeader('Authorization', 'Bearer fake-token')
                 && ($data['limit'] ?? null) === 25
                 && ($data['per_page'] ?? null) === 25
                 && ($data['length'] ?? null) === 25
                 && ($data['page'] ?? null) === 1
                 && ($data['start'] ?? null) === 0
-                && ($data['date_range'] ?? null) === ''
-                && ($data['created_in'] ?? null) === 'All Shipments'
+                && ($data['filter'] ?? null) === 'all'
+                && ($data['created_in'] ?? null) === 'All Pickups'
                 && ($data['agent_id'] ?? null) === 7
                 && ($data['created_by'] ?? null) === 7
                 && ($data['created_by_id'] ?? null) === 7
@@ -641,19 +664,22 @@ class ExampleTest extends TestCase
         });
 
         Http::assertNotSent(function ($request) {
-            return str_contains($request->url(), '/api/kay-paolo/shipping-history-filter');
+            return str_contains($request->url(), '/api/bocicot/shipping-history-filter');
         });
     }
 
-    public function test_pickup_list_proxy_converts_bocicot_html_and_skips_kay_paolo_feed(): void
+    public function test_pickup_list_proxy_forwards_empty_zion_pickup_list(): void
     {
         Http::fake([
-            '*/api/bocicot/shipping-history-filter' => Http::response(
-                '<div class="row wp-history"><h3 class="ship-number">HTS111</h3><p class="zs-trasit">Ready to Ship</p><a href="/edit-shipment/111">Edit</a></div><div class="row wp-history"><h3 class="ship-number">HTS222</h3><p class="zs-trasit">Voided</p><a href="/edit-shipment/222">Edit</a></div>',
-                200,
-                ['Content-Type' => 'text/html']
-            ),
-            '*/api/kay-paolo/shipping-history-filter' => Http::response([
+            '*/api/kay-paolo/pickup-list' => Http::response([
+                'status' => 'success',
+                'error' => false,
+                'count' => 0,
+                'pending_count' => 0,
+                'pickups' => [],
+                'message' => 'No active pickups are assigned to your states right now.',
+            ]),
+            '*/api/bocicot/shipping-history-filter' => Http::response([
                 'status' => 'success',
                 'shippings' => [
                     ['id' => 99, 'tracking_number' => 'SHOULD-NOT-WIN'],
@@ -664,14 +690,16 @@ class ExampleTest extends TestCase
         $this->withHeader('Authorization', 'Bearer fake-token')
             ->postJson('/api/kay-paolo/pickup-list', [
                 'limit' => 100,
-                'created_in' => 'All Shipments',
+                'created_in' => 'All Pickups',
             ])
             ->assertOk()
-            ->assertJsonPath('count', 1)
-            ->assertJsonPath('shippings.0.tracking_number', 'HTS111');
+            ->assertJsonPath('count', 0)
+            ->assertJsonPath('pending_count', 0)
+            ->assertJsonPath('message', 'No active pickups are assigned to your states right now.')
+            ->assertJsonCount(0, 'pickups');
 
         Http::assertNotSent(function ($request) {
-            return str_contains($request->url(), '/api/kay-paolo/shipping-history-filter');
+            return str_contains($request->url(), '/api/bocicot/shipping-history-filter');
         });
     }
 

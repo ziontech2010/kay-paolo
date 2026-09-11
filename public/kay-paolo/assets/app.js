@@ -2197,7 +2197,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const query = value('searchInput').toLowerCase();
       const statuses = Array.from(document.querySelectorAll('.status-filter:checked')).map((item) => item.value);
       const categories = Array.from(document.querySelectorAll('.category-filter:checked')).map((item) => item.value);
-      list.querySelectorAll('.shipment-card[data-status]').forEach((card) => {
+      list.querySelectorAll('.shipment-card[data-status], .pickup-list-card[data-status]').forEach((card) => {
         const matchesQuery = !query || String(card.dataset.searchPool || card.textContent).toLowerCase().includes(query);
         const matchesStatus = !statuses.length || statuses.includes(card.dataset.status);
         const matchesCategory = !categories.length || categories.includes(card.dataset.category);
@@ -2213,12 +2213,36 @@ document.addEventListener('DOMContentLoaded', () => {
 
       try {
         const selectedLimit = Number(firstValue('entriesSelect')) || 100;
-        const createdIn = firstValue('timeSelect') || (pickupMode ? 'All Shipments' : 'Last 30 Days');
+        const createdIn = firstValue('timeSelect') || (pickupMode ? 'All Pickups' : 'Last 30 Days');
         const user = storedUser();
         const userId = user.id || user.user_id || undefined;
         const agentId = user.agent_id || user.agentId || userId || undefined;
 
-        const response = await postJson(pickupMode ? route('pickupList', '/api/kay-paolo/pickup-list') : route('shippingHistory', '/api/kay-paolo/shipping-history'), compactPayload({
+        if (pickupMode) {
+          const response = await postJson(route('pickupList', '/api/kay-paolo/pickup-list'), compactPayload({
+            limit: selectedLimit,
+            per_page: selectedLimit,
+            length: selectedLimit,
+            page: 1,
+            start: 0,
+            filter: pickupListFilterValue(createdIn),
+            date_range: historyDateRangeValue(createdIn),
+            created_in: createdIn,
+            search: firstValue('searchInput'),
+            user_id: userId || user.account_number || undefined,
+            agent_id: agentId,
+            agentId: agentId,
+            created_by: user.created_by || agentId,
+            created_by_id: user.created_by_id || agentId,
+            account_number: user.account_number || undefined
+          }));
+
+          renderPickupListRows(result, normalizePickupListRows(response), response);
+          filter();
+          return;
+        }
+
+        const response = await postJson(route('shippingHistory', '/api/kay-paolo/shipping-history'), compactPayload({
           limit: selectedLimit,
           per_page: selectedLimit,
           length: selectedLimit,
@@ -2242,11 +2266,11 @@ document.addEventListener('DOMContentLoaded', () => {
             enhanceHistoryCards(result);
             updateHistoryBadgesFromCards();
           } else {
-            renderHistoryRows(result, pickupMode ? filterPickupHistoryRows(normalizeHistoryRows(response)) : normalizeHistoryRows(response));
+            renderHistoryRows(result, normalizeHistoryRows(response));
             enhanceHistoryCards(result);
           }
         } else {
-          renderHistoryRows(result, pickupMode ? filterPickupHistoryRows(normalizeHistoryRows(response)) : normalizeHistoryRows(response));
+          renderHistoryRows(result, normalizeHistoryRows(response));
           enhanceHistoryCards(result);
         }
         filter();
@@ -2300,7 +2324,17 @@ document.addEventListener('DOMContentLoaded', () => {
         if (tracking) query.set('id', tracking);
         const queryString = query.toString();
 
-        if (action === 'label') {
+        if (action === 'directions') {
+          const directionUrl = card.dataset.directionUrl || '';
+          if (directionUrl) window.open(directionUrl, '_blank', 'noopener');
+        } else if (action === 'complete-pickup') {
+          const completeUrl = card.dataset.completeUrl || '';
+          if (completeUrl) {
+            window.open(completeUrl, '_blank', 'noopener');
+          } else {
+            window.alert('Pickup completion page is unavailable for this record.');
+          }
+        } else if (action === 'label') {
           window.open(`${route('shipmentLabel', '/shipment-label')}${queryString ? `?${queryString}` : ''}`, '_blank');
         } else if (action === 'receipt') {
           window.open(`${route('shipmentReceipt', '/shipment-receipt')}${queryString ? `?${queryString}` : ''}`, '_blank');
@@ -2388,6 +2422,110 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
+  function normalizePickupListRows(response) {
+    const candidates = [
+      response?.pickups,
+      response?.pickup_list,
+      response?.data?.pickups,
+      response?.data?.pickup_list,
+      response?.data
+    ].find((item) => Array.isArray(item));
+
+    return Array.isArray(candidates) ? candidates : [];
+  }
+
+  function pickupListFilterValue(label) {
+    const value = String(label || '').toLowerCase();
+    if (value.includes('today')) return 'today';
+    if (value.includes('week') || value.includes('7')) return 'week';
+    if (value.includes('30') || value.includes('month')) return 'month';
+    return 'all';
+  }
+
+  function renderPickupListRows(container, rows, response = {}) {
+    const pendingCount = Number(
+      response?.pending_count
+      ?? response?.count
+      ?? response?.data?.pending_count
+      ?? rows.length
+      ?? 0
+    );
+    const pendingEl = document.getElementById('pickupPendingCount');
+    if (pendingEl) pendingEl.textContent = String(Number.isFinite(pendingCount) ? pendingCount : rows.length);
+
+    if (!rows.length) {
+      container.innerHTML = historyNoticeCard(
+        'No Pickups',
+        'Pickup list',
+        response?.message || 'No active pickups are assigned to your states right now.'
+      );
+      return;
+    }
+
+    container.innerHTML = rows.map((row) => {
+      const pickupId = historyField(row, ['id', 'pickup_id'], '');
+      const pickupDate = historyField(row, ['pickup_date_display', 'pickup_date'], 'N/A');
+      const pickupShipment = historyField(row, ['pickup_shipment'], '')
+        || [historyField(row, ['pickup_reference', 'reference_num'], ''), historyField(row, ['shipment_number'], '')]
+          .filter(Boolean)
+          .map((value, index) => (index === 0 && !String(value).toLowerCase().startsWith('pickup') ? `Pickup ${value}` : (index === 1 && !String(value).toLowerCase().startsWith('shipment') ? `Shipment ${value}` : value)))
+          .join(' / ')
+        || `Pickup ${pickupId || '-'}`;
+      const clientAgent = historyField(row, ['client_agent_name', 'pickup_name'], 'Unknown');
+      const phone = historyField(row, ['phone', 'pickup_phone'], 'N/A') || 'N/A';
+      const address = historyField(row, ['full_address', 'pickup_address'], 'N/A') || 'N/A';
+      const packageCount = historyField(row, ['package_count'], '0') || '0';
+      const weight = historyField(row, ['weight', 'package_weight', 'weight_display'], '0') || '0';
+      const volume = historyField(row, ['volume', 'package_volume', 'volume_display'], '0') || '0';
+      const cf = historyField(row, ['cf', 'pickup_cf', 'cf_display'], '0') || '0';
+      const billAmount = historyField(row, ['bill_amount'], '0.00') || '0.00';
+      const status = historyField(row, ['status', 'status_raw', 'pickup_status'], 'Pending') || 'Pending';
+      const directionUrl = historyField(row, ['direction_url'], '')
+        || (address && address !== 'N/A' ? `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(address)}` : '');
+      const completeUrl = historyField(row, ['complete_url'], '');
+      const searchPool = [pickupDate, pickupShipment, clientAgent, phone, address, packageCount, weight, volume, cf, status, billAmount].join(' ');
+
+      return `
+        <div class="shipment-card pickup-list-card" data-status="${escapeHtml(status)}" data-category="Pickup" data-pickup-id="${escapeHtml(pickupId)}" data-tracking="${escapeHtml(historyField(row, ['shipment_number'], ''))}" data-direction-url="${escapeHtml(directionUrl)}" data-complete-url="${escapeHtml(completeUrl)}" data-search-pool="${escapeHtml(searchPool)}" style="margin-bottom: 0">
+          <div class="history-card-main pickup-list-main">
+            <div class="history-card-col">
+              <span class="meta-label">Pickup Date</span>
+              <span class="meta-val" style="font-weight: 700">${escapeHtml(pickupDate)}</span>
+              <span class="meta-label">Status</span>
+              <span class="status-lbl">${escapeHtml(status)}</span>
+            </div>
+            <div class="history-card-col">
+              <span class="meta-label">Pickup / Shipment</span>
+              <span class="meta-val" style="font-weight: 700">${escapeHtml(pickupShipment)}</span>
+              <span class="meta-label">Driver Bill</span>
+              <span class="meta-val">$${escapeHtml(billAmount)}</span>
+            </div>
+            <div class="history-card-col">
+              <span class="meta-label">Client / Agent</span>
+              <span class="meta-val" style="font-weight: 600">${escapeHtml(clientAgent)}</span>
+              <span class="meta-label">Phone</span>
+              <span class="meta-val">${escapeHtml(phone)}</span>
+            </div>
+            <div class="history-card-col">
+              <div class="address-block">
+                <span class="meta-label">Address</span>
+                <strong>${escapeHtml(address)}</strong>
+              </div>
+              <span class="meta-label">Packages</span>
+              <span class="meta-val">${escapeHtml(packageCount)}</span>
+              <span class="meta-label">Weight / Volume / CF</span>
+              <span class="meta-val">${escapeHtml(weight)} lbs / ${escapeHtml(volume)} Ci / ${escapeHtml(cf)} CF</span>
+            </div>
+          </div>
+          <div class="history-card-footer pickup-list-actions">
+            ${directionUrl ? `<a class="btn btn-outline" href="${escapeHtml(directionUrl)}" target="_blank" rel="noopener">Directions</a>` : ''}
+            <button type="button" class="btn btn-gold" data-history-action="complete-pickup">Complete Pickup</button>
+          </div>
+        </div>
+      `;
+    }).join('');
+  }
+
   function normalizeHistoryRows(response) {
     const candidates = [
       response?.pickups,
@@ -2431,7 +2569,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!rows.length) {
       const pickupMode = queryParam('view').toLowerCase() === 'pickup';
       container.innerHTML = pickupMode
-        ? historyNoticeCard('No Pickups', 'Pickup list', 'No pickup list records found for this account.')
+        ? historyNoticeCard('No Pickups', 'Pickup list', 'No active pickups are assigned to your states right now.')
         : historyNoticeCard('No Shipments', 'Shipment history', 'No shipments found for this account.');
       return;
     }
@@ -2533,7 +2671,6 @@ document.addEventListener('DOMContentLoaded', () => {
             </div>
           </div>
           <div class="history-card-footer">
-            ${queryParam('view').toLowerCase() === 'pickup' ? '<button type="button" class="btn btn-gold" data-history-action="edit">Complete Pickup</button>' : ''}
             <div class="history-more">
               <button type="button" class="more-link" data-history-more-toggle aria-haspopup="true" aria-expanded="false">
                 More
