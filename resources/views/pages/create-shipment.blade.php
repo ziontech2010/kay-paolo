@@ -69,7 +69,7 @@
                         <div class="form-row-2">
                             <div class="field">
                                 <label>Email</label>
-                                <input type="email" id="shipmentFromEmail" value="{{ $user['email'] ?? 'zlionline@gmail.com' }}" required>
+                                <input type="email" id="shipmentFromEmail" value="{{ $user['email'] ?? '' }}" required>
                             </div>
                             <div class="field">
                                 <label>Phone</label>

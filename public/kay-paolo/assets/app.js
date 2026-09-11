@@ -1421,9 +1421,17 @@ document.addEventListener('DOMContentLoaded', () => {
         const mergedPayload = await ensureConsigneeForShipment(mergeShipmentFormPayload(pending.payload || {}));
         const payload = buildBocicotShipmentPayload(mergedPayload);
         const response = await postJson(route('shipping', '/api/kay-paolo/shipping'), payload);
-        const documentPayload = { ...mergedPayload, ...payload };
+        const documentPayload = {
+          ...mergedPayload,
+          ...payload,
+          from_email: payload.from_email || mergedPayload.from_email || value('shipmentFromEmail') || storedUser().email || undefined
+        };
         window.localStorage.setItem(shipmentResponseKey, JSON.stringify({ response, payload: documentPayload, selected: pending.card || {} }));
-        await queueShipmentEmailNotifications(response, documentPayload, pending.card || {});
+        try {
+          await queueShipmentEmailNotifications(response, documentPayload, pending.card || {});
+        } catch (emailError) {
+          console.warn('Shipment confirmation email queue failed', emailError);
+        }
         window.location.href = route('shipmentConfirmation', '/shipment-confirmation');
       } catch (error) {
         showError(result, error.message);
@@ -3862,8 +3870,6 @@ document.addEventListener('DOMContentLoaded', () => {
       payload?.customer_email,
       payload?.email,
       payload?.email_address,
-      payload?.to_email,
-      payload?.consignee_email,
       payload?.contact,
       payload?.shipper_contact,
       payload?.sender_contact,
@@ -3881,11 +3887,9 @@ document.addEventListener('DOMContentLoaded', () => {
       response?.shipping_data,
       response?.data,
       data.shipperEmail,
-      data.consigneeEmail,
-      storedUser().email,
-      'info@kaypaoloshipping.com'
+      storedUser().email
     ].flatMap(emailListFromValue).map((email) => email.toLowerCase())))
-      .filter((email) => email.toLowerCase() !== serverSentEmail);
+      .filter((email) => email && email.toLowerCase() !== serverSentEmail);
 
     if (!emails.length) return;
 
@@ -4087,7 +4091,7 @@ document.addEventListener('DOMContentLoaded', () => {
     setText('selectedDeliveredBy', deliveredBy);
 
     setValue('shipmentFromName', payload.from_name);
-    setValue('shipmentFromEmail', payload.from_email);
+    setValue('shipmentFromEmail', payload.from_email || storedUser().email);
     setValue('shipmentFromPhone', payload.from_phone);
     setSelectValue('shipmentFromCountry', payload.from_country_name || payload.from_country);
     setValue('shipmentFromZip', payload.from_zip);

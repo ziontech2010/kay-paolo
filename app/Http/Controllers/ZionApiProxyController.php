@@ -10,6 +10,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
@@ -280,11 +281,13 @@ class ZionApiProxyController extends Controller
         $rawPayload = $request->except('_token');
         $payload = $this->sanitizeShipmentPayload($rawPayload);
         $documentPayload = array_merge($rawPayload, $payload);
+        // Successful Zion shipping payloads may still include legacy HTML fragments.
+        // Do not treat those as failures or keep cascading to later endpoints.
         $response = $this->postWithFallback([
             ['endpoint' => 'web-api/update-shipping-bocicot', 'web' => true],
             ['endpoint' => 'bocicot/update-shipping'],
             ['endpoint' => 'kay-paolo/update-shipping'],
-        ], $payload, $token);
+        ], $payload, $token, null, true);
 
         if ($this->isRecoverableZionAccountNumberSchemaError($response)) {
             $retryResponse = $this->zion->postWeb('web-api/update-shipping-bocicot', $payload, $token);
@@ -623,13 +626,15 @@ class ZionApiProxyController extends Controller
 
         $mailer = $this->shipmentConfirmationMailerName();
         if ($mailer === null) {
+            Log::error('Shipment confirmation email failed: ZeptoMail/SMTP is not configured.');
+
             return response()->json([
                 'status' => 'error',
                 'message' => 'Shipment confirmation email is not configured for delivery.',
             ], 502);
         }
 
-        $this->primeShipmentDocuments($query, [
+        $documentContext = [
             'response' => [
                 'shipment_id' => $validated['shipment_id'] ?? $validated['shipping_id'] ?? null,
                 'invoice_num' => $validated['invoice'] ?? null,
@@ -652,9 +657,10 @@ class ZionApiProxyController extends Controller
                 'package_count' => $validated['package_count'] ?? null,
             ],
             'selected' => [],
-        ]);
+        ];
 
         try {
+            // Deliver first; PDF priming can be slow and must not block confirmation mail.
             Mail::mailer($mailer)->to($validated['email'])->send(new ConfirmShipmentMail([
                 'recipientName' => $validated['recipient_name'] ?? null,
                 'shipmentNumber' => (string) $shipmentNumber,
@@ -676,6 +682,11 @@ class ZionApiProxyController extends Controller
             ]));
         } catch (\Throwable $exception) {
             report($exception);
+            Log::error('Shipment confirmation email send failed.', [
+                'email' => $validated['email'],
+                'shipment' => $shipmentNumber,
+                'error' => $exception->getMessage(),
+            ]);
 
             return response()->json([
                 'status' => 'error',
@@ -683,6 +694,8 @@ class ZionApiProxyController extends Controller
                 'error' => config('app.debug') ? $exception->getMessage() : null,
             ], 502);
         }
+
+        $this->primeShipmentDocuments($query, $documentContext);
 
         return response()->json([
             'status' => 'success',
@@ -1249,18 +1262,21 @@ class ZionApiProxyController extends Controller
             || ($error === 'true' && $appLocked === 'true');
     }
 
-    private function postWithFallback(array $targets, array $payload, ?string $token = null, ?int $timeout = null): array
+    private function postWithFallback(array $targets, array $payload, ?string $token = null, ?int $timeout = null, bool $ignoreHtmlFallback = false): array
     {
         $lastResponse = null;
 
         foreach ($targets as $target) {
             $lastResponse = $this->requestZionTarget($target, $payload, $token, 'post', $timeout);
+            $needsFallback = $ignoreHtmlFallback
+                ? $this->shouldTryFallbackWithoutHtml($lastResponse)
+                : $this->shouldTryFallback($lastResponse);
 
-            if ($lastResponse['ok'] && !$this->shouldTryFallback($lastResponse)) {
+            if ($lastResponse['ok'] && !$needsFallback) {
                 return $lastResponse;
             }
 
-            if (!$this->shouldTryFallback($lastResponse)) {
+            if (!$needsFallback) {
                 return $lastResponse;
             }
         }
@@ -1797,6 +1813,8 @@ class ZionApiProxyController extends Controller
         ]);
 
         if (!$email) {
+            Log::warning('Shipment confirmation email skipped: no recipient email on create payload.');
+
             return [
                 'status' => 'skipped',
                 'message' => 'No customer email was available for confirmation.',
@@ -1818,14 +1836,10 @@ class ZionApiProxyController extends Controller
             'id' => $shipmentNumber !== 'Pending' ? $shipmentNumber : null,
         ], static fn ($value) => $value !== null && $value !== '');
 
-        $this->primeShipmentDocuments($query, [
-            'response' => $responseData,
-            'payload' => $payload,
-            'selected' => [],
-        ]);
-
         $mailer = $this->shipmentConfirmationMailerName();
         if ($mailer === null) {
+            Log::error('Shipment confirmation email failed: ZeptoMail/SMTP is not configured.');
+
             return [
                 'status' => 'error',
                 'email' => $email,
@@ -1848,6 +1862,7 @@ class ZionApiProxyController extends Controller
                 $email,
             ]);
 
+            // Send first — label/receipt PDFs are generated on click and must not delay or block mail.
             Mail::mailer($mailer)->to($email)->send(new ConfirmShipmentMail([
                 'recipientName' => $payload['from_name'] ?? session('zion.user.name') ?? null,
                 'shipmentNumber' => $shipmentNumber,
@@ -1876,6 +1891,11 @@ class ZionApiProxyController extends Controller
             ]));
         } catch (\Throwable $exception) {
             report($exception);
+            Log::error('Shipment confirmation email send failed.', [
+                'email' => $email,
+                'shipment' => $shipmentNumber,
+                'error' => $exception->getMessage(),
+            ]);
 
             return [
                 'status' => 'error',
@@ -1884,6 +1904,18 @@ class ZionApiProxyController extends Controller
                 'error' => config('app.debug') ? $exception->getMessage() : null,
             ];
         }
+
+        $this->primeShipmentDocuments($query, [
+            'response' => $responseData,
+            'payload' => $payload,
+            'selected' => [],
+        ]);
+
+        Log::info('Shipment confirmation email sent.', [
+            'email' => $email,
+            'shipment' => $shipmentNumber,
+            'mailer' => $mailer,
+        ]);
 
         return [
             'status' => 'success',
