@@ -1232,6 +1232,11 @@ class ZionApiProxyController extends Controller
 
         foreach ($targets as $target) {
             $lastResponse = $this->requestZionTarget($target, $payload, $token, 'post', $timeout);
+
+            if ($ignoreHtmlFallback && $this->shipmentWasCreated($lastResponse)) {
+                return $lastResponse;
+            }
+
             $needsFallback = $ignoreHtmlFallback
                 ? $this->shouldTryFallbackWithoutHtml($lastResponse)
                 : $this->shouldTryFallback($lastResponse);
@@ -1750,8 +1755,13 @@ class ZionApiProxyController extends Controller
         // we have used it to detect a successful create.
         unset($response['data']['html']);
 
-        if (($response['data']['status'] ?? '') === '') {
+        $dataStatus = strtolower(trim((string) ($response['data']['status'] ?? '')));
+        if ($dataStatus === '' || $dataStatus === 'error') {
             $response['data']['status'] = 'success';
+        }
+
+        if (strtolower((string) ($response['data']['method'] ?? '')) === 'error') {
+            unset($response['data']['method']);
         }
 
         if ((int) ($response['status'] ?? 0) < 200 || (int) $response['status'] >= 300) {
@@ -1769,13 +1779,7 @@ class ZionApiProxyController extends Controller
         $status = strtolower((string) ($data['status'] ?? ''));
         $method = strtolower((string) ($data['method'] ?? ''));
 
-        if ($status === 'error' || $method === 'error') {
-            return false;
-        }
-
-        return ($response['ok'] ?? false)
-            || $status === 'success'
-            || !empty($data['tracking_number'])
+        $hasCreatedEvidence = !empty($data['tracking_number'])
             || !empty($data['tracking_numbers'])
             || !empty($data['invoice_num'])
             || !empty($data['shipment_id'])
@@ -1783,6 +1787,17 @@ class ZionApiProxyController extends Controller
             || !empty($data['documents'])
             || str_contains($html, 'view labels')
             || str_contains($html, 'receipt/');
+
+        if ($hasCreatedEvidence) {
+            return true;
+        }
+
+        if ($status === 'error' || $method === 'error') {
+            return false;
+        }
+
+        return ($response['ok'] ?? false)
+            || $status === 'success';
     }
 
     private function attachShipmentEmailResult(Request $request, array &$response, array $payload): void
