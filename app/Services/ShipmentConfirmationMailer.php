@@ -85,13 +85,10 @@ class ShipmentConfirmationMailer
     public function zeptoToken(): string
     {
         $configured = config('services.zeptomail.token');
-        if ($configured === null) {
-            return '';
-        }
-
         $token = trim((string) $configured);
+
         if ($token === '') {
-            $token = trim((string) (env('ZEPTOMAIL_TOKEN') ?: getenv('ZEPTOMAIL_TOKEN') ?: ''));
+            $token = trim((string) (getenv('ZEPTOMAIL_TOKEN') ?: env('ZEPTOMAIL_TOKEN') ?: ''));
         }
 
         return trim($token, " \t\n\r\0\x0B\"'");

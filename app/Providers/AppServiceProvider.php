@@ -28,7 +28,11 @@ class AppServiceProvider extends ServiceProvider
 
         Mail::extend('zeptomail', function (array $config = []) {
             $services = config('services.zeptomail', []);
-            $token = trim((string) ($services['token'] ?? env('ZEPTOMAIL_TOKEN') ?? ''));
+            $token = trim((string) ($services['token'] ?? ''));
+
+            if ($token === '') {
+                $token = trim((string) (getenv('ZEPTOMAIL_TOKEN') ?: env('ZEPTOMAIL_TOKEN') ?: ''));
+            }
 
             return new ZeptoMailTransport(
                 token: trim($token, " \t\n\r\0\x0B\"'"),

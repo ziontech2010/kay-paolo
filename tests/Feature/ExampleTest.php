@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 // use Illuminate\Foundation\Testing\RefreshDatabase;
 use App\Mail\ConfirmShipmentMail;
+use App\Services\ShipmentConfirmationMailer;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Mail;
@@ -928,22 +929,40 @@ class ExampleTest extends TestCase
     public function test_email_shipment_reports_missing_delivery_mailer(): void
     {
         Mail::fake();
-        config([
-            'mail.default' => 'log',
-            'services.zeptomail.token' => null,
-        ]);
 
-        $this->withHeader('Authorization', 'Bearer test-token')
-            ->postJson('/api/kay-paolo/email-shipment', [
-                'email' => 'customer@example.com',
-                'invoice' => '884423',
-                'tracking_number' => 'HTB884423-1/1',
-            ])
-            ->assertStatus(502)
-            ->assertJsonPath('status', 'error')
-            ->assertJsonPath('message', 'Shipment confirmation email is not configured for delivery.');
+        $this->withRuntimeZeptoToken(null, function (): void {
+            config([
+                'mail.default' => 'log',
+                'services.zeptomail.token' => null,
+            ]);
+
+            $this->withHeader('Authorization', 'Bearer test-token')
+                ->postJson('/api/kay-paolo/email-shipment', [
+                    'email' => 'customer@example.com',
+                    'invoice' => '884423',
+                    'tracking_number' => 'HTB884423-1/1',
+                ])
+                ->assertStatus(502)
+                ->assertJsonPath('status', 'error')
+                ->assertJsonPath('message', 'Shipment confirmation email is not configured for delivery.');
+        });
 
         Mail::assertNothingSent();
+    }
+
+    public function test_shipment_confirmation_mailer_uses_runtime_zeptomail_token_when_config_token_is_missing(): void
+    {
+        $this->withRuntimeZeptoToken('runtime-zeptomail-token', function (): void {
+            config([
+                'mail.default' => 'zeptomail',
+                'services.zeptomail.token' => null,
+            ]);
+
+            $mailer = app(ShipmentConfirmationMailer::class);
+
+            $this->assertSame('runtime-zeptomail-token', $mailer->zeptoToken());
+            $this->assertSame('zeptomail', $mailer->mailerName());
+        });
     }
 
     public function test_zeptomail_transport_posts_confirmation_email_to_provider(): void
@@ -1549,5 +1568,45 @@ class ExampleTest extends TestCase
     private function configureShipmentConfirmationMailer(): void
     {
         config(['services.zeptomail.token' => 'test-zeptomail-token']);
+    }
+
+    private function withRuntimeZeptoToken(?string $token, callable $callback): mixed
+    {
+        $previousGetenv = getenv('ZEPTOMAIL_TOKEN');
+        $hadEnv = array_key_exists('ZEPTOMAIL_TOKEN', $_ENV);
+        $previousEnv = $_ENV['ZEPTOMAIL_TOKEN'] ?? null;
+        $hadServer = array_key_exists('ZEPTOMAIL_TOKEN', $_SERVER);
+        $previousServer = $_SERVER['ZEPTOMAIL_TOKEN'] ?? null;
+
+        if ($token === null) {
+            putenv('ZEPTOMAIL_TOKEN');
+            unset($_ENV['ZEPTOMAIL_TOKEN'], $_SERVER['ZEPTOMAIL_TOKEN']);
+        } else {
+            putenv('ZEPTOMAIL_TOKEN='.$token);
+            $_ENV['ZEPTOMAIL_TOKEN'] = $token;
+            $_SERVER['ZEPTOMAIL_TOKEN'] = $token;
+        }
+
+        try {
+            return $callback();
+        } finally {
+            if ($previousGetenv === false) {
+                putenv('ZEPTOMAIL_TOKEN');
+            } else {
+                putenv('ZEPTOMAIL_TOKEN='.$previousGetenv);
+            }
+
+            if ($hadEnv) {
+                $_ENV['ZEPTOMAIL_TOKEN'] = $previousEnv;
+            } else {
+                unset($_ENV['ZEPTOMAIL_TOKEN']);
+            }
+
+            if ($hadServer) {
+                $_SERVER['ZEPTOMAIL_TOKEN'] = $previousServer;
+            } else {
+                unset($_SERVER['ZEPTOMAIL_TOKEN']);
+            }
+        }
     }
 }
