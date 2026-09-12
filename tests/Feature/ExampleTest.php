@@ -1296,6 +1296,64 @@ class ExampleTest extends TestCase
         });
     }
 
+    public function test_shipping_creation_sends_kay_paolo_email_when_create_response_includes_html(): void
+    {
+        Mail::fake();
+        $this->configureShipmentConfirmationMailer();
+
+        Http::fake([
+            '*/web-api/update-shipping-bocicot' => Http::response([
+                'html' => '<div class="form-head"><h3>VIEW LABELS DOCUMENTS AND RECEIPT</h3></div><a href="/receipt/receipt_253271.pdf">View Receipt</a>',
+                'tracking_number' => 'HTS253271-1/1',
+                'invoice_num' => '253271',
+            ]),
+        ]);
+
+        $this->withHeader('Authorization', 'Bearer fake-token')
+            ->postJson('/api/kay-paolo/shipping', [
+                'user_id' => 7020,
+                'quote_id' => 93602,
+                'partner' => 'zion_products',
+                'selected_shipper' => 'Economical Air',
+                'from_name' => 'Therlande Louis Jean',
+                'from_email' => 'ztionline@gmail.com',
+                'from_phone' => '7867027700',
+                'from_country' => 'US',
+                'from_address' => '1117 NE 163rd St',
+                'from_zip' => '33162',
+                'from_city' => 'North Miami Beach',
+                'from_state' => 'FL',
+                'consignee_id' => 40285,
+                'to_name' => 'test 6',
+                'to_phone_1' => '34215356',
+                'to_country' => 'HT',
+                'to_address' => 'San Juan de la Maguana San Juan',
+                'to_city' => 'Port-au-Prince',
+                'to_state' => 'Ouest',
+                'package_count' => 1,
+                'dimensions' => [
+                    'package_count_ind' => [1],
+                    'weight' => [8],
+                    'length' => [11],
+                    'width' => [11],
+                    'height' => [11],
+                ],
+                'total_value' => 0,
+                'delivery_location' => 'Pickup in Office',
+                'payment_type' => 'PAID AT AGENT',
+            ])
+            ->assertOk()
+            ->assertJsonMissingPath('html')
+            ->assertJsonPath('status', 'success')
+            ->assertJsonPath('confirmation_email.status', 'success')
+            ->assertJsonPath('confirmation_email.email', 'ztionline@gmail.com');
+
+        Mail::assertSent(ConfirmShipmentMail::class, function ($mail) {
+            return ($mail->shipment['shipmentNumber'] ?? null) === 'HTS253271-1/1'
+                && ($mail->shipment['recipientName'] ?? null) === 'Therlande Louis Jean';
+        });
+    }
+
     public function test_create_shipment_document_context_keeps_delivery_date_and_account_number(): void
     {
         Mail::fake();

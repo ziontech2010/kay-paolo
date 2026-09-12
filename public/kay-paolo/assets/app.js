@@ -188,6 +188,59 @@ document.addEventListener('DOMContentLoaded', () => {
     return data;
   }
 
+  function shipmentLooksCreated(data) {
+    const html = String(data?.html || '');
+    return Boolean(
+      data?.tracking_number
+      || data?.tracking_numbers
+      || data?.invoice_num
+      || data?.shipment_id
+      || data?.shipping_id
+      || (Array.isArray(data?.documents) && data.documents.length)
+      || data?.confirmation_email
+      || data?.status === 'success'
+      || /view labels|receipt_/i.test(html)
+    );
+  }
+
+  async function postShipmentCreate(url, payload, options = {}) {
+    const headers = {
+      Accept: 'application/json',
+      'Content-Type': 'application/json',
+      'X-CSRF-TOKEN': csrf
+    };
+
+    const token = options.token === undefined ? storedToken() : options.token;
+    if (token) {
+      headers.Authorization = `Bearer ${token}`;
+    }
+
+    const response = await fetch(url, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(payload || {})
+    });
+
+    const text = await response.text();
+    let data = {};
+    try {
+      data = text ? JSON.parse(text) : {};
+    } catch (error) {
+      data = { status: 'error', message: text || 'Unexpected response.' };
+    }
+
+    if (shipmentLooksCreated(data)) {
+      return data;
+    }
+
+    if (!response.ok || data.html || data.status === 'error' || data.error === true || data.error === 'true') {
+      const message = data.message || data.error || 'Unable to create shipment.';
+      throw Object.assign(new Error(message), { response: data, status: response.status });
+    }
+
+    return data;
+  }
+
   async function postExternalJson(url, payload, options = {}) {
     const headers = {
       Accept: 'application/json',
@@ -1420,7 +1473,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const pending = storedJson(pendingShipmentKey, { payload: {}, card: {}, quote: {} });
         const mergedPayload = await ensureConsigneeForShipment(mergeShipmentFormPayload(pending.payload || {}));
         const payload = buildBocicotShipmentPayload(mergedPayload);
-        const response = await postJson(route('shipping', '/api/kay-paolo/shipping'), payload);
+        const response = await postShipmentCreate(route('shipping', '/api/kay-paolo/shipping'), payload);
         const documentPayload = {
           ...mergedPayload,
           ...payload,
@@ -3863,6 +3916,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const data = buildShipmentDocumentData(response || {}, payload || {}, selected || {});
     const serverEmail = response?.confirmation_email || response?.data?.confirmation_email || {};
     const serverSentEmail = serverEmail.status === 'success' ? String(serverEmail.email || '').toLowerCase() : '';
+    // Always keep a client-side send as backup when the server did not confirm delivery.
     const emails = Array.from(new Set([
       payload?.from_email,
       payload?.shipper_email,

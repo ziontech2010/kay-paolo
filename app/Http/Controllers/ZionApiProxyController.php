@@ -293,27 +293,13 @@ class ZionApiProxyController extends Controller
             $retryResponse = $this->zion->postWeb('web-api/update-shipping-bocicot', $payload, $token);
 
             if (!$this->isRecoverableZionAccountNumberSchemaError($retryResponse)) {
-                $this->attachDocumentContextKey(
-                    $retryResponse,
-                    $this->rememberShipmentContext($request, $retryResponse['data'] ?? [], $documentPayload)
-                );
-                $this->attachShipmentEmailResult($request, $retryResponse, $documentPayload);
-
-                return $this->jsonResponse($retryResponse);
+                return $this->jsonResponse($this->finalizeCreatedShipment($request, $retryResponse, $documentPayload));
             }
 
             $response = $retryResponse;
         }
 
-        if ($response['ok'] ?? false) {
-            $this->attachDocumentContextKey(
-                $response,
-                $this->rememberShipmentContext($request, $response['data'] ?? [], $documentPayload)
-            );
-            $this->attachShipmentEmailResult($request, $response, $documentPayload);
-        }
-
-        return $this->jsonResponse($response);
+        return $this->jsonResponse($this->finalizeCreatedShipment($request, $response, $documentPayload));
     }
 
     public function storeShipmentDocumentContext(Request $request): JsonResponse
@@ -1765,17 +1751,89 @@ class ZionApiProxyController extends Controller
         return str_contains(strtolower($deliveryLocation), 'home');
     }
 
+    private function finalizeCreatedShipment(Request $request, array $response, array $payload): array
+    {
+        if (!$this->shipmentWasCreated($response)) {
+            return $response;
+        }
+
+        if (!is_array($response['data'] ?? null)) {
+            $response['data'] = [];
+        }
+
+        $this->attachDocumentContextKey(
+            $response,
+            $this->rememberShipmentContext($request, $response['data'], $payload)
+        );
+        $this->attachShipmentEmailResult($request, $response, $payload);
+
+        // Zion create responses can still include leftover HTML. The Kay Paolo
+        // frontend treats `html` as a failed quote/API call, so strip it after
+        // we have used it to detect a successful create.
+        unset($response['data']['html']);
+
+        if (($response['data']['status'] ?? '') === '') {
+            $response['data']['status'] = 'success';
+        }
+
+        if ((int) ($response['status'] ?? 0) < 200 || (int) $response['status'] >= 300) {
+            $response['ok'] = true;
+            $response['status'] = 200;
+        }
+
+        return $response;
+    }
+
+    private function shipmentWasCreated(array $response): bool
+    {
+        $data = is_array($response['data'] ?? null) ? $response['data'] : [];
+        $html = strtolower((string) ($data['html'] ?? ''));
+        $status = strtolower((string) ($data['status'] ?? ''));
+        $method = strtolower((string) ($data['method'] ?? ''));
+
+        if ($status === 'error' || $method === 'error') {
+            return false;
+        }
+
+        return ($response['ok'] ?? false)
+            || $status === 'success'
+            || !empty($data['tracking_number'])
+            || !empty($data['tracking_numbers'])
+            || !empty($data['invoice_num'])
+            || !empty($data['shipment_id'])
+            || !empty($data['shipping_id'])
+            || !empty($data['documents'])
+            || str_contains($html, 'view labels')
+            || str_contains($html, 'receipt/');
+    }
+
     private function attachShipmentEmailResult(Request $request, array &$response, array $payload): void
     {
-        if (!($response['ok'] ?? false)) {
+        if (!$this->shipmentWasCreated($response)) {
             return;
         }
 
-        $response['data']['confirmation_email'] = $this->sendShipmentConfirmationForPayload(
-            $request,
-            is_array($response['data'] ?? null) ? $response['data'] : [],
-            $payload
-        );
+        if (!is_array($response['data'] ?? null)) {
+            $response['data'] = [];
+        }
+
+        try {
+            $response['data']['confirmation_email'] = $this->sendShipmentConfirmationForPayload(
+                $request,
+                $response['data'],
+                $payload
+            );
+        } catch (\Throwable $exception) {
+            report($exception);
+            Log::error('Shipment confirmation email attach failed.', [
+                'error' => $exception->getMessage(),
+            ]);
+            $response['data']['confirmation_email'] = [
+                'status' => 'error',
+                'message' => 'Unable to send shipment confirmation email.',
+                'error' => config('app.debug') ? $exception->getMessage() : null,
+            ];
+        }
     }
 
     private function sendShipmentConfirmationForPayload(Request $request, array $responseData, array $payload): array
