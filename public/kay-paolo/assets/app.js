@@ -241,6 +241,43 @@ document.addEventListener('DOMContentLoaded', () => {
     return data;
   }
 
+  async function postEmailJson(url, payload, options = {}) {
+    const headers = {
+      Accept: 'application/json',
+      'Content-Type': 'application/json',
+      'X-CSRF-TOKEN': csrf
+    };
+
+    const token = options.token === undefined ? storedToken() : options.token;
+    if (token) {
+      headers.Authorization = `Bearer ${token}`;
+    }
+
+    const response = await fetch(url, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(payload || {}),
+      keepalive: true
+    });
+
+    const text = await response.text();
+    let data = {};
+    try {
+      data = text ? JSON.parse(text) : {};
+    } catch (error) {
+      data = { status: 'error', message: text || 'Unexpected response.' };
+    }
+
+    if (!response.ok || data.status === 'error') {
+      throw Object.assign(new Error(data.message || 'Unable to send shipment confirmation email.'), {
+        response: data,
+        status: response.status
+      });
+    }
+
+    return data;
+  }
+
   async function postExternalJson(url, payload, options = {}) {
     const headers = {
       Accept: 'application/json',
@@ -1481,7 +1518,7 @@ document.addEventListener('DOMContentLoaded', () => {
         };
         window.localStorage.setItem(shipmentResponseKey, JSON.stringify({ response, payload: documentPayload, selected: pending.card || {} }));
         try {
-          await queueShipmentEmailNotifications(response, documentPayload, pending.card || {});
+          await sendCustomerShipmentConfirmation(response, documentPayload, pending.card || {});
         } catch (emailError) {
           console.warn('Shipment confirmation email queue failed', emailError);
         }
@@ -3912,46 +3949,22 @@ document.addEventListener('DOMContentLoaded', () => {
     };
   }
 
-  async function queueShipmentEmailNotifications(response, payload, selected = {}) {
+  async function sendCustomerShipmentConfirmation(response, payload, selected = {}) {
     const data = buildShipmentDocumentData(response || {}, payload || {}, selected || {});
-    const serverEmail = response?.confirmation_email || response?.data?.confirmation_email || {};
-    const serverSentEmail = serverEmail.status === 'success' ? String(serverEmail.email || '').toLowerCase() : '';
-    // Always keep a client-side send as backup when the server did not confirm delivery.
-    const emails = Array.from(new Set([
+    const customerEmail = [
       payload?.from_email,
-      payload?.shipper_email,
-      payload?.sender_email,
+      value('shipmentFromEmail'),
       payload?.customer_email,
+      payload?.shipper_email,
       payload?.email,
-      payload?.email_address,
-      payload?.contact,
-      payload?.shipper_contact,
-      payload?.sender_contact,
-      payload?.customer_contact,
-      response?.from_email,
-      response?.shipper_email,
-      response?.sender_email,
-      response?.customer_email,
-      response?.email,
-      response?.email_address,
-      response?.shipper,
-      response?.sender,
-      response?.customer,
-      response?.shipping,
-      response?.shipping_data,
-      response?.data,
       data.shipperEmail,
       storedUser().email
-    ].flatMap(emailListFromValue).map((email) => email.toLowerCase())))
-      .filter((email) => email && email.toLowerCase() !== serverSentEmail);
+    ].flatMap(emailListFromValue).map((email) => email.toLowerCase()).find(Boolean);
 
-    if (!emails.length) return;
-
-    await syncShipmentDocumentContext({
-      response: response || {},
-      payload: payload || {},
-      selected: selected || {}
-    });
+    if (!customerEmail) {
+      console.warn('No customer email available for Kay Paolo confirmation.');
+      return;
+    }
 
     const shipmentNo = data.tracking || data.documentNumber || data.shipmentId || '';
     const query = new URLSearchParams();
@@ -3983,29 +3996,11 @@ document.addEventListener('DOMContentLoaded', () => {
       receipt_url: absoluteUrl(receiptUrl)
     };
 
-    const results = await Promise.allSettled(emails.map((email) => {
-      const shipperEmails = [
-        payload?.from_email,
-        payload?.shipper_email,
-        payload?.sender_email,
-        payload?.customer_email,
-        data.shipperEmail
-      ].flatMap(emailListFromValue).map((value) => value.toLowerCase());
-      const storedEmail = emailFromValue(storedUser().email).toLowerCase();
-
-      return postJson(route('emailShipment', '/api/kay-paolo/email-shipment'), {
-        email,
-        recipient_name: shipperEmails.includes(email)
-          ? (payload?.from_name || data.shipperName || undefined)
-          : (email === storedEmail ? (storedUser().name || undefined) : undefined),
-        ...mailPayload
-      });
-    }));
-
-    const failed = results.find((result) => result.status === 'rejected');
-    if (failed) {
-      console.warn('Shipment confirmation email failed', failed.reason);
-    }
+    await postEmailJson(route('emailShipment', '/api/kay-paolo/email-shipment'), {
+      email: customerEmail,
+      recipient_name: payload?.from_name || data.shipperName || storedUser().name || undefined,
+      ...mailPayload
+    });
   }
 
   function absoluteUrl(path) {

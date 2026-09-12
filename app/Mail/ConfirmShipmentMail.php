@@ -44,14 +44,11 @@ class ConfirmShipmentMail extends Mailable
             ?? $this->shipment['trackingNumber']
             ?? 'Pending';
 
-        $fromAddress = trim((string) (config('mail.from.address') ?: 'info@kaypaoloshipping.com'));
-        $fromName = trim((string) (config('mail.from.name') ?: 'Kay Paolo Shipping'));
-
         return new Envelope(
-            from: new Address(
-                $fromAddress !== '' ? $fromAddress : 'info@kaypaoloshipping.com',
-                $fromName !== '' ? $fromName : 'Kay Paolo Shipping'
-            ),
+            from: new Address('info@kaypaoloshipping.com', 'Kay Paolo Shipping'),
+            replyTo: [
+                new Address('info@kaypaoloshipping.com', 'Kay Paolo Shipping'),
+            ],
             subject: 'Shipment Confirmation — '.$number.' | Kay Paolo Shipping',
         );
     }

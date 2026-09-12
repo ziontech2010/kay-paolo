@@ -2,7 +2,7 @@
 
 namespace App\Http\Controllers;
 
-use App\Mail\ConfirmShipmentMail;
+use App\Services\ShipmentConfirmationMailer;
 use App\Services\ShipmentDocumentPdfService;
 use App\Services\ZionShippingApi;
 use Illuminate\Http\JsonResponse;
@@ -11,7 +11,6 @@ use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
@@ -19,7 +18,8 @@ class ZionApiProxyController extends Controller
 {
     public function __construct(
         private readonly ZionShippingApi $zion,
-        private readonly ShipmentDocumentPdfService $documents
+        private readonly ShipmentDocumentPdfService $documents,
+        private readonly ShipmentConfirmationMailer $confirmationMailer
     ) {
     }
 
@@ -610,17 +610,33 @@ class ZionApiProxyController extends Controller
             'id' => $validated['tracking_number'] ?? $validated['shipment_number'] ?? $validated['id'] ?? null,
         ], static fn ($value) => $value !== null && $value !== '');
 
-        $mailer = $this->shipmentConfirmationMailerName();
-        if ($mailer === null) {
-            Log::error('Shipment confirmation email failed: ZeptoMail/SMTP is not configured.');
+        $result = $this->confirmationMailer->send($validated['email'], [
+            'recipientName' => $validated['recipient_name'] ?? null,
+            'shipmentNumber' => (string) $shipmentNumber,
+            'trackingNumber' => (string) ($validated['tracking_number'] ?? $shipmentNumber),
+            'packageCount' => (int) ($validated['package_count'] ?? 1),
+            'serviceName' => $validated['service_name'] ?? 'Shipping Service',
+            'createdAt' => $validated['created_at'] ?? now()->format('M d, Y'),
+            'shipperName' => $validated['shipper_name'] ?? 'Kay Paolo Shipping',
+            'shipperAddress' => $validated['shipper_address'] ?? '414 Main St, Asbury Park, NJ 07712',
+            'shipperContact' => $validated['shipper_contact'] ?? 'info@kaypaoloshipping.com',
+            'consigneeName' => $validated['consignee_name'] ?? 'Destination Customer',
+            'consigneeAddress' => $validated['consignee_address'] ?? 'Destination address pending',
+            'consigneeContact' => $validated['consignee_contact'] ?? 'Phone pending',
+            'labelUrl' => $validated['label_url'] ?? route('shipment.label', $query),
+            'receiptUrl' => $validated['receipt_url'] ?? route('shipment.receipt', $query),
+            'trackingUrl' => route('tracking'),
+            'confirmationUrl' => route('shipment.confirmation'),
+            'homeUrl' => route('home'),
+        ]);
 
-            return response()->json([
-                'status' => 'error',
-                'message' => 'Shipment confirmation email is not configured for delivery.',
+        if (($result['status'] ?? '') !== 'success') {
+            return response()->json($result + [
+                'message' => $result['message'] ?? 'Unable to send shipment confirmation email.',
             ], 502);
         }
 
-        $documentContext = [
+        $this->primeShipmentDocuments($query, [
             'response' => [
                 'shipment_id' => $validated['shipment_id'] ?? $validated['shipping_id'] ?? null,
                 'invoice_num' => $validated['invoice'] ?? null,
@@ -633,7 +649,7 @@ class ZionApiProxyController extends Controller
                 'from_name' => $validated['shipper_name'] ?? null,
                 'from_address' => $validated['shipper_address'] ?? null,
                 'from_phone' => $validated['shipper_contact'] ?? null,
-                'from_email' => $validated['shipper_contact'] ?? null,
+                'from_email' => $validated['email'],
                 'to_name' => $validated['consignee_name'] ?? null,
                 'consignee_name' => $validated['consignee_name'] ?? null,
                 'to_address' => $validated['consignee_address'] ?? null,
@@ -643,52 +659,14 @@ class ZionApiProxyController extends Controller
                 'package_count' => $validated['package_count'] ?? null,
             ],
             'selected' => [],
-        ];
-
-        try {
-            // Deliver first; PDF priming can be slow and must not block confirmation mail.
-            Mail::mailer($mailer)->to($validated['email'])->send(new ConfirmShipmentMail([
-                'recipientName' => $validated['recipient_name'] ?? null,
-                'shipmentNumber' => (string) $shipmentNumber,
-                'trackingNumber' => (string) ($validated['tracking_number'] ?? $shipmentNumber),
-                'packageCount' => (int) ($validated['package_count'] ?? 1),
-                'serviceName' => $validated['service_name'] ?? 'Shipping Service',
-                'createdAt' => $validated['created_at'] ?? now()->format('M d, Y'),
-                'shipperName' => $validated['shipper_name'] ?? 'Kay Paolo Shipping',
-                'shipperAddress' => $validated['shipper_address'] ?? '414 Main St, Asbury Park, NJ 07712',
-                'shipperContact' => $validated['shipper_contact'] ?? 'info@kaypaoloshipping.com',
-                'consigneeName' => $validated['consignee_name'] ?? 'Destination Customer',
-                'consigneeAddress' => $validated['consignee_address'] ?? 'Destination address pending',
-                'consigneeContact' => $validated['consignee_contact'] ?? 'Phone pending',
-                'labelUrl' => $validated['label_url'] ?? route('shipment.label', $query),
-                'receiptUrl' => $validated['receipt_url'] ?? route('shipment.receipt', $query),
-                'trackingUrl' => route('tracking'),
-                'confirmationUrl' => route('shipment.confirmation'),
-                'homeUrl' => route('home'),
-            ]));
-        } catch (\Throwable $exception) {
-            report($exception);
-            Log::error('Shipment confirmation email send failed.', [
-                'email' => $validated['email'],
-                'shipment' => $shipmentNumber,
-                'error' => $exception->getMessage(),
-            ]);
-
-            return response()->json([
-                'status' => 'error',
-                'message' => 'Unable to send shipment confirmation email.',
-                'error' => config('app.debug') ? $exception->getMessage() : null,
-            ], 502);
-        }
-
-        $this->primeShipmentDocuments($query, $documentContext);
+        ]);
 
         return response()->json([
             'status' => 'success',
             'message' => 'Shipment confirmation email sent.',
             'email' => $validated['email'],
             'shipment_number' => $shipmentNumber,
-            'mailer' => $mailer,
+            'mailer' => $result['mailer'] ?? null,
         ]);
     }
 
@@ -1894,109 +1872,56 @@ class ZionApiProxyController extends Controller
             'id' => $shipmentNumber !== 'Pending' ? $shipmentNumber : null,
         ], static fn ($value) => $value !== null && $value !== '');
 
-        $mailer = $this->shipmentConfirmationMailerName();
-        if ($mailer === null) {
-            Log::error('Shipment confirmation email failed: ZeptoMail/SMTP is not configured.');
-
-            return [
-                'status' => 'error',
-                'email' => $email,
-                'message' => 'Shipment confirmation email is not configured for delivery.',
-            ];
-        }
-
-        try {
-            $shipperEmail = $this->firstEmail([
-                $payload['from_email'] ?? null,
-                $payload['shipper_email'] ?? null,
-                $payload['sender_email'] ?? null,
-                $payload['customer_email'] ?? null,
-                $payload['email'] ?? null,
-                $payload['email_address'] ?? null,
-                $payload['shipper_contact'] ?? null,
-                $payload['sender_contact'] ?? null,
-                $payload['customer_contact'] ?? null,
-                $payload['contact'] ?? null,
-                $email,
-            ]);
-
-            // Send first — label/receipt PDFs are generated on click and must not delay or block mail.
-            Mail::mailer($mailer)->to($email)->send(new ConfirmShipmentMail([
-                'recipientName' => $payload['from_name'] ?? session('zion.user.name') ?? null,
-                'shipmentNumber' => $shipmentNumber,
-                'trackingNumber' => $shipmentNumber,
-                'packageCount' => (int) ($payload['package_count'] ?? 1),
-                'serviceName' => $payload['delivery_option'] ?? $payload['selected_shipper'] ?? 'Shipping Service',
-                'createdAt' => now()->format('M d, Y'),
-                'shipperName' => $payload['from_name'] ?? 'Kay Paolo Shipping',
-                'shipperAddress' => $this->addressText($payload, 'from'),
-                'shipperContact' => $this->contactText([
-                    $payload['from_phone'] ?? null,
-                    $shipperEmail,
-                ]),
-                'consigneeName' => $payload['to_name'] ?? $payload['consignee_name'] ?? 'Destination Customer',
-                'consigneeAddress' => $this->addressText($payload, 'to'),
-                'consigneeContact' => $this->contactText([
-                    $payload['to_phone_1'] ?? null,
-                    $payload['consignee_phone'] ?? null,
-                    $payload['to_phone_2'] ?? null,
-                ]),
-                'labelUrl' => route('shipment.label', $query),
-                'receiptUrl' => route('shipment.receipt', $query),
-                'trackingUrl' => route('tracking'),
-                'confirmationUrl' => route('shipment.confirmation'),
-                'homeUrl' => route('home'),
-            ]));
-        } catch (\Throwable $exception) {
-            report($exception);
-            Log::error('Shipment confirmation email send failed.', [
-                'email' => $email,
-                'shipment' => $shipmentNumber,
-                'error' => $exception->getMessage(),
-            ]);
-
-            return [
-                'status' => 'error',
-                'email' => $email,
-                'message' => 'Unable to send shipment confirmation email.',
-                'error' => config('app.debug') ? $exception->getMessage() : null,
-            ];
-        }
-
-        $this->primeShipmentDocuments($query, [
-            'response' => $responseData,
-            'payload' => $payload,
-            'selected' => [],
+        $shipperEmail = $this->firstEmail([
+            $payload['from_email'] ?? null,
+            $payload['shipper_email'] ?? null,
+            $payload['sender_email'] ?? null,
+            $payload['customer_email'] ?? null,
+            $payload['email'] ?? null,
+            $payload['email_address'] ?? null,
+            $payload['shipper_contact'] ?? null,
+            $payload['sender_contact'] ?? null,
+            $payload['customer_contact'] ?? null,
+            $payload['contact'] ?? null,
+            $email,
         ]);
 
-        Log::info('Shipment confirmation email sent.', [
-            'email' => $email,
-            'shipment' => $shipmentNumber,
-            'mailer' => $mailer,
+        $result = $this->confirmationMailer->send($email, [
+            'recipientName' => $payload['from_name'] ?? session('zion.user.name') ?? null,
+            'shipmentNumber' => $shipmentNumber,
+            'trackingNumber' => $shipmentNumber,
+            'packageCount' => (int) ($payload['package_count'] ?? 1),
+            'serviceName' => $payload['delivery_option'] ?? $payload['selected_shipper'] ?? 'Shipping Service',
+            'createdAt' => now()->format('M d, Y'),
+            'shipperName' => $payload['from_name'] ?? 'Kay Paolo Shipping',
+            'shipperAddress' => $this->addressText($payload, 'from'),
+            'shipperContact' => $this->contactText([
+                $payload['from_phone'] ?? null,
+                $shipperEmail,
+            ]),
+            'consigneeName' => $payload['to_name'] ?? $payload['consignee_name'] ?? 'Destination Customer',
+            'consigneeAddress' => $this->addressText($payload, 'to'),
+            'consigneeContact' => $this->contactText([
+                $payload['to_phone_1'] ?? null,
+                $payload['consignee_phone'] ?? null,
+                $payload['to_phone_2'] ?? null,
+            ]),
+            'labelUrl' => route('shipment.label', $query),
+            'receiptUrl' => route('shipment.receipt', $query),
+            'trackingUrl' => route('tracking'),
+            'confirmationUrl' => route('shipment.confirmation'),
+            'homeUrl' => route('home'),
         ]);
 
-        return [
-            'status' => 'success',
-            'email' => $email,
-            'mailer' => $mailer,
-        ];
-    }
-
-    private function shipmentConfirmationMailerName(): ?string
-    {
-        $zeptoToken = trim((string) config('services.zeptomail.token'));
-        if ($zeptoToken !== '') {
-            return 'zeptomail';
+        if (($result['status'] ?? '') === 'success') {
+            $this->primeShipmentDocuments($query, [
+                'response' => $responseData,
+                'payload' => $payload,
+                'selected' => [],
+            ]);
         }
 
-        $defaultMailer = trim((string) config('mail.default', 'log'));
-        $normalizedMailer = strtolower($defaultMailer);
-
-        if ($defaultMailer === '' || in_array($normalizedMailer, ['log', 'array', 'zeptomail'], true)) {
-            return null;
-        }
-
-        return $defaultMailer;
+        return $result;
     }
 
     private function primeShipmentDocuments(array $query, array $shipment): void

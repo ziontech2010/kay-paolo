@@ -28,11 +28,12 @@ class AppServiceProvider extends ServiceProvider
 
         Mail::extend('zeptomail', function (array $config = []) {
             $services = config('services.zeptomail', []);
+            $token = trim((string) ($services['token'] ?? env('ZEPTOMAIL_TOKEN') ?? ''));
 
             return new ZeptoMailTransport(
-                token: (string) ($services['token'] ?? ''),
-                host: (string) ($services['host'] ?? 'api.zeptomail.com'),
-                bounceAddress: $services['bounce_address'] ?: null,
+                token: trim($token, " \t\n\r\0\x0B\"'"),
+                host: (string) ($services['host'] ?? env('ZEPTOMAIL_HOST') ?? 'api.zeptomail.com'),
+                bounceAddress: ! empty($services['bounce_address']) ? $services['bounce_address'] : null,
             );
         });
     }

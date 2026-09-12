@@ -39,11 +39,13 @@ class ZeptoMailTransport extends AbstractTransport
             'bounce_address' => $this->bounceAddress,
         ], static fn ($value) => $value !== null && $value !== [] && $value !== '');
 
-        $authorization = str_starts_with(strtolower($this->token), 'zoho-enczapikey')
-            ? $this->token
-            : 'Zoho-enczapikey '.$this->token;
+        $token = trim($this->token, " \t\n\r\0\x0B\"'");
+        $authorization = str_starts_with(strtolower($token), 'zoho-enczapikey')
+            ? $token
+            : 'Zoho-enczapikey '.$token;
 
-        $host = preg_replace('#^https?://#i', '', $this->host) ?: 'api.zeptomail.com';
+        $host = preg_replace('#^https?://#i', '', trim((string) $this->host)) ?: 'api.zeptomail.com';
+        $host = trim((string) $host, '/');
 
         $response = Http::baseUrl('https://'.$host)
             ->withHeaders([

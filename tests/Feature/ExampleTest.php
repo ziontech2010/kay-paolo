@@ -970,6 +970,7 @@ class ExampleTest extends TestCase
 
             return $request->url() === 'https://api.zeptomail.com/v1.1/email'
                 && ($data['from']['address'] ?? null) === 'info@kaypaoloshipping.com'
+                && ($data['from']['name'] ?? null) === 'Kay Paolo Shipping'
                 && ($data['to'][0]['email_address']['address'] ?? null) === 'customer@example.com'
                 && str_contains((string) ($data['subject'] ?? ''), 'HTB101187-1/5')
                 && str_contains((string) ($data['htmlbody'] ?? ''), 'Therlande Louis Jean');
